@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#071428">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Universo Real — RPG de Desenvolvimento Pessoal</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo.svg">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Splash Screen (Tela de Abertura) -->
+  <div id="splashScreen">
+    <div class="splash-content">
+      <img src="logo.svg" alt="Universo Real Logo" class="splash-logo">
+      <h1>Universo Real</h1>
+      <div id="splashGreeting" style="font-size: 1.2rem; opacity: 0.8; margin-bottom: 10px; font-weight: 500;">Carregando...</div>
+      <div class="loading-bar">
+        <div class="loading-progress"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stars"></div>
+  <div class="container">
+    <!-- Tela de Login/Registro -->
+    <div class="modal" id="authModal">
+      <div class="modal-content">
+        <h2 id="authTitle">🎮 Entrar no Universo Real</h2>
+        <div id="loginForm">
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Username</label>
+              <input type="text" id="loginUsername" placeholder="Digite seu username...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Senha</label>
+              <input type="password" id="loginPassword" placeholder="Digite sua senha...">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top: 20px;">
+            <button class="btn" id="loginBtn">Entrar</button>
+            <button class="ghost" id="showRegisterBtn">Criar Conta</button>
+            <button class="ghost" id="forgotPasswordBtn" style="font-size: 12px; padding: 8px;">Esqueci a Senha</button>
+          </div>
+        </div>
+        
+        <div id="registerForm" class="hidden">
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Username</label>
+              <input type="text" id="registerUsername" placeholder="Escolha um username...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Senha</label>
+              <input type="password" id="registerPassword" placeholder="Crie uma senha...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Nome do Personagem</label>
+              <input type="text" id="registerName" placeholder="Nome do seu herói...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Classe</label>
+              <select id="registerRace">
+                <option value="Guerreiro">Guerreiro</option>
+                <option value="Sábio">Sábio</option>
+                <option value="Atleta">Atleta</option>
+                <option value="Artista">Artista</option>
+                <option value="Líder">Líder</option>
+                <option value="Equilibrado">Equilibrado</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Cor da Aura</label>
+              <input type="color" id="registerAura" value="#ffdd57">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top: 20px;">
+            <button class="btn" id="registerBtn">Criar Personagem</button>
+            <button class="ghost" id="showLoginBtn">Já tenho conta</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal de Edição de Perfil -->
+    <div class="modal" id="editProfileModal">
+      <div class="modal-content">
+        <h2>✏️ Editar Perfil</h2>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Nome do Personagem</label>
+            <input type="text" id="editName" placeholder="Nome do seu herói...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Classe</label>
+            <select id="editRace">
+              <option value="Guerreiro">Guerreiro</option>
+              <option value="Sábio">Sábio</option>
+              <option value="Atleta">Atleta</option>
+              <option value="Artista">Artista</option>
+              <option value="Líder">Líder</option>
+              <option value="Equilibrado">Equilibrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Título</label>
+            <select id="editTitle"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Cor da Aura</label>
+            <input type="color" id="editAura">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top: 20px;">
+          <button class="btn" id="saveProfileBtn">Salvar Alterações</button>
+          <button class="ghost" id="cancelEditBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tela Principal do Jogo -->
+    <div class="card hidden" id="gameScreen">
+      <div class="cinema">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#ffdd57;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#ff9f40;stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="url(#logoGradient)" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M58 25 L35 58 L52 58 L45 80 L68 45 L50 45 Z" fill="url(#logoGradient)"/>
+          </svg>
+          <span>Universo Real</span>
+        </div>
+        <div class="subtitle">Transforme sua vida em um RPG — ganhe XP, suba de nível e desbloqueie conquistas reais.</div>
+        <div class="stage" id="stage">
+          <div class="ring" id="ring"></div>
+          <div class="orb" id="orb">
+            <div class="inner" id="innerOrb">
+              <div id="orbLevel">1</div>
+              <div class="level-text">Nível</div>
+            </div>
+          </div>
+        </div>
+        <div class="press-start">
+          <div class="control-bar">
+            <button class="save-btn" id="saveBtn">💾 Salvar</button>
+            <div class="divider-v"></div>
+            <button class="icon-btn" id="exportBtn" title="Exportar Save">📤</button>
+            <button class="icon-btn" id="importBtn" title="Importar Save">📥</button>
+            <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup Automático">↺</button>
+            <div class="divider-v"></div>
+            <button class="icon-btn" id="bleBtn" title="Conectar Dispositivo BLE">📶</button>
+            <span id="bleBatteryDisplay" style="display:none; font-size: 12px; font-weight: bold; margin: 0 5px;"></span>
+            <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
+            <button class="icon-btn danger" id="logoutBtn" title="Sair">🚪</button>
+            <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
+          </div>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <!-- Menu de Abas -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="hero">🦸 Herói</button>
+          <button class="tab-btn" data-tab="quests">📜 Missões</button>
+          <button class="tab-btn" data-tab="finance">💰 Finanças</button>
+          <button class="tab-btn" data-tab="social">❤️ Social</button>
+          <button class="tab-btn" data-tab="dom">🍕 Dom</button>
+        </div>
+
+        <!-- Conteúdo da Aba: Herói -->
+        <div id="tab-hero" class="tab-content active">
+          <h3>👤 Seu Personagem</h3>
+          <div class="hero-card-container">
+            <div class="hero-card-header" id="heroCardHeader"></div>
+            <div class="hero-card-body">
+              <div class="hero-avatar-wrapper">
+                <div class="avatar large" id="avatar">🧑</div>
+                <div class="hero-level-badge">Nível <span id="level">1</span></div>
+              </div>
+              <div class="hero-info">
+                <div class="hero-identity">
+                  <h2 id="previewName">Carregando...</h2>
+                  <div class="hero-username" id="previewUsername">@...</div>
+                </div>
+                <div class="hero-badges">
+                  <span class="badge-pill race" id="previewRace">...</span>
+                  <span class="badge-pill title" id="previewTitle">...</span>
+                </div>
+                <div class="hero-visual-badges" id="heroVisualBadges"></div>
+                <div class="hero-xp-container">
+                  <div class="xp-labels">
+                    <span>Progresso de XP</span>
+                    <span id="xp" class="xp-value">0 / 100</span>
+                  </div>
+                  <div class="progress-bar slim">
+                    <div class="progress-fill" id="xpProgress" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+              <button class="edit-profile-icon" id="editProfileBtn" title="Editar Perfil">⚙️</button>
+            </div>
+          </div>
+
+          <h3>💪 Atributos</h3>
+          <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="small">Pontos disponíveis: <strong id="skillPoints">0</strong></div>
+              <button class="ghost" id="resetAttrsBtn" style="padding: 6px 12px; font-size: 12px;">Resetar</button>
+            </div>
+            <div class="attributes-grid" id="attributesGrid">
+              <!-- Atributos serão gerados dinamicamente -->
+            </div>
+            <div style="margin-top: 25px; max-width: 350px; margin-left: auto; margin-right: auto;">
+              <canvas id="attributesChart"></canvas>
+            </div>
+          </div>
+
+          <h3>📊 Histórico de XP</h3>
+          <div class="section">
+            <canvas id="xpChart"></canvas>
+          </div>
+
+          <h3>🏆 Conquistas</h3>
+          <div class="section">
+            <div class="achievements-list" id="achievementsList">
+              <!-- Conquistas serão geradas dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Conteúdo da Aba: Missões -->
+        <div id="tab-quests" class="tab-content">
+          <h3>🎯 Missões Diárias</h3>
+          <div class="section">
+            <div class="small" style="margin-bottom: 12px;">
+              Complete missões para ganhar XP e pontos de atributo. Cada dia que você acessa ganha recompensas!
+            </div>
+            <div style="display: flex; gap: 8px; flex-direction: column;">
+              <button class="btn success" id="claimBtn">🎁 Reivindicar Recompensa Diária</button>
+              <div class="small" style="text-align: center;">
+                Última reivindicação: <strong id="lastClaim">Nunca</strong><br>
+                Sequência: <strong id="streakDisplay">0</strong> dias 🔥
+              </div>
+            </div>
+            
+            <div class="progress-bar" style="margin-top: 12px;">
+              <div class="progress-fill" id="xpProgress" style="width: 0%"></div>
+            </div>
+            <div class="small" style="text-align: center; margin-top: 4px;">
+              Progresso para o próximo nível
+            </div>
+          </div>
+
+          <h3>📝 Tarefas Diárias</h3>
+          <div class="section">
+            <div class="form-row" style="margin-bottom: 12px;">
+              <input type="text" id="taskInput" placeholder="Ex: Beber 2L de água..." style="flex: 1;">
+              <button class="btn" id="addTaskBtn" style="padding: 10px; width: auto;">+</button>
+            </div>
+            <div class="task-list" id="taskList">
+              <!-- Tarefas serão geradas dinamicamente -->
+            </div>
+          </div>
+
+          <h3>📖 Diário de Gratidão</h3>
+          <div class="section">
+            <div class="small" style="margin-bottom: 12px;">Escreva 3 coisas boas do dia para ganhar <strong style="color: var(--accent);">50 XP</strong>!</div>
+            <div class="form-row" style="flex-direction: column; gap: 8px;">
+              <input type="text" id="gratitude1" placeholder="1. Sou grato por...">
+              <input type="text" id="gratitude2" placeholder="2. Sou grato por...">
+              <input type="text" id="gratitude3" placeholder="3. Sou grato por...">
+              <button class="btn info" id="gratitudeBtn">🙏 Registrar Gratidão</button>
+            </div>
+            <div id="gratitudeHistory" style="margin-top: 15px; max-height: 200px; overflow-y: auto; padding-right: 5px;"></div>
+          </div>
+
+          <h3>🎒 Inventário</h3>
+          <div class="section">
+            <div class="form-row" style="margin-bottom: 12px;">
+              <input type="text" id="inventoryInput" placeholder="Nome do item..." style="flex: 1;">
+              <button class="btn" id="addItemBtn" style="padding: 10px; width: auto;">+</button>
+            </div>
+            <div class="inventory-list" id="inventoryList">
+              <!-- Itens serão gerados dinamicamente -->
+            </div>
+            <div class="small" id="inventoryCount" style="margin-top: 8px; text-align: right; opacity: 0.7;">0 itens</div>
+          </div>
+
+        </div>
+
+        <!-- Conteúdo da Aba: Finanças -->
+        <div id="tab-finance" class="tab-content">
+          <h3>💰 Controle Financeiro</h3>
+          <div class="section">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <div class="small" style="opacity: 0.7;">Saldo Atual</div>
+              <div id="financeBalance" style="font-size: 2em; font-weight: 700;">R$ 0,00</div>
+            </div>
+            <div class="form-row">
+              <div style="flex: 2;">
+                <input type="text" id="financeDesc" placeholder="Descrição (ex: Salário, Mercado)">
+              </div>
+              <div style="flex: 1;">
+                <input type="number" id="financeValue" placeholder="R$ 0,00">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 8px;">
+              <select id="financeType" style="flex: 1;">
+                <option value="expense">Despesa</option>
+                <option value="income">Receita</option>
+              </select>
+              <select id="financeCategory" style="flex: 1;">
+                <option value="Outros">Outros</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Contas">Contas</option>
+              </select>
+              <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
+            </div>
+
+            <!-- Meta Financeira -->
+            <div style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+              <div class="form-row">
+                <input type="number" id="financeGoalInput" placeholder="Definir Meta (R$)" style="flex: 2;">
+                <button class="btn" id="setFinanceGoalBtn" style="flex: 1;">Definir Meta</button>
+              </div>
+              <div id="financeGoalDisplay" class="hidden" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                  <span class="small">Progresso</span>
+                  <span class="small" id="financeGoalText">0%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="financeGoalProgress" style="width: 0%; background: var(--success);"></div>
+                </div>
+                <div class="small" style="text-align: center; margin-top: 4px; opacity: 0.7;" id="financeGoalStatus">Faltam R$ 0,00</div>
+              </div>
+            </div>
+
+            <div class="finance-list" id="financeList">
+              <!-- Transações serão geradas dinamicamente -->
+            </div>
+          </div>
+
+          <h3>📊 Gráficos</h3>
+          <div class="section">
+            <h4 style="text-align: center; margin-bottom: 15px;">Despesas por Categoria</h4>
+            <div style="max-width: 300px; margin: 0 auto 25px auto;">
+              <canvas id="financeChart"></canvas>
+            </div>
+            <div style="height: 250px;">
+              <canvas id="financeMonthlyChart"></canvas>
+            </div>
+          </div>
+
+          <h3>📅 Contas a Pagar</h3>
+          <div class="section">
+            <div class="form-row">
+              <div style="flex: 2;">
+                <input type="text" id="billDesc" placeholder="Conta (ex: Internet, Luz)">
+              </div>
+              <div style="flex: 1;">
+                <input type="number" id="billValue" placeholder="R$ 0,00">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 8px;">
+              <div style="flex: 1;">
+                <input type="date" id="billDate">
+              </div>
+              <div style="flex: 1;">
+                <select id="billRecurrence">
+                  <option value="none">Única</option>
+                  <option value="monthly">Mensal</option>
+                  <option value="weekly">Semanal</option>
+                  <option value="yearly">Anual</option>
+                </select>
+              </div>
+              <button class="btn" id="addBillBtn" style="width: auto;">Agendar</button>
+            </div>
+            <div class="bill-list" id="billList" style="margin-top: 12px;">
+              <!-- Contas serão geradas dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Conteúdo da Aba: Social -->
+        <div id="tab-social" class="tab-content">
+          <h3>❤️ Contador de Relacionamento</h3>
+          <div class="section">
+            <div id="relationshipSetup">
+              <div class="small" style="margin-bottom: 8px;">Defina a data de início:</div>
+              <div class="form-row">
+                <input type="datetime-local" id="relationshipDateInput">
+              </div>
+              <div class="small" style="margin-bottom: 8px; margin-top: 8px;">Foto do Casal (Opcional):</div>
+              <div class="form-row">
+                <input type="file" id="relationshipPhotoInput" accept="image/*">
+              </div>
+              <button class="btn" id="setRelationshipBtn" style="width: 100%; margin-top: 12px;">Iniciar</button>
+            </div>
+            <div id="relationshipDisplay" class="hidden">
+              <img id="relationshipPhotoDisplay" src="" title="Clique para alterar a foto" style="width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px auto; display: none; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.2);">
+              <input type="file" id="updateRelationshipPhotoInput" accept="image/*" style="display: none;">
+              <div style="text-align: center; font-weight: 700; font-size: 1.1em; margin-bottom: 8px; line-height: 1.4;" id="relationshipTimer">Carregando...</div>
+              <div class="small" style="text-align: center; opacity: 0.7;">Juntos nessa jornada!</div>
+              <button class="ghost" id="resetRelationshipBtn" style="width: 100%; margin-top: 12px; font-size: 12px;">Resetar Data</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conteúdo da Aba: Dom (Pizzaria Dom) -->
+        <div id="tab-dom" class="tab-content">
+          <h3>🍕 Pizzaria Dom</h3>
+          <div class="section">
+            <!-- Registro de Carga Horária (Dia a Dia) -->
+            <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+              <h4 style="margin-bottom: 8px;">Registrar Carga Horária (Dia a Dia)</h4>
+              <div class="form-row" style="gap:8px; flex-wrap:wrap;">
+                <input type="date" id="domDateInput" placeholder="Data">
+                <input type="time" id="domEntryTimeInput" placeholder="Hora de Entrada">
+                <input type="time" id="domExitTimeInput" placeholder="Hora de Saída">
+                <button class="btn" id="addDomHourBtn">Registrar Horário</button>
+              </div>
+            </div>
+            <!-- Histórico de Carga Horária (Dia a Dia) -->
+            <div>
+              <h4>Histórico de Carga Horária (Dia a Dia)</h4>
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; background:rgba(0,0,0,0.05);">
+                  <thead>
+                    <tr style="text-align:left;">
+                      <th style="padding:6px;">Data</th>
+                      <th style="padding:6px;">Entrada</th>
+                      <th style="padding:6px;">Saída</th>
+                      <th style="padding:6px;">Total (h)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="domHourHistoryList">
+                    <tr><td colspan="4" style="padding:8px; opacity:0.6;">Nenhum registro ainda.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Registro de Produção de Massas -->
+            <div style="margin-top: 32px; margin-bottom: 20px;">
+              <h4>Registrar Produção de Massas</h4>
+              <div class="form-row" style="gap:8px; flex-wrap:wrap;">
+                <input type="week" id="domDoughDateInput" placeholder="Semana">
+                <input type="number" id="domDoughInput" placeholder="Quantidade de Massas">
+                <button class="btn" id="addDomDoughBtn">Registrar Massas</button>
+              </div>
+            </div>
+            <!-- Configuração e histórico de massas -->
+            <div style="margin-bottom: 20px;">
+              <h4>Configuração</h4>
+              <div class="form-row">
+                <label for="domPriceInput">Valor por Massa (R$)</label>
+                <input type="number" id="domPriceInput" placeholder="0.00">
+              </div>
+            </div>
+            <div>
+              <h4>Histórico de Produção de Massas</h4>
+              <div id="domHistoryList" class="small" style="min-height: 40px;">Nenhum registro ainda.</div>
+              <div style="margin-top: 10px; font-weight: bold;">Total Massas: <span id="domStats">0</span></div>
+            </div>
+            <!-- Gráfico de Produção -->
+            <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+              <h4 style="margin-bottom: 15px; text-align: center;">Produção Recente (4 Semanas)</h4>
+              <div style="height: 220px;">
+                <canvas id="domProductionChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="small" style="margin-top: auto; text-align: center;">
+          Seus dados são salvos no servidor. Acesse de qualquer dispositivo!
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <!-- Overlay Modo Zen -->
+  <div id="zenModeOverlay" class="hidden">
+    <img id="zenBackgroundDisplay" class="zen-bg-thumb hidden" alt="Fundo Zen">
+    <div class="zen-content">
+      <div id="zenTimer">0 anos, 0 meses, 0 dias...</div>
+      <div id="zenQuote">"Frase inspiradora..."</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+        <button class="ghost" id="zenMusicBtn" style="font-size: 12px; opacity: 0.7;">🎵 Música de Fundo</button>
+        <button class="ghost" id="zenImageBtn" style="font-size: 12px; opacity: 0.7;">🖼️ Imagem de Fundo</button>
+        <button class="ghost" id="zenToggleHudBtn" style="font-size: 12px; opacity: 0.7;">👁️ Ocultar Interface</button>
+      </div>
+      <input type="file" id="zenMusicInput" accept="audio/*" style="display: none;">
+      <input type="file" id="zenImageInput" accept="image/*" style="display: none;">
+      <audio id="zenAudio" loop></audio>
+      <button class="ghost" id="exitZenBtn">Sair do Modo Zen</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

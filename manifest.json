@@ -1,0 +1,15 @@
+{
+  "name": "Universo Real",
+  "short_name": "Universo Real",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#071428",
+  "theme_color": "#071428",
+  "icons": [
+    {
+      "src": "logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
