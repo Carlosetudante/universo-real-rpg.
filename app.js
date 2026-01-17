@@ -77,6 +77,33 @@ function playSound(type) {
   }
 }
 
+// Função para converter valores monetários (BR e Texto)
+function parseMoney(input) {
+  if (typeof input === 'number') return input;
+  if (!input) return 0;
+  
+  let str = input.toString().toLowerCase().trim();
+  
+  // Multiplicadores (mil, k)
+  let multiplier = 1;
+  if (str.includes('mil') || str.includes('k')) {
+    multiplier = 1000;
+  }
+  
+  // Remove tudo que não é número, vírgula, ponto ou sinal
+  str = str.replace(/[^0-9,.-]/g, '');
+  
+  // Lógica Brasileira: Ponto é milhar, Vírgula é decimal
+  if (str.includes(',')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else {
+    // Se só tem ponto (ex: 2.000), assume que é milhar
+    str = str.replace(/\./g, '');
+  }
+  
+  return (parseFloat(str) || 0) * multiplier;
+}
+
 function triggerHaptic(pattern = 15) {
   if (navigator.vibrate) {
     try {
@@ -138,6 +165,9 @@ const CLASS_THEMES = {
   'Equilibrado': { emoji: '⚖️', image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80' },
   'default': { emoji: '🎒', image: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80' } // Viajante
 };
+
+// Caminho padrão para música Zen (Online para funcionar direto)
+const DEFAULT_ZEN_MUSIC = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3';
 
 // Estado do jogo
 let gameState = null;
@@ -201,8 +231,6 @@ const elements = {
   saveBtn: document.getElementById('saveBtn'),
   exportBtn: document.getElementById('exportBtn'),
   importBtn: document.getElementById('importBtn'),
-  bleBtn: document.getElementById('bleBtn'),
-  bleBatteryDisplay: document.getElementById('bleBatteryDisplay'),
   zenModeBtn: document.getElementById('zenModeBtn'),
   restoreBackupBtn: document.getElementById('restoreBackupBtn'),
   importFile: document.getElementById('importFile'),
@@ -227,6 +255,9 @@ const elements = {
   taskInput: document.getElementById('taskInput'),
   addTaskBtn: document.getElementById('addTaskBtn'),
   taskList: document.getElementById('taskList'),
+  viewTaskHistoryBtn: document.getElementById('viewTaskHistoryBtn'),
+  taskHistoryModal: document.getElementById('taskHistoryModal'),
+  taskHistoryList: document.getElementById('taskHistoryList'),
 
   // Finance
   financeDesc: document.getElementById('financeDesc'),
@@ -575,7 +606,8 @@ function normalizeGameState(data) {
     domPrice: 0,
     zenBackgroundImage: null,
     zenMusic: null,
-    gratitudeJournal: []
+    gratitudeJournal: [],
+    taskHistory: []
   };
 
   // Mescla os dados importados com o padrão para preencher campos faltantes
@@ -853,12 +885,13 @@ function removeItem(index) {
 // --- Diário de Gratidão ---
 
 function addGratitudeEntry() {
-  const g1 = elements.gratitude1.value.trim();
-  const g2 = elements.gratitude2.value.trim();
-  const g3 = elements.gratitude3.value.trim();
+  const g1 = elements.gratitude1 ? elements.gratitude1.value.trim() : '';
+  const g2 = elements.gratitude2 ? elements.gratitude2.value.trim() : '';
+  const g3 = elements.gratitude3 ? elements.gratitude3.value.trim() : '';
 
-  if (!g1 || !g2 || !g3) {
-    showToast('⚠️ Preencha os 3 motivos de gratidão!');
+  // Permite salvar se pelo menos um estiver preenchido
+  if (!g1 && !g2 && !g3) {
+    showToast('⚠️ Escreva pelo menos uma coisa boa do seu dia!');
     return;
   }
 
@@ -873,10 +906,13 @@ function addGratitudeEntry() {
     return;
   }
 
+  // Filtra apenas os campos preenchidos
+  const items = [g1, g2, g3].filter(text => text.length > 0);
+
   // Adiciona ao início da lista
   gameState.gratitudeJournal.unshift({
     date: today,
-    items: [g1, g2, g3]
+    items: items
   });
 
   // Recompensa
@@ -895,9 +931,9 @@ function addGratitudeEntry() {
   }
 
   // Limpar campos
-  elements.gratitude1.value = '';
-  elements.gratitude2.value = '';
-  elements.gratitude3.value = '';
+  if (elements.gratitude1) elements.gratitude1.value = '';
+  if (elements.gratitude2) elements.gratitude2.value = '';
+  if (elements.gratitude3) elements.gratitude3.value = '';
 
   saveGame();
   renderGratitudeJournal();
@@ -935,7 +971,10 @@ function renderGratitudeJournal() {
 
 function addDailyTask() {
   const text = elements.taskInput.value.trim();
-  if (!text) return;
+  if (!text) {
+    showToast('⚠️ Digite o nome da tarefa!');
+    return;
+  }
 
   if (!gameState.dailyTasks) gameState.dailyTasks = [];
 
@@ -948,6 +987,7 @@ function addDailyTask() {
   elements.taskInput.value = '';
   saveGame();
   updateUI();
+  showToast('✅ Tarefa adicionada!');
 }
 
 function toggleTask(id) {
@@ -1004,6 +1044,43 @@ function removeTask(id, event) {
   }
 }
 
+function renderTaskHistory() {
+  if (!elements.taskHistoryList || !gameState.taskHistory) return;
+  
+  elements.taskHistoryList.innerHTML = '';
+  const history = gameState.taskHistory;
+
+  if (history.length === 0) {
+    elements.taskHistoryList.innerHTML = '<div class="small" style="text-align:center; opacity:0.5;">Nenhum histórico disponível.</div>';
+    return;
+  }
+
+  // Ordena do mais recente para o mais antigo
+  history.slice().reverse().forEach(day => {
+    const dateStr = new Date(day.date).toLocaleDateString('pt-BR');
+    const completedCount = day.tasks.length;
+    
+    const div = document.createElement('div');
+    div.style.cssText = 'background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid var(--success);';
+    
+    let tasksHtml = '';
+    day.tasks.forEach(t => {
+      tasksHtml += `<li style="margin-bottom: 4px; opacity: 0.8;">✅ ${t.text}</li>`;
+    });
+
+    div.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom: 8px; font-weight:bold;">
+        <span>📅 ${dateStr}</span>
+        <span style="font-size: 12px; background: rgba(46, 204, 113, 0.2); padding: 2px 8px; border-radius: 10px; color: var(--success);">${completedCount} concluídas</span>
+      </div>
+      <ul style="padding-left: 20px; font-size: 13px; margin: 0;">
+        ${tasksHtml || '<li style="opacity:0.5">Nenhuma tarefa concluída neste dia.</li>'}
+      </ul>
+    `;
+    elements.taskHistoryList.appendChild(div);
+  });
+}
+
 function checkDailyTaskReset() {
   if (!gameState || !gameState.dailyTasks) return;
 
@@ -1014,6 +1091,16 @@ function checkDailyTaskReset() {
   if (now.toDateString() !== lastReset.toDateString()) {
     let penalty = 0;
     
+    // Salvar histórico das tarefas concluídas ontem
+    const completedTasks = gameState.dailyTasks.filter(t => t.completed);
+    if (completedTasks.length > 0) {
+      if (!gameState.taskHistory) gameState.taskHistory = [];
+      gameState.taskHistory.push({
+        date: lastReset.toISOString(),
+        tasks: completedTasks
+      });
+    }
+
     // Calcula penalidade para tarefas não feitas
     gameState.dailyTasks.forEach(task => {
       if (!task.completed) {
@@ -1037,7 +1124,7 @@ function checkDailyTaskReset() {
 
 function addTransaction() {
   const desc = elements.financeDesc.value.trim();
-  const value = parseFloat(elements.financeValue.value);
+  const value = parseMoney(elements.financeValue.value);
   const type = elements.financeType.value;
   const category = elements.financeCategory.value;
 
@@ -1094,7 +1181,9 @@ function renderFinances() {
     const filters = [
       { id: 'all', label: 'Todos' },
       { id: 'income', label: 'Receitas' },
-      { id: 'expense', label: 'Despesas' }
+      { id: 'expense', label: 'Despesas' },
+      { id: 'salary', label: 'Salário' },
+      { id: 'extra', label: 'Extra' }
     ];
     
     filters.forEach(f => {
@@ -1138,6 +1227,8 @@ function renderFinances() {
   // Filtra para exibição
   const displayTransactions = transactions.filter(t => {
     if (financeFilter === 'all') return true;
+    if (financeFilter === 'salary') return t.category === 'Salário';
+    if (financeFilter === 'extra') return t.category === 'Extra';
     return t.type === financeFilter;
   });
 
@@ -1312,7 +1403,7 @@ function renderFinanceMonthlyChart() {
 }
 
 function setFinancialGoal() {
-  const goal = parseFloat(elements.financeGoalInput.value);
+  const goal = parseMoney(elements.financeGoalInput.value);
   if (isNaN(goal) || goal < 0) {
     showToast('⚠️ Defina um valor válido para a meta!');
     return;
@@ -1372,7 +1463,7 @@ function renderFinancialGoal() {
 
 function addBill() {
   const desc = elements.billDesc.value.trim();
-  const value = parseFloat(elements.billValue.value);
+  const value = parseMoney(elements.billValue.value);
   const date = elements.billDate.value;
   const recurrence = elements.billRecurrence.value;
 
@@ -1569,68 +1660,6 @@ function handlePhotoUpdate(event) {
   reader.readAsDataURL(file);
 }
 
-// --- Sistema Bluetooth (Web Bluetooth API) ---
-async function connectBluetooth() {
-  try {
-    if (!navigator.bluetooth) {
-      throw new Error('Seu navegador não suporta Bluetooth Web.');
-    }
-
-    // Solicita ao usuário para selecionar um dispositivo
-    // Nota: 'acceptAllDevices: true' requer que 'optionalServices' seja definido para ser útil em alguns casos,
-    // mas para apenas conectar e pegar o nome, funciona na maioria dos navegadores modernos.
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: ['battery_service'] // Tenta acesso a serviço de bateria como exemplo
-    });
-
-    showToast(`📶 Conectando a: ${device.name}...`);
-    
-    const server = await device.gatt.connect();
-    
-    // Tenta ler a bateria
-    try {
-      const service = await server.getPrimaryService('battery_service');
-      const characteristic = await service.getCharacteristic('battery_level');
-      
-      // Ler valor inicial
-      const value = await characteristic.readValue();
-      updateBatteryLevel(value);
-      
-      // Inscrever para notificações (atualiza se a bateria mudar)
-      await characteristic.startNotifications();
-      characteristic.addEventListener('characteristicvaluechanged', (event) => {
-        updateBatteryLevel(event.target.value);
-      });
-      
-      showToast(`🔋 Bateria de ${device.name} lida com sucesso!`);
-    } catch (e) {
-      console.warn('Serviço de bateria não disponível:', e);
-      showToast(`📶 Conectado a ${device.name} (Sem acesso à bateria)`);
-    }
-
-  } catch (error) {
-    console.error(error);
-    if (error.name === 'NotFoundError') {
-      showToast('Cancelado pelo usuário.');
-    } else {
-      showToast('❌ Erro Bluetooth: ' + error.message);
-    }
-  }
-}
-
-function updateBatteryLevel(dataView) {
-  const level = dataView.getUint8(0);
-  if (elements.bleBatteryDisplay) {
-    elements.bleBatteryDisplay.textContent = `🔋 ${level}%`;
-    elements.bleBatteryDisplay.style.display = 'inline-flex';
-    elements.bleBatteryDisplay.style.alignItems = 'center';
-    
-    if (level <= 20) elements.bleBatteryDisplay.style.color = 'var(--danger)';
-    else elements.bleBatteryDisplay.style.color = 'var(--success)';
-  }
-}
-
 function toggleZenMode() {
   if (!gameState.relationshipStart) {
     showToast('⚠️ Configure o contador de relacionamento primeiro!');
@@ -1646,11 +1675,20 @@ function toggleZenMode() {
     // Carregar música salva se existir e o player estiver vazio
     if (gameState.zenMusic && !elements.zenAudio.getAttribute('src')) {
       elements.zenAudio.src = gameState.zenMusic;
+    } else if (!gameState.zenMusic && !elements.zenAudio.getAttribute('src')) {
+      // Usa o caminho padrão se não houver música personalizada
+      elements.zenAudio.src = DEFAULT_ZEN_MUSIC;
     }
 
     // Tocar música se houver src definido
     if (elements.zenAudio.src) {
-      elements.zenAudio.play().catch(e => console.log("Interação necessária para áudio"));
+      elements.zenAudio.play().catch(e => {
+        console.warn("Reprodução de áudio impedida:", e);
+        // Se o navegador bloquear o autoplay, avisa o usuário
+        if (e.name === 'NotAllowedError') {
+          showToast('⚠️ Toque na tela para liberar o áudio.');
+        }
+      });
     }
 
     // Aplicar Imagem de Fundo
@@ -1658,7 +1696,7 @@ function toggleZenMode() {
       elements.zenBackgroundDisplay.src = gameState.zenBackgroundImage;
       elements.zenBackgroundDisplay.classList.remove('hidden');
       // Começa pequena (no canto) por padrão ao abrir
-      elements.zenBackgroundDisplay.classList.remove('expanded');
+      elements.zenBackgroundDisplay.classList.add('expanded'); // Já começa expandida e visível conforme pedido
     } else {
       elements.zenBackgroundDisplay.classList.add('hidden');
     }
@@ -1678,22 +1716,22 @@ function handleZenMusicSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
 
-  // Validação de tamanho (Limite seguro para localStorage ~2MB)
-  if (file.size > 2 * 1024 * 1024) {
-    alert('⚠️ Arquivo muito grande para salvar permanentemente (Limite: 2MB).\nA música tocará apenas nesta sessão.');
-    elements.zenAudio.src = URL.createObjectURL(file);
-    elements.zenAudio.play();
-    return;
-  }
-
   const reader = new FileReader();
   reader.onload = function(e) {
-    gameState.zenMusic = e.target.result;
-    saveGame();
+    const result = e.target.result;
     
-    elements.zenAudio.src = gameState.zenMusic;
+    // Tenta salvar, se falhar por tamanho, avisa mas toca
+    try {
+      gameState.zenMusic = result;
+      saveGame(true); // Silent save
+      showToast('🎵 Música salva para o Modo Zen!');
+    } catch (err) {
+      console.warn("Quota exceeded for music", err);
+      showToast('⚠️ Música muito grande para salvar, tocará apenas nesta sessão.');
+    }
+    
+    elements.zenAudio.src = result;
     elements.zenAudio.play();
-    showToast('🎵 Música salva para o Modo Zen!');
   };
   reader.readAsDataURL(file);
 }
@@ -2012,7 +2050,7 @@ function addDomHourRecord() {
 
 function saveDomPrice() {
   if (!gameState) return;
-  const price = parseFloat(elements.domPriceInput.value);
+  const price = parseMoney(elements.domPriceInput.value);
   gameState.domPrice = isNaN(price) ? 0 : price;
   saveGame(true);
   renderDomDoughHistory();
@@ -2053,7 +2091,7 @@ function renderDomHourHistory() {
 function addDomDoughRecord() {
   const date = elements.domDoughDateInput.value;
   const qty = parseInt(elements.domDoughInput.value);
-  const currentPrice = parseFloat(elements.domPriceInput.value);
+  const currentPrice = parseMoney(elements.domPriceInput.value);
 
   if (!date || isNaN(qty) || qty <= 0) {
     showToast('⚠️ Preencha semana e quantidade válida!');
@@ -2081,12 +2119,112 @@ function addDomDoughRecord() {
     price: priceToUse
   });
   
+  updateDomFinance(date);
   saveGame();
   renderDomDoughHistory();
   renderDomProductionChart();
   elements.domDoughDateInput.value = '';
   elements.domDoughInput.value = '';
   showToast('🍞 Registro de massas adicionado!');
+}
+
+function editDomDough(dateKey) {
+  if (!gameState.domDoughs) return;
+  
+  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
+  if (entries.length === 0) return;
+  
+  const currentTotal = entries.reduce((sum, item) => sum + item.qty, 0);
+  // Usa o preço do último registro como referência
+  const lastPrice = entries[entries.length - 1].price || gameState.domPrice || 0;
+  
+  const newTotalStr = prompt(`Editar total de massas para ${dateKey}:`, currentTotal);
+  if (newTotalStr === null) return; // Cancelado pelo usuário
+  
+  const newTotal = parseInt(newTotalStr);
+  if (isNaN(newTotal) || newTotal < 0) {
+    showToast('⚠️ Quantidade inválida!');
+    return;
+  }
+  
+  // Remove entradas antigas dessa data e adiciona a consolidada
+  gameState.domDoughs = gameState.domDoughs.filter(d => d.date !== dateKey);
+  if (newTotal > 0) {
+    gameState.domDoughs.push({ date: dateKey, qty: newTotal, price: lastPrice });
+  }
+  
+  saveGame();
+  renderDomDoughHistory();
+  renderDomProductionChart();
+  showToast('✅ Quantidade atualizada com sucesso!');
+}
+
+function updateDomFinance(dateKey) {
+  if (!gameState.domDoughs) return;
+  
+  // Calcula o total para esta semana específica
+  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
+  const totalValue = entries.reduce((sum, item) => {
+    const price = (item.price !== undefined) ? item.price : (gameState.domPrice || 0);
+    return sum + (item.qty * price);
+  }, 0);
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  // Tag única para identificar que essa entrada veio do Dom
+  const tag = `dom_${dateKey}`;
+  const existingIndex = gameState.finances.findIndex(f => f.tag === tag);
+  
+  if (totalValue > 0) {
+    if (existingIndex >= 0) {
+      // Atualiza existente
+      gameState.finances[existingIndex].value = totalValue;
+    } else {
+      // Cria nova entrada como "Extra"
+      gameState.finances.push({
+        id: Date.now(),
+        desc: `Produção Dom (${dateKey})`,
+        value: totalValue,
+        type: 'income',
+        category: 'Extra',
+        date: new Date().toISOString(),
+        tag: tag
+      });
+    }
+  } else if (existingIndex >= 0) {
+    // Se o total for 0, remove a entrada financeira
+    gameState.finances.splice(existingIndex, 1);
+  }
+}
+
+function editDomDough(dateKey) {
+  if (!gameState.domDoughs) return;
+  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
+  if (entries.length === 0) return;
+  
+  const currentTotal = entries.reduce((sum, item) => sum + item.qty, 0);
+  const lastPrice = entries[entries.length - 1].price || gameState.domPrice || 0;
+  
+  const newTotalStr = prompt(`Editar total de massas para ${dateKey}:`, currentTotal);
+  if (newTotalStr === null) return;
+  
+  const newTotal = parseInt(newTotalStr);
+  if (isNaN(newTotal) || newTotal < 0) {
+    showToast('⚠️ Quantidade inválida!');
+    return;
+  }
+  
+  // Substitui as entradas antigas por uma consolidada
+  gameState.domDoughs = gameState.domDoughs.filter(d => d.date !== dateKey);
+  if (newTotal > 0) {
+    gameState.domDoughs.push({ date: dateKey, qty: newTotal, price: lastPrice });
+  }
+  
+  updateDomFinance(dateKey);
+  saveGame();
+  renderDomDoughHistory();
+  renderDomProductionChart();
+  showToast('✅ Quantidade e Financeiro atualizados!');
 }
 
 function renderDomDoughHistory() {
@@ -2158,7 +2296,10 @@ function renderDomDoughHistory() {
       <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--accent);">
         <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
           <span style="font-weight:700; color:#fff;">${displayDate}</span>
-          <span style="font-size:12px; opacity:0.7;">${dateSubtext}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="ghost" style="padding: 2px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1);" onclick="editDomDough('${dateKey}')" title="Editar Quantidade">✏️</button>
+            <span style="font-size:12px; opacity:0.7;">${dateSubtext}</span>
+          </div>
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
           <div>🍕 <b>${group.qty}</b> massas</div>
@@ -2479,8 +2620,12 @@ if (elements.inventoryInput) elements.inventoryInput.addEventListener('keypress'
   if (e.key === 'Enter') addItem();
 });
 if (elements.addTaskBtn) elements.addTaskBtn.addEventListener('click', addDailyTask);
-if (elements.taskInput) elements.taskInput.addEventListener('keypress', (e) => {
+if (elements.taskInput) elements.taskInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addDailyTask();
+});
+if (elements.viewTaskHistoryBtn) elements.viewTaskHistoryBtn.addEventListener('click', () => {
+  renderTaskHistory();
+  elements.taskHistoryModal.classList.add('active');
 });
 if (elements.addFinanceBtn) elements.addFinanceBtn.addEventListener('click', addTransaction);
 if (elements.financeValue) elements.financeValue.addEventListener('keypress', (e) => {
@@ -2496,13 +2641,16 @@ if (elements.zenModeBtn) elements.zenModeBtn.addEventListener('click', toggleZen
 if (elements.exitZenBtn) elements.exitZenBtn.addEventListener('click', toggleZenMode);
 if (elements.zenMusicBtn && elements.zenMusicInput) elements.zenMusicBtn.addEventListener('click', () => elements.zenMusicInput.click());
 if (elements.zenImageBtn && elements.zenImageInput) elements.zenImageBtn.addEventListener('click', () => elements.zenImageInput.click());
+if (elements.zenToggleHudBtn) elements.zenToggleHudBtn.addEventListener('click', toggleZenHud);
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
 if (elements.zenImageInput) elements.zenImageInput.addEventListener('change', handleZenImageSelect);
-if (elements.zenBackgroundDisplay) elements.zenBackgroundDisplay.addEventListener('click', toggleZenImageSize);
 if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (e) => {
   // Se a interface estiver oculta e clicar no overlay, restaura
   if (elements.zenModeOverlay.classList.contains('zen-hud-hidden')) {
-    toggleZenHud();
+    // Apenas se o clique não for nos controles (que já estariam ocultos, mas por segurança)
+    if (e.target === elements.zenModeOverlay || e.target === elements.zenBackgroundDisplay) {
+       toggleZenHud();
+    }
   }
 });
 if (elements.addDomHourBtn) elements.addDomHourBtn.addEventListener('click', addDomHourRecord);
@@ -2550,6 +2698,13 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Tratamento de erro para o áudio Zen (evita erro no console se falhar)
+  if (elements.zenAudio) {
+    elements.zenAudio.addEventListener('error', (e) => {
+      console.warn("Erro ao carregar áudio (arquivo não encontrado ou erro de rede).");
+    });
+  }
+
   // 1. Re-vincular elementos (caso o script tenha carregado antes do DOM)
   Object.keys(elements).forEach(key => {
     if (!elements[key]) {
@@ -2571,6 +2726,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.head.appendChild(style);
 
   checkMissingElements();
+
+  // Re-vincular listener do botão de gratidão para garantir funcionamento
+  if (elements.gratitudeBtn) {
+    elements.gratitudeBtn.removeEventListener('click', addGratitudeEntry);
+    elements.gratitudeBtn.addEventListener('click', addGratitudeEntry);
+  }
 
   // Função para verificar elementos ausentes no DOM
   function checkMissingElements() {

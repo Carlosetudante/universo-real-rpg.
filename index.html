@@ -140,6 +140,15 @@
       </div>
     </div>
 
+    <!-- Modal de Histórico de Tarefas -->
+    <div class="modal" id="taskHistoryModal">
+      <div class="modal-content">
+        <h2>📜 Histórico de Tarefas</h2>
+        <div id="taskHistoryList" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+        <button class="btn" onclick="document.getElementById('taskHistoryModal').classList.remove('active')">Fechar</button>
+      </div>
+    </div>
+
     <!-- Tela Principal do Jogo -->
     <div class="card hidden" id="gameScreen">
       <div class="cinema">
@@ -173,9 +182,6 @@
             <button class="icon-btn" id="exportBtn" title="Exportar Save">📤</button>
             <button class="icon-btn" id="importBtn" title="Importar Save">📥</button>
             <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup Automático">↺</button>
-            <div class="divider-v"></div>
-            <button class="icon-btn" id="bleBtn" title="Conectar Dispositivo BLE">📶</button>
-            <span id="bleBatteryDisplay" style="display:none; font-size: 12px; font-weight: bold; margin: 0 5px;"></span>
             <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
             <button class="icon-btn danger" id="logoutBtn" title="Sair">🚪</button>
             <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
@@ -279,8 +285,9 @@
 
           <h3>📝 Tarefas Diárias</h3>
           <div class="section">
-            <div class="form-row" style="margin-bottom: 12px;">
-              <input type="text" id="taskInput" placeholder="Ex: Beber 2L de água..." style="flex: 1;">
+            <div class="form-row" style="margin-bottom: 12px; gap: 8px;">
+              <input type="text" id="taskInput" placeholder="Ex: Beber 2L de água..." style="flex: 2;">
+              <button class="ghost" id="viewTaskHistoryBtn" title="Ver Histórico" style="padding: 10px;">📜</button>
               <button class="btn" id="addTaskBtn" style="padding: 10px; width: auto;">+</button>
             </div>
             <div class="task-list" id="taskList">
@@ -293,8 +300,8 @@
             <div class="small" style="margin-bottom: 12px;">Escreva 3 coisas boas do dia para ganhar <strong style="color: var(--accent);">50 XP</strong>!</div>
             <div class="form-row" style="flex-direction: column; gap: 8px;">
               <input type="text" id="gratitude1" placeholder="1. Sou grato por...">
-              <input type="text" id="gratitude2" placeholder="2. Sou grato por...">
-              <input type="text" id="gratitude3" placeholder="3. Sou grato por...">
+              <input type="text" id="gratitude2" placeholder="2. (Opcional)">
+              <input type="text" id="gratitude3" placeholder="3. (Opcional)">
               <button class="btn info" id="gratitudeBtn">🙏 Registrar Gratidão</button>
             </div>
             <div id="gratitudeHistory" style="margin-top: 15px; max-height: 200px; overflow-y: auto; padding-right: 5px;"></div>
@@ -327,7 +334,7 @@
                 <input type="text" id="financeDesc" placeholder="Descrição (ex: Salário, Mercado)">
               </div>
               <div style="flex: 1;">
-                <input type="number" id="financeValue" placeholder="R$ 0,00">
+                <input type="text" inputmode="decimal" id="financeValue" placeholder="R$ 0,00">
               </div>
             </div>
             <div class="form-row" style="margin-top: 8px;">
@@ -341,6 +348,8 @@
                 <option value="Transporte">Transporte</option>
                 <option value="Lazer">Lazer</option>
                 <option value="Contas">Contas</option>
+                <option value="Salário">Salário</option>
+                <option value="Extra">Extra</option>
               </select>
               <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
             </div>
@@ -348,7 +357,7 @@
             <!-- Meta Financeira -->
             <div style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
               <div class="form-row">
-                <input type="number" id="financeGoalInput" placeholder="Definir Meta (R$)" style="flex: 2;">
+                <input type="text" inputmode="decimal" id="financeGoalInput" placeholder="Definir Meta (R$)" style="flex: 2;">
                 <button class="btn" id="setFinanceGoalBtn" style="flex: 1;">Definir Meta</button>
               </div>
               <div id="financeGoalDisplay" class="hidden" style="margin-top: 10px;">
@@ -386,7 +395,7 @@
                 <input type="text" id="billDesc" placeholder="Conta (ex: Internet, Luz)">
               </div>
               <div style="flex: 1;">
-                <input type="number" id="billValue" placeholder="R$ 0,00">
+                <input type="text" inputmode="decimal" id="billValue" placeholder="R$ 0,00">
               </div>
             </div>
             <div class="form-row" style="margin-top: 8px;">
@@ -482,7 +491,7 @@
               <h4>Configuração</h4>
               <div class="form-row">
                 <label for="domPriceInput">Valor por Massa (R$)</label>
-                <input type="number" id="domPriceInput" placeholder="0.00">
+                <input type="text" inputmode="decimal" id="domPriceInput" placeholder="0.00">
               </div>
             </div>
             <div>
