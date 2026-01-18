@@ -925,6 +925,17 @@
         flex-direction: column;
         justify-content: center;
       }
+
+      /* Ajuste para o campo de tarefas no mobile */
+      .task-input-row {
+        flex-wrap: wrap;
+      }
+      .task-input-row input {
+        flex: 1 1 100% !important;
+      }
+      .task-input-row button {
+        flex: 1;
+      }
     }
     
     /* Scrollbar customizada */
