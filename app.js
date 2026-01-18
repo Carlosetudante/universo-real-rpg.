@@ -169,6 +169,10 @@ const CLASS_THEMES = {
 // Caminho padrão para música Zen (Online para funcionar direto)
 const DEFAULT_ZEN_MUSIC = 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3';
 
+// Playlist Zen
+let zenPlaylist = [];
+let currentTrackIndex = 0;
+
 // Estado do jogo
 let gameState = null;
 let isLoggedIn = false;
@@ -311,6 +315,7 @@ const elements = {
   zenToggleHudBtn: document.getElementById('zenToggleHudBtn'),
   zenBackgroundDisplay: document.getElementById('zenBackgroundDisplay'),
   zenAudio: document.getElementById('zenAudio'),
+  zenPlaylistInfo: document.getElementById('zenPlaylistInfo'),
   exitZenBtn: document.getElementById('exitZenBtn'),
 
   // Edit Profile
@@ -1660,6 +1665,103 @@ function handlePhotoUpdate(event) {
   reader.readAsDataURL(file);
 }
 
+// --- Sistema de Playlist com IndexedDB ---
+const DB_NAME = 'UniversoRealDB';
+const DB_VERSION = 1;
+let db = null;
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains('music')) {
+        db.createObjectStore('music', { autoIncrement: true });
+      }
+    };
+    request.onsuccess = (event) => {
+      db = event.target.result;
+      resolve(db);
+    };
+    request.onerror = (event) => {
+      console.warn("IndexedDB error:", event.target.error);
+      reject(event.target.error);
+    };
+  });
+}
+
+async function saveMusicToDB(files) {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['music'], 'readwrite');
+    const store = transaction.objectStore('music');
+    store.clear(); // Limpa playlist anterior
+    
+    let count = 0;
+    Array.from(files).forEach(file => {
+      if (file.type.startsWith('audio/')) {
+        store.add(file);
+        count++;
+      }
+    });
+    
+    transaction.oncomplete = () => resolve(count);
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function getMusicFromDB() {
+  if (!db) await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(['music'], 'readonly');
+    const store = transaction.objectStore('music');
+    const request = store.getAll();
+    
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function loadAndPlayZenPlaylist() {
+  try {
+    zenPlaylist = await getMusicFromDB();
+    if (zenPlaylist.length > 0) {
+      currentTrackIndex = 0;
+      playZenTrack(currentTrackIndex);
+      if (elements.zenPlaylistInfo) {
+        elements.zenPlaylistInfo.textContent = `${zenPlaylist.length} músicas carregadas`;
+      }
+    } else {
+      // Fallback para padrão se não houver nada no banco
+      if (!elements.zenAudio.getAttribute('src')) {
+        elements.zenAudio.src = DEFAULT_ZEN_MUSIC;
+        elements.zenAudio.loop = true; // Loop se for música única padrão
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao carregar playlist", e);
+    // Fallback erro
+    elements.zenAudio.src = DEFAULT_ZEN_MUSIC;
+  }
+}
+
+function playZenTrack(index) {
+  if (zenPlaylist.length === 0) return;
+  if (index >= zenPlaylist.length) index = 0; // Loop da playlist
+  currentTrackIndex = index;
+  
+  const file = zenPlaylist[index];
+  const url = URL.createObjectURL(file);
+  
+  elements.zenAudio.src = url;
+  elements.zenAudio.loop = false; // Playlist não deve loopar a mesma música
+  elements.zenAudio.play().catch(e => console.warn("Autoplay blocked"));
+  
+  if (elements.zenPlaylistInfo) {
+    elements.zenPlaylistInfo.textContent = `Tocando ${index + 1}/${zenPlaylist.length}`;
+  }
+}
+
 function toggleZenMode() {
   if (!gameState.relationshipStart) {
     showToast('⚠️ Configure o contador de relacionamento primeiro!');
@@ -1672,12 +1774,9 @@ function toggleZenMode() {
     const randomQuote = ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)];
     if (elements.zenQuote) elements.zenQuote.textContent = `"${randomQuote}"`;
     
-    // Carregar música salva se existir e o player estiver vazio
-    if (gameState.zenMusic && !elements.zenAudio.getAttribute('src')) {
-      elements.zenAudio.src = gameState.zenMusic;
-    } else if (!gameState.zenMusic && !elements.zenAudio.getAttribute('src')) {
-      // Usa o caminho padrão se não houver música personalizada
-      elements.zenAudio.src = DEFAULT_ZEN_MUSIC;
+    // Carregar playlist do banco se o player estiver vazio ou playlist vazia
+    if (zenPlaylist.length === 0 && !elements.zenAudio.getAttribute('src')) {
+      loadAndPlayZenPlaylist();
     }
 
     // Tocar música se houver src definido
@@ -1712,28 +1811,21 @@ function toggleZenHud() {
   }
 }
 
-function handleZenMusicSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+async function handleZenMusicSelect(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const result = e.target.result;
+  try {
+    showToast('⏳ Salvando músicas...');
+    const count = await saveMusicToDB(files);
+    showToast(`🎵 ${count} músicas salvas na playlist!`);
     
-    // Tenta salvar, se falhar por tamanho, avisa mas toca
-    try {
-      gameState.zenMusic = result;
-      saveGame(true); // Silent save
-      showToast('🎵 Música salva para o Modo Zen!');
-    } catch (err) {
-      console.warn("Quota exceeded for music", err);
-      showToast('⚠️ Música muito grande para salvar, tocará apenas nesta sessão.');
-    }
-    
-    elements.zenAudio.src = result;
-    elements.zenAudio.play();
-  };
-  reader.readAsDataURL(file);
+    // Carregar e tocar a primeira
+    loadAndPlayZenPlaylist();
+  } catch (e) {
+    console.error(e);
+    showToast('⚠️ Erro ao salvar músicas (IndexedDB).');
+  }
 }
 
 function handleZenImageSelect(event) {
@@ -2697,6 +2789,15 @@ window.addEventListener('DOMContentLoaded', () => {
       triggerHaptic();
     }
   });
+
+  // Listener para Playlist (Tocar próxima)
+  if (elements.zenAudio) {
+    elements.zenAudio.addEventListener('ended', () => {
+      if (zenPlaylist.length > 0) {
+        playZenTrack(currentTrackIndex + 1);
+      }
+    });
+  }
 
   // Tratamento de erro para o áudio Zen (evita erro no console se falhar)
   if (elements.zenAudio) {
