@@ -317,6 +317,7 @@ const elements = {
   zenAudio: document.getElementById('zenAudio'),
   zenPlaylistInfo: document.getElementById('zenPlaylistInfo'),
   exitZenBtn: document.getElementById('exitZenBtn'),
+  installAppBtn: document.getElementById('installAppBtn'),
 
   // Edit Profile
   editProfileModal: document.getElementById('editProfileModal'),
@@ -2799,6 +2800,30 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // --- Lógica de Instalação PWA ---
+  let deferredPrompt;
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Impede que o navegador mostre o banner padrão imediatamente (opcional)
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Mostra o botão de instalar
+    if (elements.installAppBtn) {
+      elements.installAppBtn.style.display = 'block';
+      
+      elements.installAppBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`Resultado da instalação: ${outcome}`);
+          deferredPrompt = null;
+          elements.installAppBtn.style.display = 'none';
+        }
+      });
+    }
+  });
+
   // Tratamento de erro para o áudio Zen (evita erro no console se falhar)
   if (elements.zenAudio) {
     elements.zenAudio.addEventListener('error', (e) => {
@@ -2868,6 +2893,12 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   checkSession();
+});
+
+// Evento disparado quando o app é instalado com sucesso
+window.addEventListener('appinstalled', () => {
+  if (elements.installAppBtn) elements.installAppBtn.style.display = 'none';
+  showToast('🎉 App instalado com sucesso!');
 });
 
 // Auto-save a cada 2 minutos
