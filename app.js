@@ -318,6 +318,7 @@ const elements = {
   zenPlaylistInfo: document.getElementById('zenPlaylistInfo'),
   exitZenBtn: document.getElementById('exitZenBtn'),
   installAppBtn: document.getElementById('installAppBtn'),
+  simpleFinanceBtn: document.getElementById('simpleFinanceBtn'),
 
   // Edit Profile
   editProfileModal: document.getElementById('editProfileModal'),
@@ -1263,7 +1264,7 @@ function renderFinances() {
         <div style="font-weight:600">${t.desc} <span class="small" style="opacity:0.5; font-weight:400">(${t.category || 'Outros'})</span></div>
         <div class="small" style="opacity:0.6">${new Date(t.date).toLocaleDateString()}</div>
       </div>
-      <div class="finance-value ${t.type}">${t.type === 'income' ? '+' : '-'} R$ ${t.value.toFixed(2)}</div>
+      <div class="finance-value ${t.type}">${t.type === 'income' ? '+' : '-'} R$ ${t.value.toLocaleString('pt-BR')}</div>
       <button class="ghost" style="padding:4px 8px; margin-left:10px" onclick="removeTransaction(${t.id})">❌</button>
     `;
     if (elements.financeList) elements.financeList.appendChild(div);
@@ -1292,7 +1293,7 @@ function renderFinances() {
   }
 
   if (elements.financeBalance) {
-    elements.financeBalance.textContent = `R$ ${balance.toFixed(2)}`;
+    elements.financeBalance.textContent = `R$ ${balance.toLocaleString('pt-BR')}`;
     elements.financeBalance.style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
   }
 }
@@ -1429,7 +1430,7 @@ function renderFinancialGoal() {
   }
   
   if (elements.financeGoalDisplay) elements.financeGoalDisplay.classList.remove('hidden');
-  if (elements.financeGoalInput) elements.financeGoalInput.placeholder = `Meta atual: R$ ${goal.toFixed(2)}`;
+  if (elements.financeGoalInput) elements.financeGoalInput.placeholder = `Meta atual: R$ ${goal.toLocaleString('pt-BR')}`;
   
   // Calcular Saldo
   const transactions = gameState.finances || [];
@@ -1449,7 +1450,7 @@ function renderFinancialGoal() {
   if (percent > 100) percent = 100;
   
   if (elements.financeGoalProgress) elements.financeGoalProgress.style.width = `${percent}%`;
-  if (elements.financeGoalText) elements.financeGoalText.textContent = `${percent.toFixed(1)}% (R$ ${balance.toFixed(2)} / R$ ${goal.toFixed(2)})`;
+  if (elements.financeGoalText) elements.financeGoalText.textContent = `${percent.toFixed(1)}% (R$ ${balance.toLocaleString('pt-BR')} / R$ ${goal.toLocaleString('pt-BR')})`;
   
   const remaining = goal - balance;
   if (elements.financeGoalStatus) {
@@ -1458,7 +1459,7 @@ function renderFinancialGoal() {
       elements.financeGoalStatus.style.color = "var(--accent)";
       elements.financeGoalStatus.style.fontWeight = "bold";
     } else {
-      elements.financeGoalStatus.textContent = `Faltam R$ ${remaining.toFixed(2)}`;
+      elements.financeGoalStatus.textContent = `Faltam R$ ${remaining.toLocaleString('pt-BR')}`;
       elements.financeGoalStatus.style.color = "inherit";
       elements.financeGoalStatus.style.fontWeight = "normal";
     }
@@ -1509,7 +1510,7 @@ function toggleBillPaid(id) {
     
     if (bill.paid) {
       // Perguntar se quer lançar como despesa
-      if (confirm(`Conta "${bill.desc}" paga! \nDeseja lançar R$ ${bill.value.toFixed(2)} como despesa no financeiro?`)) {
+      if (confirm(`Conta "${bill.desc}" paga! \nDeseja lançar R$ ${bill.value.toLocaleString('pt-BR')} como despesa no financeiro?`)) {
         if (!gameState.finances) gameState.finances = [];
         gameState.finances.push({
           id: Date.now(),
@@ -1586,7 +1587,7 @@ function renderBills() {
         </div>
         <div class="bill-date">${isOverdue ? '⚠️ Venceu em: ' : 'Vence em: '} ${new Date(bill.dueDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</div>
       </div>
-      <div style="font-weight: 700; margin-right: 10px;">R$ ${bill.value.toFixed(2)}</div>
+      <div style="font-weight: 700; margin-right: 10px;">R$ ${bill.value.toLocaleString('pt-BR')}</div>
       <button class="ghost" style="padding:4px 8px;" onclick="removeBill(${bill.id})">❌</button>
     `;
     if (elements.billList) elements.billList.appendChild(div);
@@ -1605,7 +1606,7 @@ function checkBillsDueToday() {
   
   if (dueBills.length > 0) {
     const total = dueBills.reduce((sum, b) => sum + b.value, 0);
-    showToast(`⚠️ Atenção! Você tem ${dueBills.length} conta(s) vencendo hoje (Total: R$ ${total.toFixed(2)})`, 8000);
+    showToast(`⚠️ Atenção! Você tem ${dueBills.length} conta(s) vencendo hoje (Total: R$ ${total.toLocaleString('pt-BR')})`, 8000);
   }
 }
 
@@ -2396,13 +2397,13 @@ function renderDomDoughHistory() {
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
           <div>🍕 <b>${group.qty}</b> massas</div>
-          <div style="opacity: 0.8;">Unit: R$ ${group.price.toFixed(2)}</div>
-          <div style="color: var(--success); font-weight: 700;">Total: R$ ${group.value.toFixed(2)}</div>
+          <div style="opacity: 0.8;">Unit: R$ ${group.price.toLocaleString('pt-BR')}</div>
+          <div style="color: var(--success); font-weight: 700;">Total: R$ ${group.value.toLocaleString('pt-BR')}</div>
         </div>
       </div>`;
   });
 
-  elements.domStats.innerHTML = `${totalQty} <span style="color: var(--success); margin-left: 8px; font-size: 0.9em;">(Total: R$ ${totalValueGlobal.toFixed(2)})</span>`;
+  elements.domStats.innerHTML = `${totalQty} <span style="color: var(--success); margin-left: 8px; font-size: 0.9em;">(Total: R$ ${totalValueGlobal.toLocaleString('pt-BR')})</span>`;
 }
 
 function renderDomProductionChart() {
@@ -2735,6 +2736,7 @@ if (elements.exitZenBtn) elements.exitZenBtn.addEventListener('click', toggleZen
 if (elements.zenMusicBtn && elements.zenMusicInput) elements.zenMusicBtn.addEventListener('click', () => elements.zenMusicInput.click());
 if (elements.zenImageBtn && elements.zenImageInput) elements.zenImageBtn.addEventListener('click', () => elements.zenImageInput.click());
 if (elements.zenToggleHudBtn) elements.zenToggleHudBtn.addEventListener('click', toggleZenHud);
+if (elements.simpleFinanceBtn) elements.simpleFinanceBtn.addEventListener('click', () => window.location.href = './financeiro.html');
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
 if (elements.zenImageInput) elements.zenImageInput.addEventListener('change', handleZenImageSelect);
 if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (e) => {

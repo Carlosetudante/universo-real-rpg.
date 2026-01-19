@@ -936,6 +936,10 @@
       .task-input-row button {
         flex: 1;
       }
+
+      .install-instructions {
+        flex-direction: column;
+      }
     }
     
     /* Scrollbar customizada */
@@ -1336,3 +1340,48 @@
 #zenModeOverlay.zen-hud-hidden {
   cursor: pointer; /* Indica que é clicável para restaurar */
 }
+
+/* Guia de Instalação na tela de Login */
+.install-guide {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
+.install-guide h3 {
+  font-size: 1.1rem;
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+
+.install-instructions {
+  display: flex;
+  gap: 15px;
+  margin-top: 15px;
+  text-align: left;
+}
+
+.install-platform {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  padding: 15px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.install-platform h4 {
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: 8px;
+}
+
+.install-platform ol {
+  padding-left: 20px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+
+.install-platform li { margin-bottom: 8px; }
