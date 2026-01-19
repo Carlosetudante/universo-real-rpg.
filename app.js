@@ -2281,6 +2281,7 @@ function renderDomHourHistory() {
     return;
   }
   elements.domHourHistoryList.innerHTML = '';
+  let htmlContent = '';
   list.slice().reverse().forEach(item => {
     // Calcular total de horas
     let total = '';
@@ -2293,7 +2294,7 @@ function renderDomHourHistory() {
       if (diff < 0) diff += 24 * 60;
       total = (diff / 60).toFixed(2);
     } catch { total = '?'; }
-    elements.domHourHistoryList.innerHTML += `
+    htmlContent += `
       <tr>
         <td style="padding:6px;">${item.date}</td>
         <td style="padding:6px;">${item.entry}</td>
@@ -2302,6 +2303,7 @@ function renderDomHourHistory() {
       </tr>
     `;
   });
+  elements.domHourHistoryList.innerHTML = htmlContent;
 }
 
 // --- Dom: Produção de Massas ---
@@ -2343,37 +2345,6 @@ function addDomDoughRecord() {
   elements.domDoughDateInput.value = '';
   elements.domDoughInput.value = '';
   showToast('🍞 Registro de massas adicionado!');
-}
-
-function editDomDough(dateKey) {
-  if (!gameState.domDoughs) return;
-  
-  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
-  if (entries.length === 0) return;
-  
-  const currentTotal = entries.reduce((sum, item) => sum + item.qty, 0);
-  // Usa o preço do último registro como referência
-  const lastPrice = entries[entries.length - 1].price || gameState.domPrice || 0;
-  
-  const newTotalStr = prompt(`Editar total de massas para ${dateKey}:`, currentTotal);
-  if (newTotalStr === null) return; // Cancelado pelo usuário
-  
-  const newTotal = parseInt(newTotalStr);
-  if (isNaN(newTotal) || newTotal < 0) {
-    showToast('⚠️ Quantidade inválida!');
-    return;
-  }
-  
-  // Remove entradas antigas dessa data e adiciona a consolidada
-  gameState.domDoughs = gameState.domDoughs.filter(d => d.date !== dateKey);
-  if (newTotal > 0) {
-    gameState.domDoughs.push({ date: dateKey, qty: newTotal, price: lastPrice });
-  }
-  
-  saveGame();
-  renderDomDoughHistory();
-  renderDomProductionChart();
-  showToast('✅ Quantidade atualizada com sucesso!');
 }
 
 function updateDomFinance(dateKey) {
@@ -2484,7 +2455,8 @@ function renderDomDoughHistory() {
   });
 
   elements.domHistoryList.innerHTML = '';
-  
+  let htmlContent = '';
+
   // Ordenar e Renderizar
   Object.keys(groups).sort().reverse().forEach(dateKey => {
     const group = groups[dateKey];
@@ -2509,7 +2481,7 @@ function renderDomDoughHistory() {
       dateSubtext = weekStart.toLocaleDateString('pt-BR');
     }
     
-    elements.domHistoryList.innerHTML += `
+    htmlContent += `
       <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--accent);">
         <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
           <span style="font-weight:700; color:#fff;">${displayDate}</span>
@@ -2525,6 +2497,7 @@ function renderDomDoughHistory() {
         </div>
       </div>`;
   });
+  elements.domHistoryList.innerHTML = htmlContent;
 
   elements.domStats.innerHTML = `${totalQty} <span style="color: var(--success); margin-left: 8px; font-size: 0.9em;">(Total: R$ ${totalValueGlobal.toLocaleString('pt-BR')})</span>`;
 }
