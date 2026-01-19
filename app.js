@@ -196,6 +196,7 @@ const elements = {
   // Login
   loginUsername: document.getElementById('loginUsername'),
   loginPassword: document.getElementById('loginPassword'),
+  rememberUser: document.getElementById('rememberUser'),
   loginBtn: document.getElementById('loginBtn'),
   showRegisterBtn: document.getElementById('showRegisterBtn'),
   forgotPasswordBtn: document.getElementById('forgotPasswordBtn'),
@@ -206,6 +207,8 @@ const elements = {
   registerName: document.getElementById('registerName'),
   registerRace: document.getElementById('registerRace'),
   registerAura: document.getElementById('registerAura'),
+  registerQuestion: document.getElementById('registerQuestion'),
+  registerAnswer: document.getElementById('registerAnswer'),
   registerBtn: document.getElementById('registerBtn'),
   showLoginBtn: document.getElementById('showLoginBtn'),
   
@@ -402,6 +405,13 @@ function showLoginForm() {
   elements.loginForm.classList.remove('hidden');
   elements.registerForm.classList.add('hidden');
   document.getElementById('authTitle').textContent = '🎮 Entrar no Universo Real';
+  
+  // Recuperar último usuário salvo na memória do dispositivo
+  const lastUser = localStorage.getItem('ur_last_user');
+  if (lastUser && elements.loginUsername) {
+    elements.loginUsername.value = lastUser;
+    if (elements.rememberUser) elements.rememberUser.checked = true;
+  }
 }
 
 function showRegisterForm() {
@@ -455,6 +465,14 @@ async function login() {
     if (users[username].password !== password) {
       throw new Error('Senha incorreta!');
     }
+    
+    // Salvar usuário na memória se a opção estiver marcada
+    if (elements.rememberUser && elements.rememberUser.checked) {
+      localStorage.setItem('ur_last_user', username);
+    } else {
+      localStorage.removeItem('ur_last_user');
+    }
+
     showToast('✅ Login realizado com sucesso!');
     gameState = normalizeGameState(users[username].character);
     isLoggedIn = true;
@@ -475,14 +493,33 @@ async function login() {
 }
 
 function recoverPassword() {
-  const username = elements.loginUsername.value.trim();
+  let username = elements.loginUsername.value.trim();
   if (!username) {
-    showToast('⚠️ Digite seu username para recuperar a senha.');
-    return;
+    username = prompt("Digite seu usuário para recuperar a senha:");
   }
+  
+  if (!username) return;
+
   const users = getUsers();
   if (users[username]) {
-    alert(`Sua senha é: ${users[username].password}`);
+    // Verifica se o usuário tem pergunta de segurança (contas novas)
+    if (users[username].security && users[username].security.question) {
+      const answer = prompt(`Pergunta de Segurança: ${users[username].security.question}`);
+      if (answer && answer.toLowerCase().trim() === users[username].security.answer.toLowerCase().trim()) {
+        alert(`Sua senha é: ${users[username].password}`);
+      } else {
+        showToast('❌ Resposta de segurança incorreta.');
+      }
+    } else {
+      // Fallback para contas antigas (Nome do Personagem)
+      const charName = users[username].character.name;
+      const check = prompt(`Segurança (Conta Antiga): Qual o nome do seu personagem?`);
+      if (check && check.toLowerCase().trim() === charName.toLowerCase().trim()) {
+        alert(`Sua senha é: ${users[username].password}`);
+      } else {
+        showToast('❌ Nome do personagem incorreto.');
+      }
+    }
   } else {
     showToast('❌ Usuário não encontrado neste navegador.');
   }
@@ -495,7 +532,10 @@ async function register() {
   const name = elements.registerName.value.trim();
   const race = elements.registerRace.value;
   const auraColor = elements.registerAura.value;
-  if (!username || !password || !name) {
+  const question = elements.registerQuestion.value.trim();
+  const answer = elements.registerAnswer.value.trim();
+
+  if (!username || !password || !name || !question || !answer) {
     showToast('⚠️ Preencha todos os campos obrigatórios!');
     return;
   }
@@ -532,7 +572,7 @@ async function register() {
       lastTaskReset: new Date().toISOString()
     };
     character = normalizeGameState(character); // Garante que todos os campos padrão (como Pomodoro) existam
-    users[username] = { password, character };
+    users[username] = { password, character, security: { question, answer } };
     setUsers(users);
     showToast('🎉 Personagem criado com sucesso!', 4000);
     gameState = character;
@@ -545,6 +585,8 @@ async function register() {
     elements.registerUsername.value = '';
     elements.registerPassword.value = '';
     elements.registerName.value = '';
+    elements.registerQuestion.value = '';
+    elements.registerAnswer.value = '';
   } catch (error) {
     showToast(`❌ ${error.message}`);
   } finally {
@@ -684,68 +726,86 @@ function createAutoBackup() {
 }
 
 function exportSave() {
-  if (!gameState) return;
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState));
+  // Agora exporta TODOS os dados de usuário do localStorage
+  if (!isLoggedIn) {
+    showToast('⚠️ Você precisa estar logado para exportar.');
+    return;
+  }
+  const allUsers = getUsers();
+  if (Object.keys(allUsers).length === 0) {
+    showToast('⚠️ Nenhum dado de usuário para exportar.');
+    return;
+  }
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allUsers));
   const downloadAnchorNode = document.createElement('a');
   downloadAnchorNode.setAttribute("href", dataStr);
-  downloadAnchorNode.setAttribute("download", `ur_save_${gameState.username}_${new Date().toISOString().split('T')[0]}.json`);
+  downloadAnchorNode.setAttribute("download", `universo-real_backup_${new Date().toISOString().split('T')[0]}.json`);
   document.body.appendChild(downloadAnchorNode);
   downloadAnchorNode.click();
   downloadAnchorNode.remove();
-  showToast('📤 Save exportado com sucesso!');
+  showToast('📤 Backup de todos os dados exportado com sucesso!');
 }
 
 function importSave() {
   if (elements.importFile) {
     elements.importFile.click();
   } else {
-    showToast('❌ Erro: Input de arquivo não encontrado.');
+    showToast('❌ Erro: Campo de importação não encontrado.');
   }
 }
 
 function handleFileSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = function(e) {
     try {
       const importedData = JSON.parse(e.target.result);
       
-      // Validação de integridade do Save
-      if (!importedData || typeof importedData !== 'object') {
-        throw new Error('Formato de arquivo inválido.');
+      if (!importedData || typeof importedData !== 'object' || Object.keys(importedData).length === 0) {
+        throw new Error('Formato de arquivo inválido ou vazio.');
       }
 
-      const requiredFields = ['name', 'level', 'xp', 'attributes'];
-      const missingFields = requiredFields.filter(field => importedData[field] === undefined);
+      // --- DETECTAR TIPO DE BACKUP ---
+      const firstKey = Object.keys(importedData)[0];
+      const firstValue = importedData[firstKey];
 
-      if (missingFields.length > 0) {
-        throw new Error(`Save inválido! Campos ausentes: ${missingFields.join(', ')}`);
-      }
+      // Condição: É um backup completo (formato { username: { password, character }})
+      if (firstValue && firstValue.hasOwnProperty('password') && firstValue.hasOwnProperty('character')) {
+        if (confirm(`Restaurar backup completo com ${Object.keys(importedData).length} usuário(s)?\n\n⚠️ ATENÇÃO: Isso substituirá TODOS os dados salvos neste navegador!`)) {
+          setUsers(importedData); // Substitui todos os usuários
+          clearSession(); // Limpa a sessão atual
+          showToast('✅ Backup completo restaurado! Por favor, faça o login novamente.', 5000);
+          // Força um reload para reiniciar o estado do app e mostrar a tela de login
+          setTimeout(() => window.location.reload(), 1500);
+        }
+      } 
+      // Condição: É um save de personagem único (formato antigo/individual)
+      else {
+        // Validação de integridade do Save de personagem
+        const requiredFields = ['name', 'level', 'xp', 'attributes'];
+        const missingFields = requiredFields.filter(field => importedData[field] === undefined);
 
-      // Validação profunda de atributos
-      if (!importedData.attributes || typeof importedData.attributes !== 'object') {
-        throw new Error('Estrutura de atributos inválida.');
-      }
-      const missingAttrs = ATTRIBUTES.map(a => a.id).filter(id => importedData.attributes[id] === undefined);
-      if (missingAttrs.length > 0) {
-        throw new Error('Atributos corrompidos ou incompatíveis.');
-      }
-
-      if (confirm(`Importar dados de ${importedData.name} (Nível ${importedData.level})? Isso substituirá seu progresso atual.`)) {
-        // Manter o username da sessão atual para evitar conflitos de login
-        importedData.username = gameState.username;
-        gameState = typeof normalizeGameState === 'function' ? normalizeGameState(importedData) : importedData;
-        saveGame();
-        updateUI();
-        if (typeof checkAchievements === 'function') checkAchievements();
-        showToast('✅ Save importado com sucesso!');
+        if (missingFields.length > 0) {
+          throw new Error(`Save de personagem inválido! Campos ausentes: ${missingFields.join(', ')}`);
+        }
+        
+        if (confirm(`Importar dados do personagem ${importedData.name} (Nível ${importedData.level})? Isso substituirá o progresso do seu personagem ATUAL.`)) {
+          // Manter o username da sessão atual para evitar conflitos de login
+          importedData.username = gameState.username;
+          gameState = normalizeGameState(importedData);
+          saveGame();
+          updateUI();
+          checkAchievements();
+          showToast('✅ Personagem importado com sucesso!');
+        }
       }
     } catch (error) {
       showToast('❌ Erro ao importar: ' + error.message);
+    } finally {
+      if (elements.importFile) elements.importFile.value = '';
     }
-    if (elements.importFile) elements.importFile.value = '';
   };
   reader.readAsText(file);
 }
@@ -2699,6 +2759,7 @@ if (elements.registerBtn) elements.registerBtn.addEventListener('click', registe
 if (elements.showRegisterBtn) elements.showRegisterBtn.addEventListener('click', showRegisterForm);
 if (elements.showLoginBtn) elements.showLoginBtn.addEventListener('click', showLoginForm);
 if (elements.logoutBtn) elements.logoutBtn.addEventListener('click', logout);
+if (elements.forgotPasswordBtn) elements.forgotPasswordBtn.addEventListener('click', recoverPassword);
 if (elements.saveBtn) elements.saveBtn.addEventListener('click', saveGame);
 if (elements.exportBtn) elements.exportBtn.addEventListener('click', exportSave);
 if (elements.importBtn) elements.importBtn.addEventListener('click', importSave);
