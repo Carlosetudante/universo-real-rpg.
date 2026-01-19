@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="logo.svg">
+  <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -94,7 +95,31 @@
             <button class="ghost" id="showLoginBtn">Já tenho conta</button>
           </div>
         </div>
-        <button class="ghost" id="installAppBtn" style="display: none; margin-top: 15px; width: 100%; border: 1px solid var(--success); color: var(--success);">📲 Instalar Aplicativo</button>
+
+        <!-- Guia de Instalação PWA -->
+        <div class="install-guide">
+          <h3>🚀 Quer usar como um aplicativo?</h3>
+          <p class="small">Tenha acesso rápido e offline direto da sua tela inicial!</p>
+          
+          <button class="ghost" id="installAppBtn" style="display: none; margin-top: 10px; width: 100%; border: 1px solid var(--success); color: var(--success);">📲 Instalar Aplicativo (Recomendado)</button>
+
+          <div class="install-instructions">
+            <div class="install-platform">
+              <h4>🤖 Android (Chrome)</h4>
+              <ol>
+                <li>Toque no botão <strong>"Instalar Aplicativo"</strong> acima (se aparecer).</li>
+                <li>Ou, no menu do Chrome (⋮), procure por <strong>"Instalar aplicativo"</strong>.</li>
+              </ol>
+            </div>
+            <div class="install-platform">
+              <h4>🍏 iPhone (Safari)</h4>
+              <ol>
+                <li>Toque no ícone de <strong>Compartilhar</strong> (um quadrado com uma seta para cima).</li>
+                <li>Role para baixo e escolha <strong>"Adicionar à Tela de Início"</strong>.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -183,6 +208,7 @@
             <button class="icon-btn" id="importBtn" title="Importar Save">📥</button>
             <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup Automático">↺</button>
             <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
+            <button class="icon-btn" id="simpleFinanceBtn" title="Finanças Simplificadas">📊</button>
             <button class="icon-btn danger" id="logoutBtn" title="Sair">🚪</button>
             <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
           </div>

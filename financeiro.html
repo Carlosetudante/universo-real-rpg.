@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Minha Gestão Financeira</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#4f46e5">
+  
+  <!-- Configuração PWA (Para instalar no celular) -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo.svg">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <style>
+    :root {
+      --bg1: #071428;
+      --bg2: #0e2340;
+      --accent: #ffdd57;
+      --accent-hover: #ffb142;
+      --glass: rgba(255, 255, 255, 0.06);
+      --success: #4ade80;
+      --danger: #f87171;
+      --info: #60a5fa;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, var(--bg1), var(--bg2));
+      color: #e6eef8;
+      padding: 16px;
+      padding-bottom: 80px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    header h1 { font-size: 1.4rem; }
+    header small { color: #a0aec0; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 2fr 1.2fr;
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .container { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .02));
+      border-radius: 10px;
+      padding: 14px 16px;
+      border: 1px solid rgba(255, 255, 255, .05);
+      margin-bottom: 8px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+    }
+    .card small {
+      color: #a0aec0;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .summary-item {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .summary-label {
+      font-size: 0.75rem;
+      color: #a0aec0;
+      margin-bottom: 4px;
+    }
+    .summary-value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .summary-helper {
+      font-size: 0.75rem;
+      color: #718096;
+      margin-top: 4px;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #4f46e5;
+      margin-left: 6px;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.8rem;
+    }
+    .table th, .table td {
+      padding: 6px 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+    }
+    .table th {
+      font-weight: 600;
+      color: #a0aec0;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      display: inline-block;
+    }
+    .pill-income { background: #ecfdf3; color: #15803d; }
+    .pill-expense { background: #fef2f2; color: #b91c1c; }
+
+    .budget-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 6px;
+      font-size: 0.85rem;
+    }
+    .budget-bar {
+      position: relative;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .budget-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: #4ade80;
+    }
+    .budget-status {
+      font-size: 0.75rem;
+      margin-top: 4px;
+    }
+    .budget-status.ok { color: #16a34a; }
+    .budget-status.alert { color: #b91c1c; }
+
+    .list {
+      list-style: none;
+      margin-top: 8px;
+      font-size: 0.8rem;
+    }
+    .list li {
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #0369a1;
+      margin-right: 6px;
+    }
+    
+    /* Estrelas */
+    .stars {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+    
+    .stars:after, .stars:before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(#fff 0.6px, transparent 0.6px);
+      background-size: 50px 50px;
+      opacity: .06;
+    }
+    .stars:before {
+      transform: scale(.6); opacity: .04;
+    }
+
+    /* container dos gráficos */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    @media (max-width: 900px) {
+      .charts-grid { grid-template-columns: 1fr; }
+    }
+    .chart-wrapper {
+      position: relative;
+      width: 100%;
+      height: 220px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Minha Gestão Financeira</h1>
+      <small>Foco em iniciantes: simples, claro e sem complicação.</small>
+    </div>
+    <a href="./index.html" style="text-decoration: none; color: var(--accent); font-weight: bold; font-size: 0.9rem; white-space: nowrap;">&lt; Voltar ao Jogo</a>
+  </header>
+
+  <div class="stars"></div>
+
+  <div class="container">
+    <!-- COLUNA ESQUERDA -->
+    <div>
+      <!-- DASHBOARD RESUMO -->
+      <section class="card">
+        <h2>Visão geral do mês</h2>
+        <small>Veja rapidamente quanto entrou, quanto saiu e quanto ainda pode gastar.</small>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="summary-label">Entradas</div>
+            <div class="summary-value" id="summaryEntradas" style="color: var(--success);">R$ 0,00</div>
+            <div class="summary-helper">Salário + extras</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Saídas</div>
+            <div class="summary-value" id="summarySaidas" style="color: var(--danger);">R$ 0,00</div>
+            <div class="summary-helper">Gastos até agora</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Saldo Atual</div>
+            <div class="summary-value" id="summarySaldo" style="color: var(--info);">R$ 0,00</div>
+            <div class="summary-helper">Sem estourar o plano</div>
+          </div>
+        </div>
+
+        <!-- GRÁFICOS DO DASHBOARD -->
+        <div class="charts-grid">
+          <div class="chart-wrapper">
+            <canvas id="gastosPorCategoria"></canvas>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="evolucaoSaldo"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- REGISTRO DE TRANSAÇÕES -->
+      <section class="card" id="transactionHistoryCard">
+        <h2>Histórico de Transações</h2>
+        <small>Visualização de todas as movimentações registradas no jogo.</small>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Categoria</th>
+              <th>Tipo</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody id="transactionTableBody"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <!-- COLUNA DIREITA -->
+    <div>
+      <!-- LEMBRETES -->
+      <section class="card">
+        <h2>Lembretes de contas</h2>
+        <small>Evite atrasos e juros com avisos simples.</small>
+        <ul class="list" id="billsList">
+          <!-- Contas serão carregadas aqui -->
+        </ul>
+      </section>
+
+      <!-- DICAS RÁPIDAS -->
+      <section class="card">
+        <h2>Dicas rápidas</h2>
+        <small>Ajuda embutida no próprio fluxo.</small>
+        <ul class="list">
+          <li>💬 Tente separar pelo menos 10% de tudo o que ganha.</li>
+          <li>💳 Evite parcelar gastos do dia a dia.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // --- Lógica do Sistema Financeiro Integrado ---
+    
+    let gameState = null;
+    let currentUser = null;
+    let chartPizza = null;
+    let chartLinha = null;
+
+    // Inicializar
+    function init() {
+      const session = localStorage.getItem('ur_session');
+      const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+
+      if (session && users[session]) {
+        currentUser = session;
+        gameState = users[session].character;
+        // Garantir que arrays existam
+        if (!gameState.finances) gameState.finances = [];
+        if (!gameState.bills) gameState.bills = [];
+      } else {
+        // Fallback para teste sem login (não salva permanentemente no jogo)
+        gameState = { finances: [], bills: [] };
+        console.warn('Usuário não logado. As alterações não serão salvas no jogo principal.');
+      }
+
+      setupCharts();
+      updateUI();
+    }
+
+    // Salvar dados no LocalStorage (Sincroniza com o jogo)
+    function save() {
+      if (currentUser) {
+        const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+        if (users[currentUser]) {
+          users[currentUser].character = gameState;
+          localStorage.setItem('ur_users', JSON.stringify(users));
+        }
+      }
+      updateUI();
+    }
+
+    // Remover Transação (Global para ser acessível via onclick no HTML)
+    window.removeTransaction = function(id) {
+      if(confirm('Excluir esta transação?')) {
+        gameState.finances = gameState.finances.filter(t => t.id !== id);
+        save();
+      }
+    };
+
+    // Atualizar Interface
+    function updateUI() {
+      const finances = gameState.finances || [];
+      
+      // 1. Tabela
+      const tbody = document.getElementById('transactionTableBody');
+      tbody.innerHTML = '';
+      
+      // Ordenar por data (mais recente primeiro)
+      const sorted = [...finances].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      let totalEntradas = 0;
+      let totalSaidas = 0;
+
+      sorted.forEach(t => {
+        if (t.type === 'income') totalEntradas += t.value;
+        else totalSaidas += t.value;
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${new Date(t.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</td>
+          <td>${t.desc}</td>
+          <td>${t.category}</td>
+          <td><span class="pill ${t.type === 'income' ? 'pill-income' : 'pill-expense'}">${t.type === 'income' ? 'Entrada' : 'Saída'}</span></td>
+          <td>R$ ${t.value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // 2. Resumo
+      document.getElementById('summaryEntradas').textContent = `R$ ${totalEntradas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('summarySaidas').textContent = `R$ ${totalSaidas.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+      document.getElementById('summarySaldo').textContent = `R$ ${(totalEntradas - totalSaidas).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+
+      // 3. Contas (Lembretes)
+      const billsList = document.getElementById('billsList');
+      if (billsList) {
+        billsList.innerHTML = '';
+        const bills = gameState.bills || [];
+        if (bills.length === 0) {
+          billsList.innerHTML = '<li style="opacity:0.6">Nenhuma conta pendente.</li>';
+        } else {
+          bills.filter(b => !b.paid).forEach(b => {
+            const li = document.createElement('li');
+            const today = new Date().toISOString().split('T')[0];
+            const isOverdue = b.dueDate < today;
+            li.innerHTML = `<span class="badge" style="${isOverdue ? 'background:#fee2e2;color:#991b1b' : ''}">${new Date(b.dueDate).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</span> ${b.desc} • R$ ${b.value.toLocaleString('pt-BR')}`;
+            billsList.appendChild(li);
+          });
+        }
+      }
+
+      updateCharts(finances);
+    }
+
+    // Configurar Gráficos
+    function setupCharts() {
+      const ctxPizza = document.getElementById('gastosPorCategoria');
+      chartPizza = new Chart(ctxPizza, {
+        type: 'doughnut',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ['#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0', '#9966ff', '#ff9f40'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#ccc' } }, title: { display: true, text: 'Despesas por Categoria', color: '#ccc' } } }
+      });
+
+      const ctxLinha = document.getElementById('evolucaoSaldo');
+      chartLinha = new Chart(ctxLinha, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Saldo (R$)', data: [], borderColor: '#22c55e', backgroundColor: '#22c55e', tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { color: '#ccc' }, grid: { color: 'rgba(255,255,255,0.1)' } }, x: { ticks: { color: '#ccc' }, grid: { display: false } } }, plugins: { legend: { display: false }, title: { display: true, text: 'Evolução do Saldo', color: '#ccc' } } }
+      });
+    }
+
+    function updateCharts(finances) {
+      // Pizza (Despesas)
+      const expenses = finances.filter(t => t.type === 'expense');
+      const categories = {};
+      expenses.forEach(t => { categories[t.category] = (categories[t.category] || 0) + t.value; });
+      
+      chartPizza.data.labels = Object.keys(categories);
+      chartPizza.data.datasets[0].data = Object.values(categories);
+      chartPizza.update();
+
+      // Linha (Saldo acumulado simples)
+      const history = [...finances].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let balance = 0;
+      const labels = [];
+      const data = [];
+      
+      history.forEach(t => {
+        if (t.type === 'income') balance += t.value;
+        else balance -= t.value;
+        
+        const dateStr = new Date(t.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+        labels.push(dateStr);
+        data.push(balance);
+      });
+
+      // Pegar apenas os últimos 7 pontos para não poluir
+      if (labels.length > 7) {
+        chartLinha.data.labels = labels.slice(-7);
+        chartLinha.data.datasets[0].data = data.slice(-7);
+      } else {
+        chartLinha.data.labels = labels;
+        chartLinha.data.datasets[0].data = data;
+      }
+      chartLinha.update();
+    }
+
+    // Iniciar
+    window.addEventListener('load', init);
+
+    // Registrar Service Worker para funcionar offline
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>
