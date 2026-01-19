@@ -45,6 +45,10 @@
               <input type="password" id="loginPassword" placeholder="Digite sua senha...">
             </div>
           </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
+            <input type="checkbox" id="rememberUser" style="width: auto; cursor: pointer;">
+            <label for="rememberUser" style="margin:0; font-size: 13px; cursor: pointer; opacity: 0.8;">Lembrar meu usuário</label>
+          </div>
           <div style="display:flex; gap:8px; margin-top: 20px;">
             <button class="btn" id="loginBtn">Entrar</button>
             <button class="ghost" id="showRegisterBtn">Criar Conta</button>
@@ -82,6 +86,18 @@
                 <option value="Líder">Líder</option>
                 <option value="Equilibrado">Equilibrado</option>
               </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Pergunta de Segurança</label>
+              <input type="text" id="registerQuestion" placeholder="Ex: Nome do primeiro pet?">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Resposta de Segurança</label>
+              <input type="text" id="registerAnswer" placeholder="Sua resposta secreta...">
             </div>
           </div>
           <div class="form-row">
@@ -204,8 +220,8 @@
           <div class="control-bar">
             <button class="save-btn" id="saveBtn">💾 Salvar</button>
             <div class="divider-v"></div>
-            <button class="icon-btn" id="exportBtn" title="Exportar Save">📤</button>
-            <button class="icon-btn" id="importBtn" title="Importar Save">📥</button>
+            <button class="icon-btn" id="exportBtn" title="Exportar Backup Completo">📤</button>
+            <button class="icon-btn" id="importBtn" title="Importar Backup">📥</button>
             <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup Automático">↺</button>
             <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
             <button class="icon-btn" id="simpleFinanceBtn" title="Finanças Simplificadas">📊</button>
