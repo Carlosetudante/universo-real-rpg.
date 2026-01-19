@@ -42,7 +42,10 @@
           <div class="form-row">
             <div style="flex:1">
               <label>Senha</label>
-              <input type="password" id="loginPassword" placeholder="Digite sua senha...">
+              <div class="password-wrapper">
+                <input type="password" id="loginPassword" placeholder="Digite sua senha...">
+                <button type="button" class="toggle-password" data-target="loginPassword" title="Mostrar senha">👁️</button>
+              </div>
             </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
@@ -61,12 +64,26 @@
             <div style="flex:1">
               <label>Username</label>
               <input type="text" id="registerUsername" placeholder="Escolha um username...">
+              <div id="usernameCheckMsg" class="validation-msg"></div>
             </div>
           </div>
           <div class="form-row">
             <div style="flex:1">
               <label>Senha</label>
-              <input type="password" id="registerPassword" placeholder="Crie uma senha...">
+              <div class="password-wrapper">
+                <input type="password" id="registerPassword" placeholder="Crie uma senha...">
+                <button type="button" class="toggle-password" data-target="registerPassword" title="Mostrar senha">👁️</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Confirmar Senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="registerConfirmPassword" placeholder="Repita a senha...">
+                <button type="button" class="toggle-password" data-target="registerConfirmPassword" title="Mostrar senha">👁️</button>
+              </div>
+              <div id="passwordMatchMsg" class="validation-msg"></div>
             </div>
           </div>
           <div class="form-row">
@@ -563,12 +580,15 @@
   <!-- Overlay Modo Zen -->
   <div id="zenModeOverlay" class="hidden">
     <img id="zenBackgroundDisplay" class="zen-bg-thumb hidden" alt="Fundo Zen">
+    <div class="breathing-orb" id="zenBreathingOrb"></div>
     <div class="zen-content">
       <div id="zenTimer">0 anos, 0 meses, 0 dias...</div>
       <div id="zenQuote">"Frase inspiradora..."</div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
         <button class="ghost" id="zenMusicBtn" style="font-size: 12px; opacity: 0.7;">🎵 Selecionar Pasta de Músicas</button>
+        <select id="zenTrackSelect" class="ghost" style="display: none; font-size: 12px; opacity: 0.9; max-width: 250px; cursor: pointer; background: rgba(0,0,0,0.5); width: auto; padding: 8px;"></select>
         <button class="ghost" id="zenImageBtn" style="font-size: 12px; opacity: 0.7;">🖼️ Imagem de Fundo</button>
+        <button class="ghost" id="zenBreathingBtn" style="font-size: 12px; opacity: 0.7;">🌬️ Respiração</button>
         <button class="ghost" id="zenToggleHudBtn" style="font-size: 12px; opacity: 0.7;">👁️ Ocultar Interface</button>
       </div>
       <div id="zenPlaylistInfo" class="small" style="width: 100%; text-align: center; opacity: 0.6; margin-top: -10px;"></div>

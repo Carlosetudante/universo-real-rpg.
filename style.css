@@ -356,21 +356,38 @@
       font-weight: 500;
     }
     
-    input[type=text], select, input[type=color], input[type=number] {
+    input[type=text], 
+    input[type=password], 
+    input[type=number], 
+    input[type=date], 
+    input[type=datetime-local], 
+    input[type=time], 
+    input[type=week], 
+    select, 
+    input[type=color] {
       width: 100%;
-      padding: 10px;
+      padding: 12px;
       border-radius: 10px;
-      border: 1px solid rgba(255, 255, 255, .04);
-      background: rgba(0, 0, 0, .2);
-      color: inherit;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.25);
+      color: #e6eef8;
       font-size: 14px;
       transition: all .3s ease;
     }
     
-    input[type=text]:focus, select:focus, input[type=number]:focus {
+    input[type=text]:focus, 
+    input[type=password]:focus, 
+    input[type=number]:focus, 
+    input[type=date]:focus, 
+    input[type=datetime-local]:focus, 
+    input[type=time]:focus, 
+    input[type=week]:focus, 
+    select:focus, 
+    input[type=color]:focus {
       outline: none;
       border-color: var(--accent);
-      background: rgba(0, 0, 0, .3);
+      background: rgba(0, 0, 0, 0.4);
+      box-shadow: 0 0 0 3px rgba(255, 221, 87, 0.15);
     }
     
     .small {
@@ -972,8 +989,19 @@
   padding: 20px;
 }
 
+@keyframes modalOverlayEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalContentEnter {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .modal.active {
   display: flex;
+  animation: modalOverlayEnter 0.3s ease-out;
 }
 
 .modal-content {
@@ -984,15 +1012,33 @@
   width: 100%;
   border: 1px solid rgba(255, 255, 255, .1);
   box-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalContentEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-content h2 {
   margin-bottom: 20px;
   font-size: 24px;
+  text-align: center;
+  background: linear-gradient(90deg, var(--accent), #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 5px rgba(255, 221, 87, 0.3));
 }
 
 .modal-content .form-row {
   margin-bottom: 16px;
+}
+
+@keyframes formSlideIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#loginForm:not(.hidden), #registerForm:not(.hidden) {
+  animation: formSlideIn 0.3s ease-out;
 }
 
 .hidden {
@@ -1091,13 +1137,24 @@
 
 #zenTimer {
   position: absolute;
-  top: 30px;
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-  animation: breathe 6s ease-in-out infinite;
-  z-index: 2;
+  top: 15%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 200;
+  font-size: 2.2rem;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255, 221, 87, 0.6);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 20px 50px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 221, 87, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), inset 0 0 20px rgba(255, 255, 255, 0.05);
+  z-index: 10;
+  transition: all 0.5s ease;
+  text-align: center;
 }
 
 #zenQuote {
@@ -1110,6 +1167,55 @@
   position: relative;
   z-index: 2;
   animation: breathe 8s ease-in-out infinite;
+}
+
+/* Orbe de Respiração Dourado */
+.breathing-orb {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 221, 87, 0.15) 0%, rgba(255, 170, 0, 0.05) 60%, transparent 70%);
+  border: 1px solid rgba(255, 221, 87, 0.2);
+  box-shadow: 0 0 60px rgba(255, 221, 87, 0.1);
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.breathing-orb.active {
+  opacity: 1;
+  animation: breatheGold 5s infinite ease-in-out;
+}
+
+.breathing-orb::before {
+  content: '';
+  position: absolute;
+  inset: -40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+.breathing-orb.active::before {
+  opacity: 1;
+  animation: breatheGoldOuter 5s infinite ease-in-out;
+  animation-delay: 0.2s;
+}
+
+@keyframes breatheGold {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; box-shadow: 0 0 30px rgba(255, 221, 87, 0.1); }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; box-shadow: 0 0 80px rgba(255, 221, 87, 0.3), inset 0 0 30px rgba(255, 221, 87, 0.2); border-color: rgba(255, 221, 87, 0.5); }
+}
+
+@keyframes breatheGoldOuter {
+  0%, 100% { transform: scale(0.9); opacity: 0.3; border-color: rgba(255, 255, 255, 0.05); }
+  50% { transform: scale(1.3); opacity: 0.6; border-color: rgba(255, 221, 87, 0.3); }
 }
 
 /* Animação de Level Up */
@@ -1385,3 +1491,86 @@
 }
 
 .install-platform li { margin-bottom: 8px; }
+
+@media(max-width: 600px) {
+  .modal {
+    align-items: flex-start;
+    padding: 0;
+    overflow-y: auto;
+  }
+  .modal-content {
+    border-radius: 0;
+    min-height: 100vh;
+    border: none;
+    max-height: none;
+    justify-content: flex-start;
+    padding-top: 40px;
+  }
+  .modal-content h2 {
+    font-size: 28px;
+    margin-bottom: 25px;
+  }
+  #zenTimer {
+    font-size: 1.2rem;
+    padding: 15px 25px;
+    width: 90%;
+  }
+}
+
+/* Wrapper para senha com botão de olho */
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-wrapper input {
+  padding-right: 40px !important; /* Espaço para o botão não ficar em cima do texto */
+}
+
+.toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  padding: 4px;
+  z-index: 2;
+  color: #e6eef8;
+}
+
+.toggle-password:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Validação de Formulário */
+.validation-msg {
+  font-size: 12px;
+  margin-top: 4px;
+  min-height: 18px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.validation-msg.error {
+  color: var(--danger);
+}
+
+.validation-msg.success {
+  color: var(--success);
+}
+
+input.error {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15) !important;
+}
+
+input.success {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15) !important;
+}

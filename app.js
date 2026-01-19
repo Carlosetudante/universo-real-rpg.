@@ -176,6 +176,7 @@ let currentTrackIndex = 0;
 // Estado do jogo
 let gameState = null;
 let isLoggedIn = false;
+let loginTime = null;
 let financeFilter = 'all';
 let financePage = 1;
 
@@ -204,6 +205,9 @@ const elements = {
   // Register
   registerUsername: document.getElementById('registerUsername'),
   registerPassword: document.getElementById('registerPassword'),
+  registerConfirmPassword: document.getElementById('registerConfirmPassword'),
+  usernameCheckMsg: document.getElementById('usernameCheckMsg'),
+  passwordMatchMsg: document.getElementById('passwordMatchMsg'),
   registerName: document.getElementById('registerName'),
   registerRace: document.getElementById('registerRace'),
   registerAura: document.getElementById('registerAura'),
@@ -312,11 +316,14 @@ const elements = {
   zenTimer: document.getElementById('zenTimer'),
   zenQuote: document.getElementById('zenQuote'),
   zenMusicBtn: document.getElementById('zenMusicBtn'),
+  zenTrackSelect: document.getElementById('zenTrackSelect'),
   zenMusicInput: document.getElementById('zenMusicInput'),
   zenImageBtn: document.getElementById('zenImageBtn'),
   zenImageInput: document.getElementById('zenImageInput'),
   zenToggleHudBtn: document.getElementById('zenToggleHudBtn'),
   zenBackgroundDisplay: document.getElementById('zenBackgroundDisplay'),
+  zenBreathingOrb: document.getElementById('zenBreathingOrb'),
+  zenBreathingBtn: document.getElementById('zenBreathingBtn'),
   zenAudio: document.getElementById('zenAudio'),
   zenPlaylistInfo: document.getElementById('zenPlaylistInfo'),
   exitZenBtn: document.getElementById('exitZenBtn'),
@@ -476,6 +483,7 @@ async function login() {
     showToast('✅ Login realizado com sucesso!');
     gameState = normalizeGameState(users[username].character);
     isLoggedIn = true;
+    loginTime = new Date();
     saveSession(username);
     hideAuthModal();
     updateUI();
@@ -529,6 +537,7 @@ function recoverPassword() {
 async function register() {
   const username = elements.registerUsername.value.trim();
   const password = elements.registerPassword.value;
+  const confirmPassword = elements.registerConfirmPassword.value;
   const name = elements.registerName.value.trim();
   const race = elements.registerRace.value;
   const auraColor = elements.registerAura.value;
@@ -541,6 +550,10 @@ async function register() {
   }
   if (password.length < 4) {
     showToast('⚠️ A senha deve ter pelo menos 4 caracteres!');
+    return;
+  }
+  if (password !== confirmPassword) {
+    showToast('⚠️ As senhas não coincidem!');
     return;
   }
   try {
@@ -584,6 +597,7 @@ async function register() {
     checkBackupAvailability();
     elements.registerUsername.value = '';
     elements.registerPassword.value = '';
+    elements.registerConfirmPassword.value = '';
     elements.registerName.value = '';
     elements.registerQuestion.value = '';
     elements.registerAnswer.value = '';
@@ -615,6 +629,7 @@ async function checkSession() {
   if (users[username]) {
     gameState = normalizeGameState(users[username].character);
     isLoggedIn = true;
+    loginTime = new Date();
     hideAuthModal();
     checkDailyTaskReset(); // Verifica se virou o dia para resetar tarefas/aplicar penalidade
     updateUI();
@@ -1788,6 +1803,7 @@ async function loadAndPlayZenPlaylist() {
   try {
     zenPlaylist = await getMusicFromDB();
     if (zenPlaylist.length > 0) {
+      renderZenPlaylistSelect();
       currentTrackIndex = 0;
       playZenTrack(currentTrackIndex);
       if (elements.zenPlaylistInfo) {
@@ -1807,6 +1823,28 @@ async function loadAndPlayZenPlaylist() {
   }
 }
 
+function renderZenPlaylistSelect() {
+  if (!elements.zenTrackSelect) return;
+  
+  if (zenPlaylist.length === 0) {
+    elements.zenTrackSelect.style.display = 'none';
+    elements.zenMusicBtn.textContent = '🎵 Selecionar Pasta de Músicas';
+    return;
+  }
+
+  elements.zenTrackSelect.innerHTML = '';
+  zenPlaylist.forEach((file, index) => {
+    const option = document.createElement('option');
+    option.value = index;
+    option.textContent = (index + 1) + '. ' + file.name.replace(/\.[^/.]+$/, ""); // Remove extensão
+    elements.zenTrackSelect.appendChild(option);
+  });
+  
+  elements.zenTrackSelect.style.display = 'block';
+  elements.zenMusicBtn.textContent = '📂'; // Minimiza o botão da pasta
+  elements.zenMusicBtn.title = 'Alterar Pasta';
+}
+
 function playZenTrack(index) {
   if (zenPlaylist.length === 0) return;
   if (index >= zenPlaylist.length) index = 0; // Loop da playlist
@@ -1821,6 +1859,10 @@ function playZenTrack(index) {
   
   if (elements.zenPlaylistInfo) {
     elements.zenPlaylistInfo.textContent = `Tocando ${index + 1}/${zenPlaylist.length}`;
+  }
+
+  if (elements.zenTrackSelect) {
+    elements.zenTrackSelect.value = index;
   }
 }
 
@@ -1911,6 +1953,12 @@ function handleZenImageSelect(event) {
 function toggleZenImageSize() {
   if (elements.zenBackgroundDisplay) {
     elements.zenBackgroundDisplay.classList.toggle('expanded');
+  }
+}
+
+function toggleZenBreathing() {
+  if (elements.zenBreathingOrb) {
+    elements.zenBreathingOrb.classList.toggle('active');
   }
 }
 
@@ -2177,7 +2225,22 @@ function renderVisualBadges() {
       const badge = document.createElement('div');
       badge.className = 'visual-badge';
       badge.textContent = achievement.icon;
-      badge.title = `${achievement.name}\n${achievement.titleReward ? 'Título: ' + achievement.titleReward : 'Conquista Desbloqueada'}`;
+      
+      if (achievement.icon === '👣') {
+        badge.style.cursor = 'pointer';
+        badge.title = "Ver tempo online";
+        badge.onclick = () => {
+          const now = new Date();
+          const start = loginTime || now;
+          const diff = now - start;
+          const hours = Math.floor(diff / 3600000);
+          const minutes = Math.floor((diff % 3600000) / 60000);
+          showToast(`⏱️ Tempo online: ${hours}h e ${minutes}m`);
+        };
+      } else {
+        badge.title = `${achievement.name}\n${achievement.titleReward ? 'Título: ' + achievement.titleReward : 'Conquista Desbloqueada'}`;
+      }
+      
       elements.heroVisualBadges.appendChild(badge);
     }
   });
@@ -2797,9 +2860,12 @@ if (elements.exitZenBtn) elements.exitZenBtn.addEventListener('click', toggleZen
 if (elements.zenMusicBtn && elements.zenMusicInput) elements.zenMusicBtn.addEventListener('click', () => elements.zenMusicInput.click());
 if (elements.zenImageBtn && elements.zenImageInput) elements.zenImageBtn.addEventListener('click', () => elements.zenImageInput.click());
 if (elements.zenToggleHudBtn) elements.zenToggleHudBtn.addEventListener('click', toggleZenHud);
+if (elements.zenTrackSelect) elements.zenTrackSelect.addEventListener('change', (e) => playZenTrack(parseInt(e.target.value)));
 if (elements.simpleFinanceBtn) elements.simpleFinanceBtn.addEventListener('click', () => window.location.href = './financeiro.html');
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
 if (elements.zenImageInput) elements.zenImageInput.addEventListener('change', handleZenImageSelect);
+if (elements.zenBackgroundDisplay) elements.zenBackgroundDisplay.addEventListener('click', toggleZenImageSize);
+if (elements.zenBreathingBtn) elements.zenBreathingBtn.addEventListener('click', toggleZenBreathing);
 if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (e) => {
   // Se a interface estiver oculta e clicar no overlay, restaura
   if (elements.zenModeOverlay.classList.contains('zen-hud-hidden')) {
@@ -2812,6 +2878,78 @@ if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (
 if (elements.addDomHourBtn) elements.addDomHourBtn.addEventListener('click', addDomHourRecord);
 if (elements.addDomDoughBtn) elements.addDomDoughBtn.addEventListener('click', addDomDoughRecord);
 if (elements.domPriceInput) elements.domPriceInput.addEventListener('change', saveDomPrice);
+
+// Toggle Password Visibility (Olho Mágico)
+document.querySelectorAll('.toggle-password').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault(); // Evita submeter o formulário
+    const targetId = btn.getAttribute('data-target');
+    const input = document.getElementById(targetId);
+    if (input) {
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.textContent = isPassword ? '🙈' : '👁️';
+      btn.title = isPassword ? 'Ocultar senha' : 'Mostrar senha';
+    }
+  });
+});
+
+// Validação em Tempo Real: Username
+if (elements.registerUsername) {
+  elements.registerUsername.addEventListener('input', () => {
+    const username = elements.registerUsername.value.trim();
+    const msg = elements.usernameCheckMsg;
+    
+    if (username.length < 3) {
+      msg.textContent = '';
+      msg.className = 'validation-msg';
+      elements.registerUsername.classList.remove('success', 'error');
+      return;
+    }
+
+    const users = getUsers();
+    // Verifica se existe (case insensitive)
+    if (users[username] || Object.keys(users).some(k => k.toLowerCase() === username.toLowerCase())) {
+      msg.textContent = '❌ Usuário já existe!';
+      msg.className = 'validation-msg error';
+      elements.registerUsername.classList.add('error');
+      elements.registerUsername.classList.remove('success');
+    } else {
+      msg.textContent = '✅ Disponível';
+      msg.className = 'validation-msg success';
+      elements.registerUsername.classList.add('success');
+      elements.registerUsername.classList.remove('error');
+    }
+  });
+}
+
+// Validação em Tempo Real: Senhas
+function validatePasswords() {
+  const p1 = elements.registerPassword.value;
+  const p2 = elements.registerConfirmPassword.value;
+  const msg = elements.passwordMatchMsg;
+
+  if (!p1 || !p2) {
+    msg.textContent = '';
+    elements.registerConfirmPassword.classList.remove('success', 'error');
+    return;
+  }
+
+  if (p1 === p2) {
+    msg.textContent = '✅ As senhas coincidem';
+    msg.className = 'validation-msg success';
+    elements.registerConfirmPassword.classList.add('success');
+    elements.registerConfirmPassword.classList.remove('error');
+  } else {
+    msg.textContent = '❌ As senhas não coincidem';
+    msg.className = 'validation-msg error';
+    elements.registerConfirmPassword.classList.add('error');
+    elements.registerConfirmPassword.classList.remove('success');
+  }
+}
+
+if (elements.registerPassword) elements.registerPassword.addEventListener('input', validatePasswords);
+if (elements.registerConfirmPassword) elements.registerConfirmPassword.addEventListener('input', validatePasswords);
 
 // Inicialização
 window.addEventListener('DOMContentLoaded', () => {
