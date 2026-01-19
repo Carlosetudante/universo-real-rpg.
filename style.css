@@ -294,6 +294,11 @@
       transform: translateY(0);
     }
     
+    /* Otimização para toque em mobile (remove delay de clique) */
+    button, .btn, .icon-btn, .tab-btn, .task-item, .bill-item, .shop-item {
+      touch-action: manipulation;
+    }
+
     .btn.success {
       background: linear-gradient(180deg, var(--success), #22c55e);
     }
