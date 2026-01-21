@@ -25,6 +25,8 @@
       background: linear-gradient(180deg, var(--bg1), var(--bg2));
       color: #e6eef8;
       overflow-y: auto;
+      /* Garante que o conteúdo não fique atrás da barra de home em iPhones */
+      padding-bottom: env(safe-area-inset-bottom);
     }
     
     /* Estrelas animadas */
@@ -831,7 +833,8 @@
 
       .card {
         width: 100%;
-        min-height: 100vh;
+        min-height: 100vh; /* Fallback */
+        min-height: 100dvh; /* Altura dinâmica para mobile (ignora barra de endereço) */
         border-radius: 0;
         margin: 0;
         display: flex;
@@ -961,6 +964,26 @@
 
       .install-instructions {
         flex-direction: column;
+      }
+
+      /* --- Otimizações Mobile (Toque e Teclado) --- */
+      
+      /* Previne zoom automático no iPhone ao clicar em inputs (mínimo 16px) */
+      input[type=text], input[type=password], input[type=number], 
+      input[type=date], input[type=datetime-local], input[type=time], 
+      input[type=week], select, input[type=color] {
+        font-size: 16px;
+      }
+
+      /* Aumenta área de toque dos botões de ícone */
+      .icon-btn {
+        width: 44px;
+        height: 44px;
+      }
+
+      /* Garante que o modal não fique preso atrás do teclado */
+      .modal-content {
+        padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* Espaço extra + área segura */
       }
     }
     
@@ -1141,8 +1164,7 @@
 }
 
 #zenTimer {
-  position: absolute;
-  top: 15%;
+  position: relative;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-weight: 200;
   font-size: 2.2rem;

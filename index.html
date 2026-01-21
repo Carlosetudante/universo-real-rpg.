@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#071428">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -204,6 +204,23 @@
         <h2>📜 Histórico de Tarefas</h2>
         <div id="taskHistoryList" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
         <button class="btn" onclick="document.getElementById('taskHistoryModal').classList.remove('active')">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Modal de Configuração de Grupos Financeiros -->
+    <div class="modal" id="groupConfigModal">
+      <div class="modal-content">
+        <h2>🧩 Configurar Grupos</h2>
+        <p class="small" style="margin-bottom: 15px;">Crie grupos para somar gastos automaticamente baseados em palavras-chave na descrição.</p>
+        <div class="form-row">
+          <input type="text" id="groupNameInput" placeholder="Nome (ex: Casa)" style="flex:1">
+        </div>
+        <div class="form-row">
+          <input type="text" id="groupKeywordsInput" placeholder="Palavras-chave (ex: luz, agua, net)" style="flex:1">
+        </div>
+        <button class="btn" id="addGroupBtn" style="width:100%; margin-bottom:20px;">Adicionar Grupo</button>
+        <div id="groupsListConfig" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
+        <button class="ghost" id="closeGroupConfigBtn" style="width:100%;">Fechar</button>
       </div>
     </div>
 
@@ -447,6 +464,15 @@
             </div>
           </div>
 
+          <h3>🧩 Análise por Grupos</h3>
+          <div class="section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div class="small">Gastos agrupados por palavras-chave</div>
+              <button class="ghost" id="configGroupsBtn" style="font-size:12px; padding: 4px 10px;">⚙️ Configurar</button>
+            </div>
+            <div id="financeGroupsDisplay" style="display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+
           <h3>📅 Contas a Pagar</h3>
           <div class="section">
             <div class="form-row">
@@ -540,7 +566,7 @@
             <div style="margin-top: 32px; margin-bottom: 20px;">
               <h4>Registrar Produção de Massas</h4>
               <div class="form-row" style="gap:8px; flex-wrap:wrap;">
-                <input type="week" id="domDoughDateInput" placeholder="Semana">
+                <input type="date" id="domDoughDateInput" placeholder="Data">
                 <input type="number" id="domDoughInput" placeholder="Quantidade de Massas">
                 <button class="btn" id="addDomDoughBtn">Registrar Massas</button>
               </div>
@@ -560,7 +586,7 @@
             </div>
             <!-- Gráfico de Produção -->
             <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-              <h4 style="margin-bottom: 15px; text-align: center;">Produção Recente (4 Semanas)</h4>
+              <h4 style="margin-bottom: 15px; text-align: center;">Produção Recente</h4>
               <div style="height: 220px;">
                 <canvas id="domProductionChart"></canvas>
               </div>

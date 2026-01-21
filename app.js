@@ -288,6 +288,16 @@ const elements = {
   financeGoalText: document.getElementById('financeGoalText'),
   financeGoalProgress: document.getElementById('financeGoalProgress'),
   financeGoalStatus: document.getElementById('financeGoalStatus'),
+  
+  // Finance Groups
+  configGroupsBtn: document.getElementById('configGroupsBtn'),
+  groupConfigModal: document.getElementById('groupConfigModal'),
+  groupNameInput: document.getElementById('groupNameInput'),
+  groupKeywordsInput: document.getElementById('groupKeywordsInput'),
+  addGroupBtn: document.getElementById('addGroupBtn'),
+  groupsListConfig: document.getElementById('groupsListConfig'),
+  closeGroupConfigBtn: document.getElementById('closeGroupConfigBtn'),
+  financeGroupsDisplay: document.getElementById('financeGroupsDisplay'),
 
   // Bills
   billDesc: document.getElementById('billDesc'),
@@ -671,7 +681,8 @@ function normalizeGameState(data) {
     zenBackgroundImage: null,
     zenMusic: null,
     gratitudeJournal: [],
-    taskHistory: []
+    taskHistory: [],
+    expenseGroups: [] // Novos grupos de despesas
   };
 
   // Mescla os dados importados com o padrão para preencher campos faltantes
@@ -910,7 +921,10 @@ function updateXpHistory(amount) {
   const now = new Date();
   const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
   
-  gameState.xpHistory[dateKey] = (gameState.xpHistory[dateKey] || 0) + amount;
+  let current = gameState.xpHistory[dateKey] || 0;
+  let newVal = current + amount;
+  if (newVal < 0) newVal = 0; // Garante que o histórico não fique negativo
+  gameState.xpHistory[dateKey] = newVal;
 }
 
 function resetAttributes() {
@@ -1026,8 +1040,29 @@ function addGratitudeEntry() {
 
 function renderGratitudeJournal() {
   if (!elements.gratitudeHistory) return;
-  elements.gratitudeHistory.innerHTML = '';
   const list = gameState.gratitudeJournal || [];
+  
+  // Verificar se já registrou hoje para bloquear a interface
+  const today = new Date().toLocaleDateString('pt-BR');
+  const alreadyPosted = list.some(entry => entry.date === today);
+
+  if (elements.gratitudeBtn) {
+    if (alreadyPosted) {
+      elements.gratitudeBtn.disabled = true;
+      elements.gratitudeBtn.textContent = '✅ Gratidão Registrada (Volte Amanhã)';
+      if (elements.gratitude1) elements.gratitude1.disabled = true;
+      if (elements.gratitude2) elements.gratitude2.disabled = true;
+      if (elements.gratitude3) elements.gratitude3.disabled = true;
+    } else {
+      elements.gratitudeBtn.disabled = false;
+      elements.gratitudeBtn.textContent = '🙏 Registrar Gratidão';
+      if (elements.gratitude1) elements.gratitude1.disabled = false;
+      if (elements.gratitude2) elements.gratitude2.disabled = false;
+      if (elements.gratitude3) elements.gratitude3.disabled = false;
+    }
+  }
+
+  elements.gratitudeHistory.innerHTML = '';
   
   if (list.length === 0) {
     elements.gratitudeHistory.innerHTML = '<div class="small" style="opacity:0.5; text-align:center;">Seu diário está vazio. Comece hoje!</div>';
@@ -1539,6 +1574,119 @@ function renderFinancialGoal() {
       elements.financeGoalStatus.style.fontWeight = "normal";
     }
   }
+}
+
+// --- Sistema de Grupos Financeiros Personalizados ---
+
+function openGroupConfig() {
+  elements.groupConfigModal.classList.add('active');
+  renderGroupsConfig();
+}
+
+function closeGroupConfig() {
+  elements.groupConfigModal.classList.remove('active');
+  updateUI(); // Atualiza a tela principal com as mudanças
+}
+
+function addExpenseGroup() {
+  const name = elements.groupNameInput.value.trim();
+  const keywordsStr = elements.groupKeywordsInput.value.trim();
+
+  if (!name || !keywordsStr) {
+    showToast('⚠️ Preencha o nome e as palavras-chave!');
+    return;
+  }
+
+  if (!gameState.expenseGroups) gameState.expenseGroups = [];
+
+  // Separa as palavras por vírgula e limpa espaços
+  const keywords = keywordsStr.split(',').map(k => k.trim()).filter(k => k.length > 0);
+
+  gameState.expenseGroups.push({
+    id: Date.now(),
+    name,
+    keywords
+  });
+
+  elements.groupNameInput.value = '';
+  elements.groupKeywordsInput.value = '';
+  
+  saveGame();
+  renderGroupsConfig();
+  showToast('✅ Grupo criado!');
+}
+
+function removeExpenseGroup(id) {
+  if (confirm('Excluir este grupo?')) {
+    gameState.expenseGroups = gameState.expenseGroups.filter(g => g.id !== id);
+    saveGame();
+    renderGroupsConfig();
+  }
+}
+
+function renderGroupsConfig() {
+  if (!elements.groupsListConfig) return;
+  elements.groupsListConfig.innerHTML = '';
+  const groups = gameState.expenseGroups || [];
+
+  if (groups.length === 0) {
+    elements.groupsListConfig.innerHTML = '<div class="small" style="opacity:0.5; text-align:center;">Nenhum grupo configurado.</div>';
+    return;
+  }
+
+  groups.forEach(g => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:bold; font-size:13px;">${g.name}</div>
+        <div class="small" style="opacity:0.6; font-size:11px;">${g.keywords.join(', ')}</div>
+      </div>
+      <button class="ghost" style="padding:4px 8px; font-size:12px;" onclick="removeExpenseGroup(${g.id})">🗑️</button>
+    `;
+    elements.groupsListConfig.appendChild(div);
+  });
+}
+
+function renderFinanceGroups() {
+  if (!elements.financeGroupsDisplay || !gameState) return;
+  elements.financeGroupsDisplay.innerHTML = '';
+  
+  const groups = gameState.expenseGroups || [];
+  const transactions = gameState.finances || [];
+
+  if (groups.length === 0) {
+    elements.financeGroupsDisplay.innerHTML = '<div class="small" style="opacity:0.5; text-align:center; padding:10px;">Configure grupos para ver análises personalizadas.</div>';
+    return;
+  }
+
+  groups.forEach(group => {
+    let total = 0;
+    // Normaliza palavras-chave para minúsculas
+    const keywords = group.keywords.map(k => k.toLowerCase());
+
+    transactions.forEach(t => {
+      if (t.type === 'expense') {
+        const desc = t.desc.toLowerCase();
+        // Verifica se a descrição contém alguma das palavras-chave
+        if (keywords.some(k => desc.includes(k))) {
+          total += t.value;
+        }
+      }
+    });
+
+    const div = document.createElement('div');
+    div.className = 'finance-item'; // Reutiliza estilo existente
+    div.style.borderLeft = '3px solid var(--accent)';
+    div.innerHTML = `
+      <div style="flex:1">
+        <div style="font-weight:600">${group.name}</div>
+        <div class="small" style="opacity:0.6">${group.keywords.length} palavras-chave</div>
+      </div>
+      <div style="font-weight:bold;">R$ ${total.toLocaleString('pt-BR')}</div>
+    `;
+    elements.financeGroupsDisplay.appendChild(div);
+  });
 }
 
 // --- Sistema de Contas a Pagar ---
@@ -2313,7 +2461,7 @@ function addDomDoughRecord() {
   const currentPrice = parseMoney(elements.domPriceInput.value);
 
   if (!date || isNaN(qty) || qty <= 0) {
-    showToast('⚠️ Preencha semana e quantidade válida!');
+    showToast('⚠️ Preencha data e quantidade válida!');
     return;
   }
 
@@ -2479,6 +2627,12 @@ function renderDomDoughHistory() {
       
       displayDate = `Semana ${week}/${year}`;
       dateSubtext = weekStart.toLocaleDateString('pt-BR');
+    } else if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+      // Formatar data YYYY-MM-DD para DD/MM/AAAA
+      const [y, m, d] = dateKey.split('-');
+      displayDate = `${d}/${m}/${y}`;
+      const dateObj = new Date(y, m - 1, d);
+      dateSubtext = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
     }
     
     htmlContent += `
@@ -2514,19 +2668,22 @@ function renderDomProductionChart() {
     groups[item.date] += item.qty;
   });
 
-  // Pegar as últimas 4 semanas ordenadas
+  // Pegar as últimas 7 entradas ordenadas (dias ou semanas)
   const sortedWeeks = Object.keys(groups).sort();
-  const last4Weeks = sortedWeeks.slice(-4);
+  const lastEntries = sortedWeeks.slice(-7);
   
-  const labels = last4Weeks.map(w => {
+  const labels = lastEntries.map(w => {
     if (w.includes('-W')) {
       const [y, week] = w.split('-W');
       return `Sem ${week}`;
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(w)) {
+      const [y, m, d] = w.split('-');
+      return `${d}/${m}`;
     }
     return w;
   });
   
-  const data = last4Weeks.map(w => groups[w]);
+  const data = lastEntries.map(w => groups[w]);
 
   if (domProductionChartInstance) {
     domProductionChartInstance.destroy();
@@ -2627,8 +2784,8 @@ function renderDailyTasks() {
     div.dataset.id = task.id; // Identificador para animação
     div.onclick = () => toggleTask(task.id);
     div.innerHTML = `
-      <span style="flex:1">${task.completed ? '✅' : '⬜'} ${task.text}</span>
-      <button class="ghost" style="padding:4px 8px; font-size:10px" onclick="removeTask(${task.id}, event)">❌</button>
+      <span style="flex:1; word-break: break-word; line-height: 1.4; padding-right: 10px;">${task.completed ? '✅' : '⬜'} ${task.text}</span>
+      <button class="ghost" style="padding:4px 8px; font-size:10px; flex-shrink:0; width: auto;" onclick="removeTask(${task.id}, event)" title="Excluir">❌</button>
     `;
     if (elements.taskList) elements.taskList.appendChild(div);
   });
@@ -2649,7 +2806,9 @@ function renderXpChart() {
     const dayName = days[d.getDay()];
     
     labels.push(dayName);
-    data.push((gameState.xpHistory && gameState.xpHistory[dateKey]) || 0);
+    let val = (gameState.xpHistory && gameState.xpHistory[dateKey]) || 0;
+    if (val < 0) val = 0; // Visualmente corrige dias passados negativos
+    data.push(val);
   }
 
   if (xpChartInstance) {
@@ -2754,6 +2913,7 @@ function updateUI() {
   renderFinanceChart();
   renderFinancialGoal();
   renderFinanceMonthlyChart();
+  renderFinanceGroups();
   renderBills();
   renderDomHourHistory();
   renderDomDoughHistory();
@@ -2851,6 +3011,9 @@ if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (
 if (elements.addDomHourBtn) elements.addDomHourBtn.addEventListener('click', addDomHourRecord);
 if (elements.addDomDoughBtn) elements.addDomDoughBtn.addEventListener('click', addDomDoughRecord);
 if (elements.domPriceInput) elements.domPriceInput.addEventListener('change', saveDomPrice);
+if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click', openGroupConfig);
+if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
+if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
 // Toggle Password Visibility (Olho Mágico)
 document.querySelectorAll('.toggle-password').forEach(btn => {
