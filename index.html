@@ -258,6 +258,7 @@
             <button class="icon-btn" id="importBtn" title="Importar Backup">📥</button>
             <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup Automático">↺</button>
             <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
+            <button class="icon-btn" id="chatBtn" title="Falar com o Oráculo">🤖</button>
             <button class="icon-btn" id="simpleFinanceBtn" title="Finanças Simplificadas">📊</button>
             <button class="icon-btn danger" id="logoutBtn" title="Sair">🚪</button>
             <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
@@ -615,6 +616,28 @@
       <button class="fab-action" id="fabFinanceBtn" title="Nova Transação">💰</button>
     </div>
     <button class="fab-main" id="fabMainBtn">➕</button>
+  </div>
+
+  <!-- Modal do Chat (Oráculo) -->
+  <div id="chatModal" class="modal">
+    <div class="modal-content" style="height: 80vh; display: flex; flex-direction: column; padding: 0;">
+      <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h2 style="margin: 0; font-size: 1.2rem;">🤖 Oráculo</h2>
+          <select id="oraclePersonalitySelect" class="ghost" style="padding: 2px 8px; font-size: 11px; height: auto; border-radius: 6px;">
+            <option value="robot">🤖 Robô</option>
+            <option value="wise">🧙‍♂️ Sábio</option>
+            <option value="coach">🏋️ Treinador</option>
+          </select>
+        </div>
+        <button class="ghost" id="closeChatBtn" style="padding: 4px 10px;">✕</button>
+      </div>
+      <div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;"></div>
+      <div style="padding: 15px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <input type="text" id="chatInput" placeholder="Pergunte algo (ex: saldo, xp, tarefas)..." style="margin: 0;">
+        <button class="btn" id="sendMessageBtn" style="width: auto;">Enviar</button>
+      </div>
+    </div>
   </div>
 
   <div id="toast" class="toast" style="display:none"></div>

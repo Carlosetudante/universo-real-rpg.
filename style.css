@@ -1788,3 +1788,32 @@ input.success {
   align-items: center;
   gap: 8px;
 }
+
+/* --- Chat do Oráculo --- */
+.chat-message {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  position: relative;
+  animation: fadeIn 0.3s ease;
+}
+
+.chat-message.bot {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.1);
+  border-bottom-left-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.chat-message.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #1a1a1a;
+  border-bottom-right-radius: 2px;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(255, 221, 87, 0.2);
+}
+
+.chat-message strong { font-weight: 800; }
