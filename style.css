@@ -985,6 +985,12 @@
       .modal-content {
         padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* Espaço extra + área segura */
       }
+
+      /* Empilha campos de formulário em telas pequenas para melhor toque */
+      .form-row {
+        flex-direction: column;
+        gap: 12px;
+      }
     }
     
     /* Scrollbar customizada */
@@ -1600,4 +1606,185 @@ input.error {
 input.success {
   border-color: var(--success) !important;
   box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15) !important;
+}
+
+/* FAB - Botão Flutuante */
+.fab-container {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 12px;
+}
+
+.fab-container.hidden {
+  display: none !important;
+}
+
+.fab-main {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #1a1a1a;
+  border: none;
+  font-size: 28px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.fab-main.active {
+  transform: rotate(45deg);
+  background: #fff;
+}
+
+.fab-actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 12px;
+  margin-bottom: 5px;
+  transition: all 0.3s ease;
+}
+
+.fab-actions.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px) scale(0.8);
+}
+
+.fab-action {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  transition: all 0.2s;
+  position: relative;
+  padding: 0;
+}
+
+.fab-action:hover {
+  background: var(--accent);
+  color: #1a1a1a;
+  transform: scale(1.1);
+}
+
+/* Tooltip para Desktop/Hover */
+.fab-action::after {
+  content: attr(title);
+  position: absolute;
+  right: 60px;
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  font-weight: 500;
+}
+
+.fab-action:hover::after {
+  opacity: 1;
+}
+
+@media(max-width: 600px) {
+  .fab-action::after {
+    display: none; /* Oculta tooltip no mobile */
+  }
+}
+
+/* --- Estilos da Aba Trabalho (Dashboard) --- */
+
+.work-dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.timer-card {
+  background: linear-gradient(145deg, rgba(0,0,0,0.4), rgba(20,20,20,0.4));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 25px;
+  text-align: center;
+  box-shadow: inset 0 0 30px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Efeito de scanline sutil no timer */
+.timer-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.digital-clock {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  margin: 15px 0 25px 0;
+  letter-spacing: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.control-panel {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+}
+
+.control-panel::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; width: 4px; height: 100%;
+  background: var(--accent);
+  border-radius: 4px 0 0 4px;
+  opacity: 0.5;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.history-section-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.6;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

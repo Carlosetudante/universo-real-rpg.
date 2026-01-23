@@ -184,7 +184,7 @@ let financePage = 1;
 let xpChartInstance = null;
 let financeChartInstance = null;
 let financeMonthlyChartInstance = null;
-let domProductionChartInstance = null;
+let workChartInstance = null;
 let attributesChartInstance = null;
 
 // Elementos DOM
@@ -350,19 +350,26 @@ const elements = {
   saveProfileBtn: document.getElementById('saveProfileBtn'),
   cancelEditBtn: document.getElementById('cancelEditBtn'),
 
-  // Dom
-  domDateInput: document.getElementById('domDateInput'),
-  domEntryTimeInput: document.getElementById('domEntryTimeInput'),
-  domExitTimeInput: document.getElementById('domExitTimeInput'),
-  addDomHourBtn: document.getElementById('addDomHourBtn'),
-  domHourHistoryList: document.getElementById('domHourHistoryList'),
-  domDoughDateInput: document.getElementById('domDoughDateInput'),
-  domDoughInput: document.getElementById('domDoughInput'),
-  addDomDoughBtn: document.getElementById('addDomDoughBtn'),
-  domHistoryList: document.getElementById('domHistoryList'),
-  domStats: document.getElementById('domStats'),
-  domPriceInput: document.getElementById('domPriceInput'),
-  domProductionChart: document.getElementById('domProductionChart')
+  // Trabalho (Work)
+  workSetupSection: document.getElementById('workSetupSection'),
+  workDashboardSection: document.getElementById('workDashboardSection'),
+  jobNameInput: document.getElementById('jobNameInput'),
+  jobTypeSelect: document.getElementById('jobTypeSelect'),
+  saveJobBtn: document.getElementById('saveJobBtn'),
+  configJobBtn: document.getElementById('configJobBtn'),
+  workTitleDisplay: document.getElementById('workTitleDisplay'),
+  workSingularityContainer: document.getElementById('workSingularityContainer'),
+  workTimeHistoryList: document.getElementById('workTimeHistoryList'),
+  workProductionHistoryList: document.getElementById('workProductionHistoryList'),
+  workChart: document.getElementById('workChart'),
+
+  // FAB
+  fabContainer: document.getElementById('fabContainer'),
+  fabMainBtn: document.getElementById('fabMainBtn'),
+  fabActions: document.getElementById('fabActions'),
+  fabWorkBtn: document.getElementById('fabWorkBtn'),
+  fabTaskBtn: document.getElementById('fabTaskBtn'),
+  fabFinanceBtn: document.getElementById('fabFinanceBtn')
 };
 
 // Funções auxiliares
@@ -411,11 +418,13 @@ function triggerLevelUpAnimation() {
 function showAuthModal() {
   elements.authModal.classList.add('active');
   elements.gameScreen.classList.add('hidden');
+  if (elements.fabContainer) elements.fabContainer.classList.add('hidden');
 }
 
 function hideAuthModal() {
   elements.authModal.classList.remove('active');
   elements.gameScreen.classList.remove('hidden');
+  if (elements.fabContainer) elements.fabContainer.classList.remove('hidden');
 }
 
 function showLoginForm() {
@@ -600,6 +609,7 @@ async function register() {
     showToast('🎉 Personagem criado com sucesso!', 4000);
     gameState = character;
     isLoggedIn = true;
+    loginTime = new Date();
     saveSession(username);
     hideAuthModal();
     updateUI();
@@ -677,7 +687,9 @@ function normalizeGameState(data) {
     xpHistory: {},
     lastTaskReset: new Date().toISOString(),
     lastClaim: null,
-    domPrice: 0,
+    playTime: 0,
+    job: { name: null, type: null, config: {} }, // Configuração do Trabalho
+    workLog: [],   // Histórico de ponto
     zenBackgroundImage: null,
     zenMusic: null,
     gratitudeJournal: [],
@@ -708,6 +720,13 @@ async function saveGame(arg) {
     const username = getSession();
     let users = getUsers();
     if (users[username]) {
+      // Atualiza tempo de jogo antes de salvar
+      if (loginTime) {
+        const now = new Date();
+        gameState.playTime = (gameState.playTime || 0) + (now - loginTime);
+        loginTime = now;
+      }
+
       users[username].character = gameState;
       setUsers(users);
       
@@ -2379,11 +2398,11 @@ function renderVisualBadges() {
         badge.title = "Ver tempo online";
         badge.onclick = () => {
           const now = new Date();
-          const start = loginTime || now;
-          const diff = now - start;
-          const hours = Math.floor(diff / 3600000);
-          const minutes = Math.floor((diff % 3600000) / 60000);
-          showToast(`⏱️ Tempo online: ${hours}h e ${minutes}m`);
+          const sessionTime = loginTime ? (now - loginTime) : 0;
+          const totalTime = (gameState.playTime || 0) + sessionTime;
+          const hours = Math.floor(totalTime / 3600000);
+          const minutes = Math.floor((totalTime % 3600000) / 60000);
+          showToast(`⏱️ Tempo total online: ${hours}h e ${minutes}m`);
         };
       } else {
         badge.title = `${achievement.name}\n${achievement.titleReward ? 'Título: ' + achievement.titleReward : 'Conquista Desbloqueada'}`;
@@ -2394,323 +2413,662 @@ function renderVisualBadges() {
   });
 }
 
-// --- Dom: Carga Horária (Dia a Dia) ---
-function addDomHourRecord() {
-  const date = elements.domDateInput.value;
-  const entry = elements.domEntryTimeInput.value;
-  const exit = elements.domExitTimeInput.value;
-  if (!date || !entry || !exit) {
-    showToast('⚠️ Preencha data, entrada e saída!');
+// --- Sistema de Trabalho (Work) ---
+
+const JOB_TYPES = {
+  pizzaria: {
+    label: 'Pizzaria',
+    inputLabel: 'Quantidade de Massas',
+    configLabel: 'Valor por Massa (R$)',
+    unit: 'massas',
+    icon: '🍕'
+  },
+  vendedor: {
+    label: 'Vendedor',
+    inputLabel: 'Valor da Venda (R$)',
+    configLabel: 'Comissão (%)',
+    unit: 'vendas',
+    icon: '🤝'
+  },
+  motorista: {
+    label: 'Motorista',
+    inputLabel: 'Valor da Corrida (R$)',
+    configLabel: 'Meta Diária (R$)',
+    unit: 'corridas',
+    icon: '🚖'
+  },
+  freelancer: {
+    label: 'Freelancer',
+    inputLabel: 'Valor do Projeto/Hora (R$)',
+    configLabel: 'Valor Hora Estimado (R$)',
+    unit: 'projetos',
+    icon: '💻'
+  }
+};
+
+function saveJobSettings() {
+  const name = elements.jobNameInput.value.trim();
+  const type = elements.jobTypeSelect.value;
+
+  if (!name) {
+    showToast('⚠️ Digite o nome da empresa!');
     return;
   }
-  if (!gameState.domHours) gameState.domHours = [];
-  gameState.domHours.push({ date, entry, exit });
+
+  if (!gameState.job) gameState.job = {};
+  gameState.job.name = name;
+  gameState.job.type = type;
+  
+  // Inicializa config se vazio
+  if (!gameState.job.config) gameState.job.config = { rate: 0 };
+
   saveGame();
-  renderDomHourHistory();
-  elements.domDateInput.value = '';
-  elements.domEntryTimeInput.value = '';
-  elements.domExitTimeInput.value = '';
-  showToast('⏰ Registro de carga horária adicionado!');
+  renderWorkTab();
+  showToast('💼 Trabalho configurado!');
 }
 
-function saveDomPrice() {
+function resetJobSettings() {
+  if (confirm('Deseja reconfigurar seu trabalho? O histórico será mantido.')) {
+    gameState.job.name = null;
+    saveGame();
+    renderWorkTab();
+  }
+}
+
+function renderWorkTab() {
+  if (!gameState.job || !gameState.job.name) {
+    // Modo Configuração
+    if (elements.workSetupSection) elements.workSetupSection.classList.remove('hidden');
+    if (elements.workDashboardSection) elements.workDashboardSection.classList.add('hidden');
+  } else {
+    // Modo Dashboard
+    if (elements.workSetupSection) elements.workSetupSection.classList.add('hidden');
+    if (elements.workDashboardSection) elements.workDashboardSection.classList.remove('hidden');
+    
+    if (elements.workTitleDisplay) elements.workTitleDisplay.textContent = `💼 ${gameState.job.name}`;
+    
+    renderWorkSingularity();
+    renderWorkHistory();
+    renderWorkChart();
+  }
+}
+
+function renderWorkSingularity() {
+  if (!elements.workSingularityContainer) return;
+  
+  const type = gameState.job.type || 'pizzaria';
+  const def = JOB_TYPES[type];
+  const configValue = gameState.job.config ? (gameState.job.config.rate || 0) : 0;
+  const today = new Date().toISOString().split('T')[0];
+  
+  let currentWeek = Math.ceil(new Date().getDate() / 7);
+  if (currentWeek > 4) currentWeek = 4; // Limita a 4 semanas conforme solicitado
+
+  elements.workSingularityContainer.innerHTML = `
+    <div class="control-panel">
+      <div class="panel-header">
+        <div style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">${def.icon}</span> 
+          <span>Registro de ${def.label}</span>
+        </div>
+        
+        <!-- Configuração Rápida (Compacta) -->
+        <div style="display: flex; gap: 5px; align-items: center; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 8px;">
+          <label style="font-size: 10px; opacity: 0.7; margin: 0;">${def.configLabel}:</label>
+          <input type="number" id="workConfigInput" value="${configValue}" placeholder="0" style="padding: 2px 5px; width: 60px; text-align: right; border: none; background: transparent; color: var(--accent); font-weight: bold;">
+          <button class="ghost" onclick="saveWorkConfig()" style="font-size: 10px; padding: 2px 6px; height: auto; min-height: 0;">💾</button>
+        </div>
+      </div>
+
+      <!-- Formulário de Registro -->
+      <div class="form-row" style="margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">Data</label>
+          <input type="date" id="workDateInput" value="${today}" onchange="autoSelectWeek()">
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">Semana</label>
+          <select id="workWeekInput">
+            <option value="1" ${currentWeek === 1 ? 'selected' : ''}>Semana 1</option>
+            <option value="2" ${currentWeek === 2 ? 'selected' : ''}>Semana 2</option>
+            <option value="3" ${currentWeek === 3 ? 'selected' : ''}>Semana 3</option>
+            <option value="4" ${currentWeek === 4 ? 'selected' : ''}>Semana 4</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">${def.inputLabel}</label>
+          <input type="number" id="workInput" placeholder="0" style="font-size: 1.2rem; font-weight: bold;">
+        </div>
+      </div>
+      <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px;">
+        <input type="checkbox" id="workUnpaidInput" style="width: auto; cursor: pointer;">
+        <label for="workUnpaidInput" style="margin: 0; font-size: 12px; cursor: pointer; opacity: 0.8;">Não remunerado (apenas registro)</label>
+      </div>
+      <button class="btn" onclick="addWorkRecord()" style="width: 100%; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">✅ Registrar Produção</button>
+    </div>
+  `;
+}
+
+// Função para selecionar a semana automaticamente baseada na data
+window.autoSelectWeek = function() {
+  const dateInput = document.getElementById('workDateInput');
+  const weekSelect = document.getElementById('workWeekInput');
+  
+  if (!dateInput || !weekSelect || !dateInput.value) return;
+
+  // Pega o dia da data selecionada (YYYY-MM-DD)
+  const day = parseInt(dateInput.value.split('-')[2]);
+  
+  let week = Math.ceil(day / 7);
+  // Garante que dias 22 a 31 fiquem na semana 4
+  if (week > 4) week = 4;
+
+  weekSelect.value = week;
+};
+
+window.saveWorkConfig = function() {
+  const input = document.getElementById('workConfigInput');
+  if (input) {
+    const val = parseFloat(input.value);
+    if (!gameState.job.config) gameState.job.config = {};
+    gameState.job.config.rate = isNaN(val) ? 0 : val;
+    saveGame(true);
+    showToast('✅ Configuração salva!');
+  }
+};
+
+window.addWorkRecord = function() {
+  const input = document.getElementById('workInput');
+  const dateInput = document.getElementById('workDateInput');
+  const weekInput = document.getElementById('workWeekInput');
+  const unpaidInput = document.getElementById('workUnpaidInput');
+  if (!input) return;
+  
+  const val = parseFloat(input.value);
+  if (isNaN(val) || val <= 0) {
+    showToast('⚠️ Valor inválido!');
+    return;
+  }
+
+  const type = gameState.job.type;
+  const rate = gameState.job.config.rate || 0;
+  let financialValue = 0;
+  let desc = '';
+  const isUnpaid = unpaidInput ? unpaidInput.checked : false;
+  const week = weekInput ? weekInput.value : null;
+
+  // Lógica de Singularidade
+  if (type === 'pizzaria') {
+    financialValue = val * rate;
+    desc = `Produção: ${val} massas`;
+  } else if (type === 'vendedor') {
+    financialValue = val * (rate / 100);
+    desc = `Comissão s/ venda de R$ ${val}`;
+  } else if (type === 'motorista') {
+    financialValue = val;
+    desc = `Corrida`;
+  } else if (type === 'freelancer') {
+    financialValue = val;
+    desc = `Projeto/Hora`;
+  }
+
+  // Salvar no Log de Trabalho
+  if (!gameState.workLog) gameState.workLog = [];
+  
+  // Usa a data do input ou hoje como fallback
+  const recordDate = dateInput && dateInput.value ? dateInput.value : new Date().toISOString().split('T')[0];
+  
+  // Se for não remunerado, o valor financeiro registrado é 0 para não afetar gráficos de ganhos
+  const loggedFinancialValue = isUnpaid ? 0 : financialValue;
+
+  gameState.workLog.push({
+    date: recordDate,
+    timestamp: Date.now(),
+    inputVal: val,
+    financialVal: loggedFinancialValue,
+    type: type,
+    isUnpaid: isUnpaid,
+    week: week
+  });
+
+  // Adicionar ao Financeiro (se gerou valor)
+  if (loggedFinancialValue > 0) {
+    if (!gameState.finances) gameState.finances = [];
+    gameState.finances.push({
+      id: Date.now(),
+      desc: `${gameState.job.name} - ${desc}`,
+      value: loggedFinancialValue,
+      type: 'income',
+      category: 'Extra', // Poderia ser Salário, mas Extra é mais seguro para variáveis
+      date: new Date().toISOString()
+    });
+  }
+
+  input.value = '';
+  if (unpaidInput) unpaidInput.checked = false;
+  saveGame();
+  renderWorkHistory();
+  renderWorkChart();
+  showToast(`✅ Registrado! ${loggedFinancialValue > 0 ? '+ R$ ' + loggedFinancialValue.toFixed(2) : '(Não remunerado)'}`);
+}
+
+// Função para finalizar sessão de tempo (Cronômetro)
+window.finishWorkSession = function(startTime) {
   if (!gameState) return;
-  const price = parseMoney(elements.domPriceInput.value);
-  gameState.domPrice = isNaN(price) ? 0 : price;
-  saveGame(true);
-  renderDomDoughHistory();
-}
-
-function renderDomHourHistory() {
-  if (!elements.domHourHistoryList || !gameState) return;
-  const list = gameState.domHours || [];
-  if (list.length === 0) {
-    elements.domHourHistoryList.innerHTML = '<tr><td colspan="4" style="padding:8px; opacity:0.6;">Nenhum registro ainda.</td></tr>';
-    return;
-  }
-  elements.domHourHistoryList.innerHTML = '';
-  let htmlContent = '';
-  list.slice().reverse().forEach(item => {
-    // Calcular total de horas
-    let total = '';
-    try {
-      const [h1, m1] = item.entry.split(':').map(Number);
-      const [h2, m2] = item.exit.split(':').map(Number);
-      let start = h1 * 60 + m1;
-      let end = h2 * 60 + m2;
-      let diff = end - start;
-      if (diff < 0) diff += 24 * 60;
-      total = (diff / 60).toFixed(2);
-    } catch { total = '?'; }
-    htmlContent += `
-      <tr>
-        <td style="padding:6px;">${item.date}</td>
-        <td style="padding:6px;">${item.entry}</td>
-        <td style="padding:6px;">${item.exit}</td>
-        <td style="padding:6px;">${total}</td>
-      </tr>
-    `;
-  });
-  elements.domHourHistoryList.innerHTML = htmlContent;
-}
-
-// --- Dom: Produção de Massas ---
-function addDomDoughRecord() {
-  const date = elements.domDoughDateInput.value;
-  const qty = parseInt(elements.domDoughInput.value);
-  const currentPrice = parseMoney(elements.domPriceInput.value);
-
-  if (!date || isNaN(qty) || qty <= 0) {
-    showToast('⚠️ Preencha data e quantidade válida!');
-    return;
-  }
-
-  // Validação de preço maior que zero
-  const priceToUse = !isNaN(currentPrice) ? currentPrice : (gameState.domPrice || 0);
-  if (priceToUse <= 0) {
-    showToast('⚠️ O valor por massa deve ser maior que zero!');
-    return;
-  }
-
-  // Atualiza o preço global se válido
-  if (!isNaN(currentPrice)) {
-    gameState.domPrice = currentPrice;
-  }
-
-  if (!gameState.domDoughs) gameState.domDoughs = [];
   
-  // Salva o registro com o preço atual
-  gameState.domDoughs.push({ 
-    date, 
-    qty,
-    price: priceToUse
-  });
+  const now = Date.now();
+  let duration = now - startTime;
   
-  updateDomFinance(date);
+  // Ignorar registros muito curtos (< 1 minuto) para evitar cliques acidentais
+  if (duration < 60000) {
+    showToast('⚠️ Trabalho muito curto para registrar (mínimo 1 min).');
+    return;
+  }
+
+  // Limite máximo de 48 horas
+  const maxDuration = 48 * 60 * 60 * 1000;
+  if (duration > maxDuration) {
+    duration = maxDuration;
+    showToast('⚠️ Sessão ajustada para o limite de 48 horas.');
+  }
+
+  const hours = duration / 3600000;
+  const type = gameState.job.type || 'pizzaria';
+  let financialValue = 0;
+  
+  // Se for Freelancer, calcula valor por hora baseado na configuração
+  if (type === 'freelancer') {
+    const rate = gameState.job.config.rate || 0;
+    financialValue = hours * rate;
+  }
+
+  // Adicionar ao Log
+  if (!gameState.workLog) gameState.workLog = [];
+  
+  gameState.workLog.push({
+    date: new Date().toISOString().split('T')[0],
+    timestamp: now,
+    inputVal: hours, // Armazena horas como valor de entrada
+    financialVal: financialValue,
+    type: 'time_tracking', // Tipo especial para logs de tempo
+    duration: duration
+  });
+
+  // Adicionar ao Financeiro (apenas se gerou valor financeiro)
+  if (financialValue > 0) {
+    if (!gameState.finances) gameState.finances = [];
+    gameState.finances.push({
+      id: Date.now(),
+      desc: `${gameState.job.name} (Freelancer)`,
+      value: financialValue,
+      type: 'income',
+      category: 'Salário',
+      date: new Date().toISOString()
+    });
+  }
+
   saveGame();
-  renderDomDoughHistory();
-  renderDomProductionChart();
-  elements.domDoughDateInput.value = '';
-  elements.domDoughInput.value = '';
-  showToast('🍞 Registro de massas adicionado!');
-}
+  renderWorkHistory();
+  renderWorkChart();
+  
+  const h = Math.floor(duration / 3600000);
+  const m = Math.floor((duration % 3600000) / 60000);
+  showToast(`✅ Sessão registrada: ${h}h ${m}m`);
+};
 
-function updateDomFinance(dateKey) {
-  if (!gameState.domDoughs) return;
+function renderWorkHistory() {
+  if (!elements.workTimeHistoryList || !elements.workProductionHistoryList) return;
   
-  // Calcula o total para esta semana específica
-  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
-  const totalValue = entries.reduce((sum, item) => {
-    const price = (item.price !== undefined) ? item.price : (gameState.domPrice || 0);
-    return sum + (item.qty * price);
-  }, 0);
-  
-  if (!gameState.finances) gameState.finances = [];
-  
-  // Tag única para identificar que essa entrada veio do Dom
-  const tag = `dom_${dateKey}`;
-  const existingIndex = gameState.finances.findIndex(f => f.tag === tag);
-  
-  if (totalValue > 0) {
-    if (existingIndex >= 0) {
-      // Atualiza existente
-      gameState.finances[existingIndex].value = totalValue;
-    } else {
-      // Cria nova entrada como "Extra"
-      gameState.finances.push({
-        id: Date.now(),
-        desc: `Produção Dom (${dateKey})`,
-        value: totalValue,
-        type: 'income',
-        category: 'Extra',
-        date: new Date().toISOString(),
-        tag: tag
-      });
+  // Pega os últimos 50 registros para não pesar
+  const log = (gameState.workLog || []).slice(-50);
+
+  // Separar logs
+  const timeLogs = log.filter(i => i.type === 'time_tracking');
+  const prodLogs = log.filter(i => i.type !== 'time_tracking');
+
+  // Renderizar Lista de Ponto (Agrupada por Data)
+  const renderList = (items, container, emptyMsg) => {
+    container.innerHTML = '';
+    if (items.length === 0) {
+      container.innerHTML = `<div class="small" style="opacity:0.5; text-align: center; padding: 10px;">${emptyMsg}</div>`;
+      return;
     }
-  } else if (existingIndex >= 0) {
-    // Se o total for 0, remove a entrada financeira
-    gameState.finances.splice(existingIndex, 1);
-  }
-}
 
-function editDomDough(dateKey) {
-  if (!gameState.domDoughs) return;
-  const entries = gameState.domDoughs.filter(d => d.date === dateKey);
-  if (entries.length === 0) return;
-  
-  const currentTotal = entries.reduce((sum, item) => sum + item.qty, 0);
-  const lastPrice = entries[entries.length - 1].price || gameState.domPrice || 0;
-  
-  const newTotalStr = prompt(`Editar total de massas para ${dateKey}:`, currentTotal);
-  if (newTotalStr === null) return;
-  
-  const newTotal = parseInt(newTotalStr);
-  if (isNaN(newTotal) || newTotal < 0) {
-    showToast('⚠️ Quantidade inválida!');
-    return;
-  }
-  
-  // Substitui as entradas antigas por uma consolidada
-  gameState.domDoughs = gameState.domDoughs.filter(d => d.date !== dateKey);
-  if (newTotal > 0) {
-    gameState.domDoughs.push({ date: dateKey, qty: newTotal, price: lastPrice });
-  }
-  
-  updateDomFinance(dateKey);
-  saveGame();
-  renderDomDoughHistory();
-  renderDomProductionChart();
-  showToast('✅ Quantidade e Financeiro atualizados!');
-}
+    const groups = {};
+    items.forEach(item => {
+      if (!groups[item.date]) groups[item.date] = [];
+      groups[item.date].push(item);
+    });
 
-function renderDomDoughHistory() {
-  if (!elements.domHistoryList || !elements.domStats || !gameState) return;
-  const list = gameState.domDoughs || [];
-  
-  // Atualiza o input de preço com o valor salvo
-  if (elements.domPriceInput && document.activeElement !== elements.domPriceInput) {
-    elements.domPriceInput.value = gameState.domPrice || '';
-  }
+    const sortedDates = Object.keys(groups).sort().reverse();
 
-  if (list.length === 0) {
-    elements.domHistoryList.innerHTML = '<div style="padding:10px; opacity:0.6;">Nenhum registro ainda.</div>';
-    elements.domStats.innerHTML = '0';
-    return;
-  }
-
-  // Agrupar por semana
-  const groups = {};
-  let totalQty = 0;
-  let totalValueGlobal = 0;
-
-  list.forEach(item => {
-    totalQty += item.qty;
-    
-    // Usa o preço salvo no item ou o global como fallback
-    const itemPrice = (item.price !== undefined) ? item.price : (gameState.domPrice || 0);
-    const itemTotal = item.qty * itemPrice;
-    
-    totalValueGlobal += itemTotal;
-
-    if (!groups[item.date]) {
-      groups[item.date] = { qty: 0, value: 0, price: itemPrice };
-    }
-    
-    groups[item.date].qty += item.qty;
-    groups[item.date].value += itemTotal;
-    // Atualiza o preço de referência para o grupo (último registrado)
-    groups[item.date].price = itemPrice;
-  });
-
-  elements.domHistoryList.innerHTML = '';
-  let htmlContent = '';
-
-  // Ordenar e Renderizar
-  Object.keys(groups).sort().reverse().forEach(dateKey => {
-    const group = groups[dateKey];
-    
-    let displayDate = dateKey;
-    let dateSubtext = '';
-
-    // Converter 2026-W01 para data legível
-    if (dateKey && dateKey.includes('-W')) {
-      const [yearStr, weekStr] = dateKey.split('-W');
-      const year = parseInt(yearStr);
-      const week = parseInt(weekStr);
-      
-      // Cálculo aproximado do início da semana ISO
-      const simple = new Date(year, 0, 1 + (week - 1) * 7);
-      const dayOfWeek = simple.getDay();
-      const weekStart = simple;
-      if (dayOfWeek <= 4) weekStart.setDate(simple.getDate() - simple.getDay() + 1);
-      else weekStart.setDate(simple.getDate() + 8 - simple.getDay());
-      
-      displayDate = `Semana ${week}/${year}`;
-      dateSubtext = weekStart.toLocaleDateString('pt-BR');
-    } else if (dateKey && /^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-      // Formatar data YYYY-MM-DD para DD/MM/AAAA
+    sortedDates.forEach(dateKey => {
       const [y, m, d] = dateKey.split('-');
-      displayDate = `${d}/${m}/${y}`;
       const dateObj = new Date(y, m - 1, d);
-      dateSubtext = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+      const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+      // Calcular total do dia
+      let dailyTotalMs = 0;
+      groups[dateKey].forEach(item => {
+         dailyTotalMs += item.duration || (item.inputVal * 3600000);
+      });
+      const totalH = Math.floor(dailyTotalMs / 3600000);
+      const totalM = Math.floor((dailyTotalMs % 3600000) / 60000);
+
+      const groupDiv = document.createElement('div');
+      groupDiv.style.marginBottom = '15px';
+      
+      let groupHtml = `
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); text-transform: capitalize;">
+          <span>${capitalizedDate}</span>
+          <span style="font-size: 11px; opacity: 0.9; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px;">Total: ${totalH}h ${totalM}m</span>
+        </div>`;
+      
+      groups[dateKey].slice().reverse().forEach(item => {
+        let text = '';
+        let icon = '📄';
+        const itemType = item.type || gameState.job.type || 'pizzaria';
+
+        if (itemType === 'time_tracking') {
+           const duration = item.duration || (item.inputVal * 3600000);
+           const h = Math.floor(duration / 3600000);
+           const m = Math.floor((duration % 3600000) / 60000);
+           text = `Jornada: ${h}h ${m}m`;
+           icon = '⏱️';
+        } else if (itemType === 'pizzaria') {
+           text = `${item.inputVal} massas`;
+           icon = '🍕';
+        } else if (itemType === 'vendedor') {
+           text = `Venda: R$ ${item.inputVal}`;
+           icon = '🤝';
+        } else if (itemType === 'motorista') {
+           text = `Corrida: R$ ${item.inputVal}`;
+           icon = '🚖';
+        } else {
+           text = `Registro: ${item.inputVal}`;
+        }
+
+        let moneyDisplay = '';
+        if (item.isUnpaid) {
+          moneyDisplay = '<span style="opacity:0.6; font-size:11px; font-style:italic;">Não remunerado</span>';
+        } else {
+          moneyDisplay = item.financialVal > 0 ? '+ R$ ' + item.financialVal.toFixed(2) : '';
+        }
+
+        groupHtml += `
+          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; margin-bottom: 6px; font-size: 13px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 16px;">${icon}</span>
+              <span>${text}</span>
+            </div>
+            <div style="font-weight: 600; color: var(--success);">${moneyDisplay}</div>
+          </div>
+        `;
+      });
+
+      groupDiv.innerHTML = groupHtml;
+      container.appendChild(groupDiv);
+    });
+  };
+
+  // Renderizar Lista de Produção (Agrupada por Semana)
+  const renderProductionList = (items, container, emptyMsg) => {
+    container.innerHTML = '';
+    if (items.length === 0) {
+      container.innerHTML = `<div class="small" style="opacity:0.5; text-align: center; padding: 10px;">${emptyMsg}</div>`;
+      return;
     }
-    
-    htmlContent += `
-      <div style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--accent);">
-        <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
-          <span style="font-weight:700; color:#fff;">${displayDate}</span>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button class="ghost" style="padding: 2px 6px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1);" onclick="editDomDough('${dateKey}')" title="Editar Quantidade">✏️</button>
-            <span style="font-size:12px; opacity:0.7;">${dateSubtext}</span>
+
+    const groups = {};
+    items.forEach(item => {
+      // Agrupar por Semana se existir, senão joga em "Outros"
+      const key = item.week ? `Semana ${item.week}` : 'Outros';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+
+    // Ordenar chaves: Semana 5 -> Semana 1 -> Outros
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      if (a === 'Outros') return 1;
+      if (b === 'Outros') return -1;
+      return b.localeCompare(a);
+    });
+
+    // Helper para toggle (expandir/recolher)
+    if (!window.toggleWeekDetails) {
+      window.toggleWeekDetails = function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+           const isHidden = el.style.display === 'none';
+           el.style.display = isHidden ? 'block' : 'none';
+           const arrow = document.getElementById(`arrow-${id}`);
+           if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+      };
+    }
+
+    sortedKeys.forEach((key, index) => {
+      const groupItems = groups[key];
+      // Ordenar itens dentro da semana por data (mais recente primeiro)
+      groupItems.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Calcular totais da semana
+      let totalQty = 0;
+      let paidQty = 0;
+      let unpaidQty = 0;
+      
+      groupItems.forEach(i => {
+        const val = i.inputVal || 0;
+        totalQty += val;
+        if (i.isUnpaid) unpaidQty += val;
+        else paidQty += val;
+      });
+
+      const type = gameState.job.type || 'pizzaria';
+      const def = JOB_TYPES[type];
+      const unit = def ? def.unit : 'unidades';
+
+      const groupDiv = document.createElement('div');
+      groupDiv.style.marginBottom = '10px';
+      groupDiv.style.background = 'rgba(255,255,255,0.03)';
+      groupDiv.style.borderRadius = '8px';
+      groupDiv.style.overflow = 'hidden';
+      
+      const detailsId = `week-details-${index}`;
+      
+      // Cabeçalho Clicável
+      let headerHtml = `
+        <div onclick="toggleWeekDetails('${detailsId}')" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05);">
+          <div>
+            <div style="font-weight: 700; color: var(--accent); font-size: 13px;">${key}</div>
+            <div style="font-size: 11px; opacity: 0.7;">Total: ${paidQty} ${unit}</div>
+          </div>
+          <div style="font-size: 12px; opacity: 0.5; transition: transform 0.3s;" id="arrow-${detailsId}">▼</div>
+        </div>
+      `;
+
+      // Área de Detalhes (Oculta por padrão)
+      let detailsHtml = `<div id="${detailsId}" style="display: none; padding: 10px; border-top: 1px solid rgba(255,255,255,0.05);">`;
+      
+      // Resumo da Semana
+      detailsHtml += `
+        <div style="margin-bottom: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 12px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span>Remunerado:</span>
+            <span style="color: var(--success); font-weight:bold;">${paidQty} ${unit}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span>Não remunerado:</span>
+            <span style="opacity:0.7;">${unpaidQty} ${unit}</span>
           </div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px;">
-          <div>🍕 <b>${group.qty}</b> massas</div>
-          <div style="opacity: 0.8;">Unit: R$ ${group.price.toLocaleString('pt-BR')}</div>
-          <div style="color: var(--success); font-weight: 700;">Total: R$ ${group.value.toLocaleString('pt-BR')}</div>
-        </div>
-      </div>`;
-  });
-  elements.domHistoryList.innerHTML = htmlContent;
+      `;
 
-  elements.domStats.innerHTML = `${totalQty} <span style="color: var(--success); margin-left: 8px; font-size: 0.9em;">(Total: R$ ${totalValueGlobal.toLocaleString('pt-BR')})</span>`;
+      // Lista de Itens
+      groupItems.forEach(item => {
+        let text = '';
+        let icon = '📄';
+        const itemType = item.type || gameState.job.type || 'pizzaria';
+        const dateStr = new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+        if (itemType === 'pizzaria') {
+           text = `Total: ${item.inputVal} massas`;
+           icon = '🍕';
+        } else if (itemType === 'vendedor') {
+           text = `Venda: R$ ${item.inputVal}`;
+           icon = '🤝';
+        } else if (itemType === 'motorista') {
+           text = `Corrida: R$ ${item.inputVal}`;
+           icon = '🚖';
+        } else {
+           text = `Registro: ${item.inputVal}`;
+        }
+
+        let moneyDisplay = item.isUnpaid 
+          ? '<span style="opacity:0.6; font-size:11px; font-style:italic;">Não remunerado</span>' 
+          : (item.financialVal > 0 ? '+ R$ ' + item.financialVal.toFixed(2) : '');
+
+        detailsHtml += `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 10px; opacity: 0.5; font-family: monospace; min-width: 35px;">${dateStr}</span>
+              <span>${text}</span>
+            </div>
+            <div style="font-weight: 600; color: var(--success);">${moneyDisplay}</div>
+          </div>
+        `;
+      });
+      
+      detailsHtml += `</div>`; // Fecha div de detalhes
+
+      groupDiv.innerHTML = headerHtml + detailsHtml;
+      container.appendChild(groupDiv);
+    });
+  };
+
+  // Renderizar as duas listas
+  renderList(timeLogs, elements.workTimeHistoryList, 'Sem registros de ponto.');
+  renderProductionList(prodLogs, elements.workProductionHistoryList, 'Sem registros de produção.');
 }
 
-function renderDomProductionChart() {
-  if (!elements.domProductionChart || !gameState) return;
-
-  const list = gameState.domDoughs || [];
-  const groups = {};
-
-  // Agrupar por semana
-  list.forEach(item => {
-    if (!groups[item.date]) groups[item.date] = 0;
-    groups[item.date] += item.qty;
-  });
-
-  // Pegar as últimas 7 entradas ordenadas (dias ou semanas)
-  const sortedWeeks = Object.keys(groups).sort();
-  const lastEntries = sortedWeeks.slice(-7);
+function renderWorkChart() {
+  if (!elements.workChart) return;
   
-  const labels = lastEntries.map(w => {
-    if (w.includes('-W')) {
-      const [y, week] = w.split('-W');
-      return `Sem ${week}`;
-    } else if (/^\d{4}-\d{2}-\d{2}$/.test(w)) {
-      const [y, m, d] = w.split('-');
-      return `${d}/${m}`;
-    }
-    return w;
-  });
+  const log = gameState.workLog || [];
   
-  const data = lastEntries.map(w => groups[w]);
+  // Verifica se há registros de tempo (prioridade para o gráfico de tempo se houver)
+  const hasTimeLogs = log.some(i => i.type === 'time_tracking');
 
-  if (domProductionChartInstance) {
-    domProductionChartInstance.destroy();
+  if (workChartInstance) {
+    workChartInstance.destroy();
   }
 
-  domProductionChartInstance = new Chart(elements.domProductionChart, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Massas',
-        data: data,
-        backgroundColor: '#ffdd57',
-        borderRadius: 4,
-        barThickness: 40
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc', precision: 0 } },
-        x: { grid: { display: false }, ticks: { color: '#ccc' } }
+  if (hasTimeLogs) {
+    // Gráfico de Pizza: Distribuição por Dia da Semana
+    const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const distribution = new Array(7).fill(0);
+
+    log.forEach(item => {
+      if (item.type === 'time_tracking') {
+        let date;
+        if (item.timestamp) {
+          date = new Date(item.timestamp);
+        } else {
+          // Fallback seguro para data local
+          const [y, m, d] = item.date.split('-').map(Number);
+          date = new Date(y, m - 1, d);
+        }
+        
+        const dayIndex = date.getDay();
+        const durationMs = item.duration || (item.inputVal * 3600000);
+        distribution[dayIndex] += durationMs;
+      }
+    });
+
+    // Converter ms para horas
+    const dataHours = distribution.map(ms => parseFloat((ms / 3600000).toFixed(1)));
+
+    workChartInstance = new Chart(elements.workChart, {
+      type: 'pie',
+      data: {
+        labels: weekDays,
+        datasets: [{
+          data: dataHours,
+          backgroundColor: [
+            '#ff6384', '#36a2eb', '#ffcd56', '#4bc0c0', '#9966ff', '#ff9f40', '#c9cbcf'
+          ],
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.1)'
+        }]
       },
-      plugins: { legend: { display: false } }
-    }
-  });
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { 
+            position: 'right', 
+            labels: { color: '#ccc', boxWidth: 12, font: { size: 11 } } 
+          },
+          title: {
+            display: true,
+            text: 'Horas por Dia da Semana',
+            color: 'rgba(255,255,255,0.8)',
+            font: { size: 13 },
+            padding: { bottom: 10 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return ` ${context.label}: ${context.parsed}h`;
+              }
+            }
+          }
+        }
+      }
+    });
+
+  } else {
+    // Fallback: Gráfico de Barras (Financeiro) para quem só usa produção
+    const days = {};
+    
+    log.forEach(item => {
+      if (!days[item.date]) days[item.date] = 0;
+      days[item.date] += item.financialVal;
+    });
+
+    const labels = Object.keys(days).sort().slice(-7);
+    const data = labels.map(d => days[d]);
+    
+    const formattedLabels = labels.map(d => {
+      const parts = d.split('-');
+      return `${parts[2]}/${parts[1]}`;
+    });
+
+    workChartInstance = new Chart(elements.workChart, {
+      type: 'bar',
+      data: {
+        labels: formattedLabels,
+        datasets: [{
+          label: 'Ganhos (R$)',
+          data: data,
+          backgroundColor: '#4ade80',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#ccc' } },
+          x: { grid: { display: false }, ticks: { color: '#ccc' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
 }
 
 function renderInventory() {
@@ -2915,9 +3273,7 @@ function updateUI() {
   renderFinanceMonthlyChart();
   renderFinanceGroups();
   renderBills();
-  renderDomHourHistory();
-  renderDomDoughHistory();
-  renderDomProductionChart();
+  renderWorkTab();
   
   // Atualizar Badges nas Abas
   // 1. Hero: Pontos de habilidade disponíveis
@@ -3008,12 +3364,59 @@ if (elements.zenModeOverlay) elements.zenModeOverlay.addEventListener('click', (
     }
   }
 });
-if (elements.addDomHourBtn) elements.addDomHourBtn.addEventListener('click', addDomHourRecord);
-if (elements.addDomDoughBtn) elements.addDomDoughBtn.addEventListener('click', addDomDoughRecord);
-if (elements.domPriceInput) elements.domPriceInput.addEventListener('change', saveDomPrice);
+if (elements.saveJobBtn) elements.saveJobBtn.addEventListener('click', saveJobSettings);
+if (elements.configJobBtn) elements.configJobBtn.addEventListener('click', resetJobSettings);
 if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click', openGroupConfig);
 if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
+
+// --- Lógica do FAB (Botão Flutuante) ---
+if (elements.fabMainBtn) {
+  elements.fabMainBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    elements.fabActions.classList.toggle('hidden');
+    elements.fabMainBtn.classList.toggle('active');
+  });
+}
+
+// Fechar FAB ao clicar fora
+document.addEventListener('click', (e) => {
+  if (elements.fabActions && !elements.fabActions.classList.contains('hidden')) {
+    if (!e.target.closest('.fab-container')) {
+      elements.fabActions.classList.add('hidden');
+      elements.fabMainBtn.classList.remove('active');
+    }
+  }
+});
+
+// Ações do FAB
+if (elements.fabWorkBtn) {
+  elements.fabWorkBtn.addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="dom"]').click();
+    elements.fabActions.classList.add('hidden');
+    elements.fabMainBtn.classList.remove('active');
+    // Rola suavemente para o timer
+    setTimeout(() => document.getElementById('workTimerDisplay')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+  });
+}
+
+if (elements.fabTaskBtn) {
+  elements.fabTaskBtn.addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="quests"]').click();
+    elements.fabActions.classList.add('hidden');
+    elements.fabMainBtn.classList.remove('active');
+    setTimeout(() => elements.taskInput?.focus(), 100);
+  });
+}
+
+if (elements.fabFinanceBtn) {
+  elements.fabFinanceBtn.addEventListener('click', () => {
+    document.querySelector('.tab-btn[data-tab="finance"]').click();
+    elements.fabActions.classList.add('hidden');
+    elements.fabMainBtn.classList.remove('active');
+    setTimeout(() => elements.financeDesc?.focus(), 100);
+  });
+}
 
 // Toggle Password Visibility (Olho Mágico)
 document.querySelectorAll('.toggle-password').forEach(btn => {
@@ -3236,6 +3639,17 @@ window.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('appinstalled', () => {
   if (elements.installAppBtn) elements.installAppBtn.style.display = 'none';
   showToast('🎉 App instalado com sucesso!');
+});
+
+// Salvar ao sair/ocultar (Garante contagem de tempo correta em segundo plano)
+window.addEventListener('beforeunload', () => {
+  if (isLoggedIn && gameState) saveGame(true);
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && isLoggedIn && gameState) {
+    saveGame(true);
+  }
 });
 
 // Auto-save a cada 2 minutos

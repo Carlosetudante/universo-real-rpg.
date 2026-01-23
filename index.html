@@ -272,7 +272,7 @@
           <button class="tab-btn" data-tab="quests">📜 Missões</button>
           <button class="tab-btn" data-tab="finance">💰 Finanças</button>
           <button class="tab-btn" data-tab="social">❤️ Social</button>
-          <button class="tab-btn" data-tab="dom">🍕 Dom</button>
+          <button class="tab-btn" data-tab="dom">💼 Trabalho</button>
         </div>
 
         <!-- Conteúdo da Aba: Herói -->
@@ -529,66 +529,72 @@
           </div>
         </div>
 
-        <!-- Conteúdo da Aba: Dom (Pizzaria Dom) -->
+        <!-- Conteúdo da Aba: Trabalho -->
         <div id="tab-dom" class="tab-content">
-          <h3>🍕 Pizzaria Dom</h3>
-          <div class="section">
-            <!-- Registro de Carga Horária (Dia a Dia) -->
-            <div style="margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
-              <h4 style="margin-bottom: 8px;">Registrar Carga Horária (Dia a Dia)</h4>
-              <div class="form-row" style="gap:8px; flex-wrap:wrap;">
-                <input type="date" id="domDateInput" placeholder="Data">
-                <input type="time" id="domEntryTimeInput" placeholder="Hora de Entrada">
-                <input type="time" id="domExitTimeInput" placeholder="Hora de Saída">
-                <button class="btn" id="addDomHourBtn">Registrar Horário</button>
+          <!-- Tela de Configuração (Aparece se não tiver trabalho definido) -->
+          <div id="workSetupSection" class="section hidden">
+            <h3>💼 Configurar Novo Trabalho</h3>
+            <p class="small" style="margin-bottom: 15px;">Defina sua empresa e o tipo de atividade para personalizar sua experiência.</p>
+            
+            <div class="form-row">
+              <div style="flex:1">
+                <label>Nome da Empresa / Negócio</label>
+                <input type="text" id="jobNameInput" placeholder="Ex: Pizzaria do Zé, Uber, Minha Loja...">
               </div>
             </div>
-            <!-- Histórico de Carga Horária (Dia a Dia) -->
-            <div>
-              <h4>Histórico de Carga Horária (Dia a Dia)</h4>
-              <div style="overflow-x:auto;">
-                <table style="width:100%; border-collapse:collapse; background:rgba(0,0,0,0.05);">
-                  <thead>
-                    <tr style="text-align:left;">
-                      <th style="padding:6px;">Data</th>
-                      <th style="padding:6px;">Entrada</th>
-                      <th style="padding:6px;">Saída</th>
-                      <th style="padding:6px;">Total (h)</th>
-                    </tr>
-                  </thead>
-                  <tbody id="domHourHistoryList">
-                    <tr><td colspan="4" style="padding:8px; opacity:0.6;">Nenhum registro ainda.</td></tr>
-                  </tbody>
-                </table>
+            
+            <div class="form-row">
+              <div style="flex: 1;">
+                <label>Tipo de Atividade</label>
+                <select id="jobTypeSelect">
+                  <option value="pizzaria">🍕 Pizzaria (Produção de Massas)</option>
+                  <option value="vendedor">🤝 Vendedor (Comissões)</option>
+                  <option value="motorista">🚖 Motorista (Corridas)</option>
+                  <option value="freelancer">💻 Freelancer (Projetos/Horas)</option>
+                </select>
               </div>
             </div>
-            <!-- Registro de Produção de Massas -->
-            <div style="margin-top: 32px; margin-bottom: 20px;">
-              <h4>Registrar Produção de Massas</h4>
-              <div class="form-row" style="gap:8px; flex-wrap:wrap;">
-                <input type="date" id="domDoughDateInput" placeholder="Data">
-                <input type="number" id="domDoughInput" placeholder="Quantidade de Massas">
-                <button class="btn" id="addDomDoughBtn">Registrar Massas</button>
+            
+            <button class="btn success" id="saveJobBtn" style="width:100%; margin-top:10px;">Começar Jornada</button>
+          </div>
+
+          <!-- Painel de Trabalho (Aparece quando configurado) -->
+          <div id="workDashboardSection" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+              <h3 id="workTitleDisplay" style="margin:0; font-size: 1.2rem;">💼 Trabalho</h3>
+              <button class="ghost" id="configJobBtn" style="font-size:12px; padding:4px 8px;">⚙️ Configurar</button>
+            </div>
+
+            <div class="work-dashboard-grid">
+              <!-- Cronômetro Simples -->
+              <div class="timer-card">
+                <div id="workTimerDisplay" class="digital-clock">00:00:00</div>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                  <button id="startWorkBtn" class="btn success" style="min-width: 140px; font-weight: 800; letter-spacing: 0.5px;">▶ INICIAR</button>
+                  <button id="stopWorkBtn" class="btn danger" style="min-width: 140px; font-weight: 800; letter-spacing: 0.5px;" disabled>⏹ FINALIZAR</button>
+                </div>
               </div>
-            </div>
-            <!-- Configuração e histórico de massas -->
-            <div style="margin-bottom: 20px;">
-              <h4>Configuração</h4>
-              <div class="form-row">
-                <label for="domPriceInput">Valor por Massa (R$)</label>
-                <input type="text" inputmode="decimal" id="domPriceInput" placeholder="0.00">
+              
+              <!-- Histórico de Ponto (Separado) -->
+              <div>
+                <div class="history-section-title">⏱️ Últimos Registros de Ponto</div>
+                <div id="workTimeHistoryList" style="max-height: 150px; overflow-y: auto;"></div>
               </div>
-            </div>
-            <div>
-              <h4>Histórico de Produção de Massas</h4>
-              <div id="domHistoryList" class="small" style="min-height: 40px;">Nenhum registro ainda.</div>
-              <div style="margin-top: 10px; font-weight: bold;">Total Massas: <span id="domStats">0</span></div>
-            </div>
-            <!-- Gráfico de Produção -->
-            <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
-              <h4 style="margin-bottom: 15px; text-align: center;">Produção Recente</h4>
-              <div style="height: 220px;">
-                <canvas id="domProductionChart"></canvas>
+              
+              <!-- Área de Singularidade (Dinâmica por Tipo de Trabalho) -->
+              <div id="workSingularityContainer">
+                <!-- Injetado via JS -->
+              </div>
+              
+              <!-- Histórico de Produção (Separado) -->
+              <div>
+                <div class="history-section-title">📊 Histórico de Produção</div>
+                <div id="workProductionHistoryList" style="max-height: 200px; overflow-y: auto;"></div>
+              </div>
+
+              <!-- Gráfico -->
+              <div style="height: 200px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px;">
+                <canvas id="workChart"></canvas>
               </div>
             </div>
           </div>
@@ -601,6 +607,16 @@
     </div>
   </div>
   
+  <!-- FAB (Botão Flutuante de Ações Rápidas) -->
+  <div class="fab-container hidden" id="fabContainer">
+    <div class="fab-actions hidden" id="fabActions">
+      <button class="fab-action" id="fabWorkBtn" title="Registrar Ponto">💼</button>
+      <button class="fab-action" id="fabTaskBtn" title="Adicionar Tarefa">📝</button>
+      <button class="fab-action" id="fabFinanceBtn" title="Nova Transação">💰</button>
+    </div>
+    <button class="fab-main" id="fabMainBtn">➕</button>
+  </div>
+
   <div id="toast" class="toast" style="display:none"></div>
 
   <!-- Overlay Modo Zen -->
@@ -626,5 +642,66 @@
   </div>
 
   <script src="app.js"></script>
-</body>
-</html>
+  <script>
+    // Lógica do Cronômetro de Trabalho
+    (function() {
+      const startBtn = document.getElementById('startWorkBtn');
+      const stopBtn = document.getElementById('stopWorkBtn');
+      const display = document.getElementById('workTimerDisplay');
+      let intervalId = null;
+
+      function updateDisplay() {
+        const startTime = localStorage.getItem('work_start_time');
+        if (startTime) {
+          let diff = Date.now() - parseInt(startTime);
+          
+          // Limite visual de 48 horas (172800000 ms)
+          const maxDuration = 48 * 60 * 60 * 1000;
+          if (diff >= maxDuration) {
+            diff = maxDuration;
+            display.style.color = '#f87171'; // Vermelho para indicar limite
+          } else {
+            display.style.color = '';
+          }
+
+          const hrs = Math.floor(diff / 3600000);
+          const mins = Math.floor((diff % 3600000) / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          display.textContent = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+          
+          startBtn.disabled = true;
+          startBtn.style.opacity = '0.5';
+          stopBtn.disabled = false;
+          stopBtn.style.opacity = '1';
+        } else {
+          display.textContent = '00:00:00';
+          display.style.color = '';
+          startBtn.disabled = false;
+          startBtn.style.opacity = '1';
+          stopBtn.disabled = true;
+          stopBtn.style.opacity = '0.5';
+        }
+      }
+
+      startBtn.addEventListener('click', () => {
+        localStorage.setItem('work_start_time', Date.now());
+        intervalId = setInterval(updateDisplay, 1000);
+        updateDisplay();
+      });
+
+      stopBtn.addEventListener('click', () => {
+        const startTime = parseInt(localStorage.getItem('work_start_time'));
+        if (startTime) {
+          // Salva a sessão antes de limpar o timer
+          if (typeof window.finishWorkSession === 'function') {
+            window.finishWorkSession(startTime);
+          }
+          localStorage.removeItem('work_start_time');
+          clearInterval(intervalId);
+          updateDisplay();
+        }
+      });
+
+      updateDisplay();
+    })();
+  </script>
