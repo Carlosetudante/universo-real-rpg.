@@ -362,6 +362,15 @@ const elements = {
   workTimeHistoryList: document.getElementById('workTimeHistoryList'),
   workProductionHistoryList: document.getElementById('workProductionHistoryList'),
   workChart: document.getElementById('workChart'),
+  
+  // Chat (Oráculo)
+  chatBtn: document.getElementById('chatBtn'),
+  chatModal: document.getElementById('chatModal'),
+  closeChatBtn: document.getElementById('closeChatBtn'),
+  chatMessages: document.getElementById('chatMessages'),
+  chatInput: document.getElementById('chatInput'),
+  sendMessageBtn: document.getElementById('sendMessageBtn'),
+  oraclePersonalitySelect: document.getElementById('oraclePersonalitySelect'),
 
   // FAB
   fabContainer: document.getElementById('fabContainer'),
@@ -688,6 +697,7 @@ function normalizeGameState(data) {
     lastTaskReset: new Date().toISOString(),
     lastClaim: null,
     playTime: 0,
+    oraclePersonality: 'robot', // Personalidade padrão
     job: { name: null, type: null, config: {} }, // Configuração do Trabalho
     workLog: [],   // Histórico de ponto
     zenBackgroundImage: null,
@@ -3369,6 +3379,181 @@ if (elements.configJobBtn) elements.configJobBtn.addEventListener('click', reset
 if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click', openGroupConfig);
 if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
+
+// --- Sistema de Chat (Oráculo) ---
+
+// Definição das Personalidades
+const ORACLE_PERSONALITIES = {
+  robot: {
+    greeting: (name) => `Olá, ${name}. Sistemas online.`,
+    xp: (level, xp, missing) => `Você está no <strong>Nível ${level}</strong> com <strong>${xp} XP</strong>. Faltam ${missing} XP para o próximo nível.`,
+    finance: (balance) => `Seu saldo atual é de <strong>R$ ${balance}</strong>.`,
+    tasks: (count, list) => `Você tem <strong>${count} tarefas pendentes</strong>:<br>${list}`,
+    noTasks: () => `Você não tem tarefas pendentes hoje.`,
+    motivation: (quote) => `<em>"${quote}"</em><br><br>Continue processando.`,
+    work: (total) => `Hoje você registrou <strong>${total}</strong> unidades de produção.`,
+    help: () => `Posso informar sobre: <strong>Status</strong>, <strong>Finanças</strong>, <strong>Tarefas</strong>, <strong>Motivação</strong>.`,
+    default: () => `Comando não reconhecido. Tente "saldo", "tarefas" ou "xp".`,
+    suggestion: (text) => `Sugestão: ${text}`
+  },
+  wise: {
+    greeting: (name) => `Saudações, viajante ${name}.`,
+    xp: (level, xp, missing) => `Sua jornada o levou ao <strong>Nível ${level}</strong>. A experiência acumulada é de <strong>${xp}</strong>. Apenas ${missing} passos o separam da ascensão.`,
+    finance: (balance) => `As riquezas materiais somam <strong>R$ ${balance}</strong>. Use-as com sabedoria.`,
+    tasks: (count, list) => `O destino lhe reserva <strong>${count} desafios</strong>:<br>${list}`,
+    noTasks: () => `Sua mente está livre de obrigações por enquanto. Aproveite a paz.`,
+    motivation: (quote) => `Reflita sobre estas palavras:<br><em>"${quote}"</em>`,
+    work: (total) => `O fruto do seu labor hoje rendeu <strong>${total}</strong> criações.`,
+    help: () => `Posso iluminar seu caminho sobre: <strong>Status</strong>, <strong>Riquezas</strong>, <strong>Deveres</strong> ou <strong>Sabedoria</strong>.`,
+    default: () => `Minha visão está turva. Pergunte sobre seu caminho (xp), ouro (saldo) ou destino (tarefas).`,
+    suggestion: (text) => `Os astros sugerem: ${text}`
+  },
+  coach: {
+    greeting: (name) => `E AÍ, ${name.toUpperCase()}! PRONTO PARA VENCER?`,
+    xp: (level, xp, missing) => `<strong>NÍVEL ${level}</strong>! Você tem <strong>${xp} XP</strong>! Vamos lá, só mais ${missing} para subir! FOCO!`,
+    finance: (balance) => `Você tem <strong>R$ ${balance}</strong> no caixa! Vamos fazer esse número crescer!`,
+    tasks: (count, list) => `Temos <strong>${count} missões</strong> para derrubar hoje:<br>${list}<br>PRA CIMA DELES!`,
+    noTasks: () => `Tudo limpo! Você destruiu todas as tarefas! Descanse, campeão!`,
+    motivation: (quote) => `PEGA ESSA VISÃO:<br><em>"${quote}"</em><br>AGORA VAI LÁ E FAZ ACONTECER!`,
+    work: (total) => `MONSTRO! Você fez <strong>${total}</strong> hoje! Continue nesse ritmo!`,
+    help: () => `Quer saber seu placar? Pergunte sobre <strong>XP</strong>, <strong>Grana</strong>, <strong>Tarefas</strong> ou peça uma <strong>Motivação</strong>!`,
+    default: () => `NÃO ENTENDI! FALA DIREITO, CAMPEÃO! Tenta: saldo, tarefas, xp!`,
+    suggestion: (text) => `DICA DE CAMPEÃO: ${text}`
+  }
+};
+
+function getTimeBasedSuggestion() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "🌅 <strong>Bom dia!</strong> Já bebeu água hoje? Que tal definir uma meta para o dia?";
+  if (hour >= 12 && hour < 14) return "☀️ <strong>Hora do almoço!</strong> Uma pausa agora ajuda a manter o foco à tarde.";
+  if (hour >= 14 && hour < 18) return "☕ <strong>Boa tarde!</strong> Se sentir cansaço, faça um alongamento rápido de 5 minutos.";
+  if (hour >= 18 && hour < 22) return "🌙 <strong>Boa noite!</strong> Ótimo momento para revisar suas conquistas do dia ou ler um livro.";
+  return "🦉 <strong>Madrugada...</strong> O descanso é essencial para recuperar seu XP. Tente dormir um pouco!";
+}
+
+function toggleChat() {
+  elements.chatModal.classList.toggle('active');
+  if (elements.chatModal.classList.contains('active')) {
+    setTimeout(() => elements.chatInput.focus(), 100);
+    
+    // Atualiza o select com a personalidade salva
+    if (elements.oraclePersonalitySelect && gameState) {
+      elements.oraclePersonalitySelect.value = gameState.oraclePersonality || 'robot';
+    }
+
+    if (elements.chatMessages.children.length === 0) {
+      const p = ORACLE_PERSONALITIES[gameState.oraclePersonality || 'robot'];
+      addBotMessage(p.greeting(gameState.name));
+      setTimeout(() => addBotMessage(p.suggestion(getTimeBasedSuggestion())), 600);
+    }
+  }
+}
+
+function addUserMessage(text) {
+  const div = document.createElement('div');
+  div.className = 'chat-message user';
+  div.textContent = text;
+  elements.chatMessages.appendChild(div);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+}
+
+function addBotMessage(text) {
+  const div = document.createElement('div');
+  div.className = 'chat-message bot';
+  div.innerHTML = text; // Permite HTML básico (negrito, quebras)
+  elements.chatMessages.appendChild(div);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+  playSound('click'); // Som sutil ao receber mensagem
+}
+
+function processUserMessage() {
+  const text = elements.chatInput.value.trim();
+  if (!text) return;
+
+  addUserMessage(text);
+  elements.chatInput.value = '';
+
+  // Simula "pensando"
+  setTimeout(() => {
+    const response = getOracleResponse(text.toLowerCase());
+    addBotMessage(response);
+  }, 600);
+}
+
+function getOracleResponse(input) {
+  const pKey = gameState.oraclePersonality || 'robot';
+  const p = ORACLE_PERSONALITIES[pKey];
+  
+  // 1. Status / XP / Nível
+  if (input.includes('xp') || input.includes('nível') || input.includes('nivel') || input.includes('status')) {
+    const missing = 100 - gameState.xp;
+    return p.xp(gameState.level, gameState.xp, missing);
+  }
+
+  // 2. Finanças / Saldo / Dinheiro
+  if (input.includes('saldo') || input.includes('dinheiro') || input.includes('finança') || input.includes('gasto')) {
+    let balance = 0;
+    (gameState.finances || []).forEach(t => {
+      if (t.type === 'income') balance += t.value;
+      else balance -= t.value;
+    });
+    return p.finance(balance.toLocaleString('pt-BR', {minimumFractionDigits: 2}));
+  }
+
+  // 3. Tarefas / Pendências
+  if (input.includes('tarefa') || input.includes('fazer') || input.includes('pendente')) {
+    const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
+    if (pending.length === 0) {
+      return p.noTasks();
+    }
+    const list = pending.map(t => `• ${t.text}`).join('<br>');
+    return p.tasks(pending.length, list);
+  }
+
+  // 4. Motivação / Triste
+  if (input.includes('triste') || input.includes('desanimado') || input.includes('motiva') || input.includes('frase')) {
+    const quote = ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)];
+    return p.motivation(quote);
+  }
+
+  // 5. Trabalho
+  if (input.includes('trabalho') || input.includes('produção') || input.includes('massa')) {
+    const today = new Date().toISOString().split('T')[0];
+    const todayLogs = (gameState.workLog || []).filter(l => l.date === today && l.type !== 'time_tracking');
+    let total = 0;
+    todayLogs.forEach(l => total += l.inputVal);
+    return p.work(total);
+  }
+
+  // 6. Ajuda / Oi
+  if (input.includes('oi') || input.includes('olá') || input.includes('ajuda')) {
+    return p.help();
+  }
+
+  // 7. Sugestão / Dica
+  if (input.includes('sugestão') || input.includes('dica') || input.includes('recomend')) {
+    return p.suggestion(getTimeBasedSuggestion());
+  }
+
+  // Padrão
+  return p.default();
+}
+
+if (elements.chatBtn) elements.chatBtn.addEventListener('click', toggleChat);
+if (elements.closeChatBtn) elements.closeChatBtn.addEventListener('click', toggleChat);
+if (elements.sendMessageBtn) elements.sendMessageBtn.addEventListener('click', processUserMessage);
+if (elements.chatInput) elements.chatInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') processUserMessage();
+});
+if (elements.oraclePersonalitySelect) {
+  elements.oraclePersonalitySelect.addEventListener('change', (e) => {
+    if (gameState) {
+      gameState.oraclePersonality = e.target.value;
+      saveGame(true);
+      addBotMessage(`<em>[Personalidade alterada para: ${e.target.options[e.target.selectedIndex].text}]</em>`);
+    }
+  });
+}
 
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {
