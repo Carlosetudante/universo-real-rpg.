@@ -899,38 +899,44 @@ async function saveGame(arg) {
       elements.saveBtn.textContent = '💾 Salvando...';
     }
     const username = getSession();
-    let users = getUsers();
-    if (users[username]) {
-      // Atualiza tempo de jogo antes de salvar
-      if (loginTime) {
-        const now = new Date();
-        gameState.playTime = (gameState.playTime || 0) + (now - loginTime);
-        loginTime = now;
-      }
-
-      // Inclui memórias do oráculo no gameState para salvar
-      if (typeof OracleMemory !== 'undefined' && OracleMemory.data) {
-        gameState.oracleMemory = OracleMemory.data;
-      }
-
-      users[username].character = gameState;
-      setUsers(users);
-      
-      // Sincroniza TUDO com Supabase (em background)
-      if (useSupabase()) {
-        SupabaseService.syncAllToCloud(gameState).catch(e => {
-          console.warn('Erro ao sincronizar com nuvem:', e);
-        });
-      }
-      
-      // Backup Automático
-      createAutoBackup();
-
-      if (!silent) showToast('💾 Progresso salvo com sucesso!');
-    } else {
-      throw new Error('Usuário não encontrado para salvar.');
+    
+    // Atualiza tempo de jogo antes de salvar
+    if (loginTime) {
+      const now = new Date();
+      gameState.playTime = (gameState.playTime || 0) + (now - loginTime);
+      loginTime = now;
     }
+
+    // Inclui memórias do oráculo no gameState para salvar
+    if (typeof OracleMemory !== 'undefined' && OracleMemory.data) {
+      gameState.oracleMemory = OracleMemory.data;
+    }
+
+    // Se está usando Supabase, sincroniza com a nuvem
+    if (useSupabase()) {
+      try {
+        await SupabaseService.syncAllToCloud(gameState);
+        console.log('✅ Dados salvos na nuvem');
+      } catch (e) {
+        console.warn('Erro ao sincronizar com nuvem:', e);
+      }
+    }
+    
+    // Também salva localmente (backup offline)
+    let users = getUsers();
+    if (!users[username]) {
+      users[username] = { character: gameState };
+    } else {
+      users[username].character = gameState;
+    }
+    setUsers(users);
+    
+    // Backup Automático
+    createAutoBackup();
+
+    if (!silent) showToast('💾 Progresso salvo com sucesso!');
   } catch (error) {
+    console.error('Erro ao salvar:', error);
     if (!silent) showToast(`❌ ${error.message}`);
   } finally {
     if (!silent) {
