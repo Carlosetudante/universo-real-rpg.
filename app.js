@@ -3587,20 +3587,23 @@ const OracleNLU = {
     
     'finance.expense': {
       patterns: [
-        /(?:gastei|paguei|comprei|perdi|saiu|foi)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s*(?:em|no|na|com|de|pra|para)?\s*(.+)?/i,
-        /(?:coloca|adiciona|registra|bota|põe)\s+(?:uma?\s+)?(?:saída|gasto|despesa)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com|de)?\s*(.+)?/i,
-        /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com)?\s*(.+)?/i,
-        /(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i
+        /(?:gastei|paguei|comprei|perdi|saiu|foi)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:r?\$?\s*)?(?:reais?)?\s*(?:hoje|ontem|amanhã)?\s*(?:em|no|na|com|de|pra|para)?\s*(.+)?/i,
+        /(?:coloca|adiciona|registra|bota|põe)\s+(?:uma?\s+)?(?:saída|gasto|despesa)\s+(?:de\s+)?(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com|de)?\s*(.+)?/i,
+        /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com)?\s*(.+)?/i,
+        /(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i
       ],
       extract: (text, match) => {
         const amount = parseFloat(match[1].replace(',', '.'));
         let description = match[2]?.trim() || null;
         
-        // Limpa descrição
+        // Limpa descrição removendo $, palavras temporais e preposições extras
         if (description) {
           description = description
-            .replace(/^(?:o|a|um|uma|no|na|em|com|de|pra|para)\s+/i, '')
-            .replace(/(?:\s+(?:pfv|pf|por favor))$/i, '')
+            .replace(/^\$\s*/i, '')  // Remove $ no início
+            .replace(/^(?:hoje|ontem|amanhã|amanha)\s*/i, '')  // Remove palavras temporais
+            .replace(/^(?:o|a|um|uma|no|na|em|com|de|pra|para)\s+/i, '')  // Remove preposições
+            .replace(/(?:\s+(?:pfv|pf|por favor))$/i, '')  // Remove "por favor"
+            .replace(/\s+/g, ' ')  // Normaliza espaços
             .trim();
         }
         
