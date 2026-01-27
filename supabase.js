@@ -769,7 +769,9 @@ async function syncAllToCloud(localData) {
       skill_points: localData.skillPoints || 0,
       attributes: localData.attributes,
       achievements: localData.achievements,
-      inventory: localData.inventory
+      inventory: localData.inventory,
+      last_claim: localData.lastClaim || null,
+      play_time: localData.playTime || 0
     });
     console.log('✅ Perfil salvo!');
 
