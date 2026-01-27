@@ -553,6 +553,64 @@ async function syncCloudToLocal() {
     const profile = await getProfile();
     if (!profile) return null;
 
+    // Carrega TODOS os dados do usuário
+    const [tasks, finances, workSessions, oracleMemories] = await Promise.all([
+      getTasks().catch(() => []),
+      getFinances().catch(() => []),
+      getWorkSessions().catch(() => []),
+      getOracleMemories().catch(() => [])
+    ]);
+
+    // Converte tarefas do formato Supabase para formato local
+    const localTasks = tasks.map(t => ({
+      id: t.id,
+      text: t.title,
+      completed: t.status === 'completed',
+      date: t.created_at,
+      completedAt: t.completed_at,
+      dueDate: t.due_date,
+      xpReward: t.xp_reward,
+      category: t.category
+    }));
+
+    // Converte finanças do formato Supabase para formato local
+    const localFinances = finances.map(f => ({
+      id: f.id,
+      desc: f.description,
+      value: f.amount,
+      type: f.type,
+      category: f.category,
+      date: f.created_at
+    }));
+
+    // Converte sessões de trabalho
+    const localWorkLog = workSessions.map(w => ({
+      id: w.id,
+      date: w.session_date,
+      startTime: w.start_time,
+      endTime: w.end_time,
+      duration: w.duration,
+      production: w.production,
+      money: w.earnings
+    }));
+
+    // Converte memórias do oráculo
+    const localOracleMemory = {
+      learned: oracleMemories.map(m => ({
+        text: m.fact,
+        date: m.created_at,
+        tags: m.tags
+      })),
+      profile: {}
+    };
+
+    // Extrai informações de perfil das memórias
+    oracleMemories.forEach(m => {
+      if (m.title && m.title !== 'memory') {
+        localOracleMemory.profile[m.title] = m.fact;
+      }
+    });
+
     return {
       username: currentUser.email,
       name: profile.character_name,
@@ -563,11 +621,16 @@ async function syncCloudToLocal() {
       xp: profile.xp,
       streak: profile.streak,
       skillPoints: profile.skill_points,
-      attributes: profile.attributes,
-      achievements: profile.achievements,
-      inventory: profile.inventory,
+      attributes: profile.attributes || {},
+      achievements: profile.achievements || [],
+      inventory: profile.inventory || [],
       lastClaim: profile.last_claim,
-      playTime: profile.play_time
+      playTime: profile.play_time,
+      // Dados adicionais
+      dailyTasks: localTasks,
+      finances: localFinances,
+      workLog: localWorkLog,
+      oracleMemory: localOracleMemory
     };
   } catch (error) {
     console.error('❌ Erro ao carregar da nuvem:', error);
@@ -575,10 +638,98 @@ async function syncCloudToLocal() {
   }
 }
 
+// Sincroniza TUDO para a nuvem
+async function syncAllToCloud(localData) {
+  if (!isSupabaseConfigured() || !currentUser) return false;
+
+  try {
+    // 1. Atualiza perfil
+    await updateProfile({
+      character_name: localData.name,
+      character_class: localData.race,
+      title: localData.title,
+      aura_color: localData.auraColor,
+      level: localData.level,
+      xp: localData.xp,
+      streak: localData.streak,
+      skill_points: localData.skillPoints || 0,
+      attributes: localData.attributes,
+      achievements: localData.achievements,
+      inventory: localData.inventory
+    });
+
+    // 2. Sincroniza tarefas (apenas novas, não sobrescreve tudo)
+    if (localData.dailyTasks && localData.dailyTasks.length > 0) {
+      const existingTasks = await getTasks();
+      const existingIds = new Set(existingTasks.map(t => t.id));
+      
+      for (const task of localData.dailyTasks) {
+        // Se é uma tarefa nova (id numérico local, não UUID)
+        if (typeof task.id === 'number' && !existingIds.has(task.id)) {
+          await addTask({
+            title: task.text,
+            status: task.completed ? 'completed' : 'pending',
+            xpReward: task.xpReward || 10,
+            dueDate: task.dueDate
+          });
+        }
+      }
+    }
+
+    // 3. Sincroniza finanças
+    if (localData.finances && localData.finances.length > 0) {
+      const existingFinances = await getFinances();
+      const existingIds = new Set(existingFinances.map(f => f.id));
+      
+      for (const fin of localData.finances) {
+        if (typeof fin.id === 'number' && !existingIds.has(fin.id)) {
+          await addFinance({
+            type: fin.type,
+            category: fin.category,
+            amount: fin.value,
+            description: fin.desc
+          });
+        }
+      }
+    }
+
+    // 4. Sincroniza memórias do oráculo
+    if (localData.oracleMemory) {
+      const existingMemories = await getOracleMemories();
+      const existingFacts = new Set(existingMemories.map(m => m.fact));
+      
+      // Salva informações de perfil
+      if (localData.oracleMemory.profile) {
+        for (const [key, value] of Object.entries(localData.oracleMemory.profile)) {
+          if (value && !existingFacts.has(value)) {
+            await saveOracleMemory(key, value, ['profile'], 10);
+          }
+        }
+      }
+      
+      // Salva memórias aprendidas
+      if (localData.oracleMemory.learned) {
+        for (const memory of localData.oracleMemory.learned) {
+          if (!existingFacts.has(memory.text)) {
+            await saveOracleMemory('memory', memory.text, memory.tags || [], 5);
+          }
+        }
+      }
+    }
+
+    console.log('✅ Todos os dados sincronizados com a nuvem');
+    return true;
+  } catch (error) {
+    console.error('❌ Erro ao sincronizar:', error);
+    return false;
+  }
+}
+
 // Exporta funções para uso global
 window.SupabaseService = {
   init: initSupabase,
   isConfigured: isSupabaseConfigured,
+  getCurrentUser: () => currentUser,
   
   // Auth
   signUp: supabaseSignUp,
@@ -619,7 +770,8 @@ window.SupabaseService = {
   
   // Sync
   syncLocalToCloud,
-  syncCloudToLocal
+  syncCloudToLocal,
+  syncAllToCloud
 };
 
 console.log('📦 Supabase Service carregado');
