@@ -495,53 +495,77 @@ async function login() {
 
     // Tenta login com Supabase primeiro
     if (useSupabase()) {
-      const { data, error } = await SupabaseService.signIn(email, password);
-      if (error) throw error;
-
-      // Carrega TODOS os dados do banco (perfil + tarefas + finanças + memórias)
-      elements.loginBtn.textContent = 'Carregando dados...';
-      const cloudData = await SupabaseService.syncCloudToLocal();
+      console.log('🔐 Tentando login com Supabase...');
       
-      if (cloudData) {
-        gameState = normalizeGameState(cloudData);
+      try {
+        const { data, error } = await SupabaseService.signIn(email, password);
         
-        // Carrega memórias do oráculo se existirem
-        if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
-          OracleMemory.data = cloudData.oracleMemory;
+        if (error) {
+          console.error('Erro Supabase:', error);
+          
+          // Traduz erros comuns do Supabase
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Email ou senha incorretos. Verifique suas credenciais.');
+          } else if (error.message.includes('Email not confirmed')) {
+            throw new Error('Email não confirmado! Verifique sua caixa de entrada e spam.');
+          } else if (error.message.includes('User not found')) {
+            throw new Error('Usuário não encontrado. Crie uma conta primeiro.');
+          } else {
+            throw error;
+          }
         }
+
+        // Carrega TODOS os dados do banco (perfil + tarefas + finanças + memórias)
+        elements.loginBtn.textContent = 'Carregando dados...';
+        const cloudData = await SupabaseService.syncCloudToLocal();
         
-        console.log('✅ Dados carregados da nuvem:', {
-          tarefas: cloudData.dailyTasks?.length || 0,
-          financas: cloudData.finances?.length || 0,
-          trabalho: cloudData.workLog?.length || 0
-        });
-      } else {
-        // Primeiro login - cria estado inicial
-        gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
-      }
+        if (cloudData) {
+          gameState = normalizeGameState(cloudData);
+          
+          // Carrega memórias do oráculo se existirem
+          if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
+            OracleMemory.data = cloudData.oracleMemory;
+          }
+          
+          console.log('✅ Dados carregados da nuvem:', {
+            tarefas: cloudData.dailyTasks?.length || 0,
+            financas: cloudData.finances?.length || 0,
+            trabalho: cloudData.workLog?.length || 0
+          });
+        } else {
+          // Primeiro login - cria estado inicial
+          gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
+        }
 
-      // Salvar localmente também (para funcionar offline)
-      if (elements.rememberUser && elements.rememberUser.checked) {
-        localStorage.setItem('ur_last_user', email);
-      }
+        // Salvar localmente também (para funcionar offline)
+        if (elements.rememberUser && elements.rememberUser.checked) {
+          localStorage.setItem('ur_last_user', email);
+        }
 
-      showToast('✅ Login realizado! Dados carregados da nuvem ☁️');
-      isLoggedIn = true;
-      loginTime = new Date();
-      saveSession(email);
-      hideAuthModal();
-      updateUI();
-      if (typeof renderDailyTasks === 'function') renderDailyTasks();
-      if (typeof renderFinances === 'function') renderFinances();
-      if (typeof checkAchievements === 'function') checkAchievements();
-      checkBackupAvailability();
-      checkBillsDueToday();
-      elements.loginUsername.value = '';
-      elements.loginPassword.value = '';
-      return;
+        showToast('✅ Login realizado! Dados carregados da nuvem ☁️');
+        isLoggedIn = true;
+        loginTime = new Date();
+        saveSession(email);
+        hideAuthModal();
+        updateUI();
+        if (typeof renderDailyTasks === 'function') renderDailyTasks();
+        if (typeof renderFinances === 'function') renderFinances();
+        if (typeof checkAchievements === 'function') checkAchievements();
+        checkBackupAvailability();
+        checkBillsDueToday();
+        elements.loginUsername.value = '';
+        elements.loginPassword.value = '';
+        return;
+        
+      } catch (supabaseError) {
+        console.warn('Supabase login falhou:', supabaseError.message);
+        // Mostra o erro do Supabase e para (não tenta fallback local)
+        throw supabaseError;
+      }
     }
 
-    // Fallback: Login local (localStorage)
+    // Fallback: Login local (localStorage) - SÓ se Supabase não estiver disponível
+    console.log('📁 Usando login local (Supabase não disponível)');
     const users = getUsers();
     if (!users[email]) {
       const foundKey = Object.keys(users).find(k => k.toLowerCase() === email.toLowerCase());
