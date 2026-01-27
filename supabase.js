@@ -26,10 +26,34 @@ function initSupabase() {
   if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log('✅ Supabase inicializado');
+    console.log('📡 URL:', SUPABASE_URL);
+    
+    // Teste de conexão
+    testConnection();
+    
     return true;
   } else {
     console.warn('⚠️ Supabase JS não carregado. Usando modo offline (localStorage).');
     return false;
+  }
+}
+
+// Testa a conexão com o Supabase
+async function testConnection() {
+  try {
+    const { data, error } = await supabase.from('profiles').select('count').limit(1);
+    if (error) {
+      if (error.message.includes('relation') && error.message.includes('does not exist')) {
+        console.error('❌ TABELAS NÃO CRIADAS! Execute o database-schema.sql no Supabase.');
+        console.error('📋 Vá em: Supabase Dashboard > SQL Editor > New Query > Cole o conteúdo de database-schema.sql');
+      } else {
+        console.warn('⚠️ Erro ao testar conexão:', error.message);
+      }
+    } else {
+      console.log('✅ Conexão com Supabase OK - Tabelas existem');
+    }
+  } catch (e) {
+    console.error('❌ Erro de conexão:', e);
   }
 }
 
