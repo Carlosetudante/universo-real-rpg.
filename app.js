@@ -2453,7 +2453,10 @@ async function claimDailyReward() {
       gameState.xp = gameState.xp - 100;
       leveledUp = true;
     }
-    saveGame();
+    
+    // IMPORTANTE: Aguarda o salvamento para garantir persistência
+    await saveGame(true); // silent = true
+    
     let message = `🎁 +${xpReward} XP e +${pointsReward} pontos!`;
     if (streak > 1) {
       message += ` Sequência: ${streak} dias 🔥`;
