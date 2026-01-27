@@ -1,4 +1,4 @@
-const CACHE_NAME = 'universo-real-v5';
+const CACHE_NAME = 'universo-real-v6';
 
 const urlsToCache = [
   './index.html',
@@ -9,7 +9,7 @@ const urlsToCache = [
   './workTimer.js',
   './logo.svg',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'https://unpkg.com/@supabase/supabase-js@2'
 ];
 
 self.addEventListener('install', event => {
