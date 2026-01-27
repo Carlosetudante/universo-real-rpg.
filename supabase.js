@@ -1,21 +1,21 @@
-﻿// ===========================================
-// SUPABASE - CONFIGURAÃ‡ÃƒO E SERVIÃ‡OS
+// ===========================================
+// SUPABASE - CONFIGURAÇÃO E SERVIÇOS
 // ===========================================
 // 
 // COMO CONFIGURAR:
 // 1. Crie uma conta em https://supabaseClient.com
 // 2. Crie um novo projeto
-// 3. VÃ¡ em Project Settings > API
+// 3. Vá em Project Settings > API
 // 4. Copie a "Project URL" e a "anon public" key
-// 5. Cole abaixo nas variÃ¡veis SUPABASE_URL e SUPABASE_ANON_KEY
+// 5. Cole abaixo nas variáveis SUPABASE_URL e SUPABASE_ANON_KEY
 //
 // ===========================================
 
-// âš ï¸ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE âš ï¸
+// ⚠️ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE ⚠️
 const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
 
-// ImportaÃ§Ã£o do Supabase Client (via CDN)
+// Importação do Supabase Client (via CDN)
 // Adicionado no index.html: <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 let supabaseClient = null;
@@ -23,47 +23,47 @@ let currentUser = null;
 
 // Inicializa o cliente Supabase
 function initSupabase() {
-  console.log('ðŸ”„ Tentando inicializar supabaseClient...');
+  console.log('🔄 Tentando inicializar supabaseClient...');
   
-  // Verifica se o objeto supabase estÃ¡ disponÃ­vel globalmente
+  // Verifica se o objeto supabase está disponível globalmente
   if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('âœ… Supabase inicializado com sucesso!');
-    console.log('ðŸ“¡ URL:', SUPABASE_URL);
+    console.log('✅ Supabase inicializado com sucesso!');
+    console.log('📡 URL:', SUPABASE_URL);
     
-    // Teste de conexÃ£o
+    // Teste de conexão
     testConnection();
     
     return true;
   } else {
-    console.error('âŒ Supabase JS NÃƒO carregado!');
-    console.error('Verifique se o script estÃ¡ no index.html:');
+    console.error('❌ Supabase JS NÃO carregado!');
+    console.error('Verifique se o script está no index.html:');
     console.error('<script src="https://unpkg.com/@supabase/supabase-js@2"></script>');
     console.log('window.supabase =', typeof window.supabase);
     return false;
   }
 }
 
-// Testa a conexÃ£o com o Supabase
+// Testa a conexão com o Supabase
 async function testConnection() {
   try {
     const { data, error } = await supabaseClient.from('profiles').select('count').limit(1);
     if (error) {
       if (error.message.includes('relation') && error.message.includes('does not exist')) {
-        console.error('âŒ TABELAS NÃƒO CRIADAS! Execute o database-schema.sql no supabaseClient.');
-        console.error('ðŸ“‹ VÃ¡ em: Supabase Dashboard > SQL Editor > New Query > Cole o conteÃºdo de database-schema.sql');
+        console.error('❌ TABELAS NÃO CRIADAS! Execute o database-schema.sql no supabaseClient.');
+        console.error('📋 Vá em: Supabase Dashboard > SQL Editor > New Query > Cole o conteúdo de database-schema.sql');
       } else {
-        console.warn('âš ï¸ Erro ao testar conexÃ£o:', error.message);
+        console.warn('⚠️ Erro ao testar conexão:', error.message);
       }
     } else {
-      console.log('âœ… ConexÃ£o com Supabase OK - Tabelas existem');
+      console.log('✅ Conexão com Supabase OK - Tabelas existem');
     }
   } catch (e) {
-    console.error('âŒ Erro de conexÃ£o:', e);
+    console.error('❌ Erro de conexão:', e);
   }
 }
 
-// Verifica se estÃ¡ configurado corretamente
+// Verifica se está configurado corretamente
 function isSupabaseConfigured() {
   return SUPABASE_URL !== 'https://SEU-PROJETO.supabase.co' && 
          SUPABASE_ANON_KEY !== 'SUA-ANON-KEY-AQUI' &&
@@ -71,13 +71,13 @@ function isSupabaseConfigured() {
 }
 
 // ===========================================
-// AUTENTICAÃ‡ÃƒO
+// AUTENTICAÇÃO
 // ===========================================
 
-// Registrar novo usuÃ¡rio
+// Registrar novo usuário
 async function supabaseSignUp(email, password, characterData) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase nÃ£o configurado. Configure as credenciais em supabaseClient.js');
+    throw new Error('Supabase não configurado. Configure as credenciais em supabaseClient.js');
   }
 
   const { data, error } = await supabaseClient.auth.signUp({
@@ -104,7 +104,7 @@ async function supabaseSignUp(email, password, characterData) {
 // Login
 async function supabaseSignIn(email, password) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase nÃ£o configurado. Configure as credenciais em supabaseClient.js');
+    throw new Error('Supabase não configurado. Configure as credenciais em supabaseClient.js');
   }
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
@@ -128,7 +128,7 @@ async function supabaseSignOut() {
   currentUser = null;
 }
 
-// Verifica sessÃ£o atual
+// Verifica sessão atual
 async function supabaseGetSession() {
   if (!isSupabaseConfigured()) return null;
 
@@ -139,7 +139,7 @@ async function supabaseGetSession() {
   return session;
 }
 
-// Listener de mudanÃ§a de auth
+// Listener de mudança de auth
 function onAuthStateChange(callback) {
   if (!isSupabaseConfigured()) return;
 
@@ -150,7 +150,7 @@ function onAuthStateChange(callback) {
 }
 
 // ===========================================
-// PERFIL DO USUÃRIO
+// PERFIL DO USUÁRIO
 // ===========================================
 
 async function createProfile(userId, characterData) {
@@ -260,7 +260,7 @@ async function deleteTask(taskId) {
 }
 
 // ===========================================
-// FINANÃ‡AS (FINANCE TRANSACTIONS)
+// FINANÇAS (FINANCE TRANSACTIONS)
 // ===========================================
 
 async function getFinances(filters = {}) {
@@ -326,7 +326,7 @@ async function deleteFinance(transactionId) {
 }
 
 // ===========================================
-// SESSÃ•ES DE TRABALHO (WORK SESSIONS)
+// SESSÕES DE TRABALHO (WORK SESSIONS)
 // ===========================================
 
 async function getWorkSessions(filters = {}) {
@@ -371,7 +371,7 @@ async function addWorkSession(session) {
 }
 
 // ===========================================
-// XP EVENTS (HISTÃ“RICO DE XP)
+// XP EVENTS (HISTÓRICO DE XP)
 // ===========================================
 
 async function addXpEvent(deltaXp, reason) {
@@ -406,7 +406,7 @@ async function getXpHistory(limit = 50) {
 }
 
 // ===========================================
-// ORÃCULO - MENSAGENS E MEMÃ“RIA
+// ORÁCULO - MENSAGENS E MEMÓRIA
 // ===========================================
 
 async function saveOracleMessage(role, content, meta = {}) {
@@ -438,7 +438,7 @@ async function getOracleMessages(limit = 50) {
     .limit(limit);
 
   if (error) throw error;
-  return (data || []).reverse(); // Retorna em ordem cronolÃ³gica
+  return (data || []).reverse(); // Retorna em ordem cronológica
 }
 
 async function saveOracleMemory(title, fact, tags = [], importance = 5) {
@@ -480,10 +480,10 @@ async function getOracleMemories(searchTags = null) {
 }
 
 // ===========================================
-// ORÃCULO - PROCESSADOR DE AÃ‡Ã•ES
+// ORÁCULO - PROCESSADOR DE AÇÕES
 // ===========================================
 
-// Processa as aÃ§Ãµes retornadas pelo OrÃ¡culo
+// Processa as ações retornadas pelo Oráculo
 async function processOracleActions(actions) {
   const results = [];
 
@@ -528,12 +528,12 @@ async function processOracleActions(actions) {
           break;
 
         case 'xp.add':
-          await addXpEvent(action.amount, action.reason || 'BÃ´nus do OrÃ¡culo');
+          await addXpEvent(action.amount, action.reason || 'Bônus do Oráculo');
           results.push({ success: true, action: 'xp.add', amount: action.amount });
           break;
 
         default:
-          results.push({ success: false, action: action.type, error: 'AÃ§Ã£o desconhecida' });
+          results.push({ success: false, action: action.type, error: 'Ação desconhecida' });
       }
     } catch (error) {
       results.push({ success: false, action: action.type, error: error.message });
@@ -567,10 +567,10 @@ async function syncLocalToCloud(localData) {
       inventory: localData.inventory
     });
 
-    console.log('âœ… Dados sincronizados com a nuvem');
+    console.log('✅ Dados sincronizados com a nuvem');
     return true;
   } catch (error) {
-    console.error('âŒ Erro ao sincronizar:', error);
+    console.error('❌ Erro ao sincronizar:', error);
     return false;
   }
 }
@@ -583,7 +583,7 @@ async function syncCloudToLocal() {
     const profile = await getProfile();
     if (!profile) return null;
 
-    // Carrega TODOS os dados do usuÃ¡rio
+    // Carrega TODOS os dados do usuário
     const [tasks, finances, workSessions, oracleMemories] = await Promise.all([
       getTasks().catch(() => []),
       getFinances().catch(() => []),
@@ -603,7 +603,7 @@ async function syncCloudToLocal() {
       category: t.category
     }));
 
-    // Converte finanÃ§as do formato Supabase para formato local
+    // Converte finanças do formato Supabase para formato local
     const localFinances = finances.map(f => ({
       id: f.id,
       desc: f.description,
@@ -613,7 +613,7 @@ async function syncCloudToLocal() {
       date: f.created_at
     }));
 
-    // Converte sessÃµes de trabalho
+    // Converte sessões de trabalho
     const localWorkLog = workSessions.map(w => ({
       id: w.id,
       date: w.session_date,
@@ -624,7 +624,7 @@ async function syncCloudToLocal() {
       money: w.earnings
     }));
 
-    // Converte memÃ³rias do orÃ¡culo
+    // Converte memórias do oráculo
     const localOracleMemory = {
       learned: oracleMemories.map(m => ({
         text: m.fact,
@@ -634,7 +634,7 @@ async function syncCloudToLocal() {
       profile: {}
     };
 
-    // Extrai informaÃ§Ãµes de perfil das memÃ³rias
+    // Extrai informações de perfil das memórias
     oracleMemories.forEach(m => {
       if (m.title && m.title !== 'memory') {
         localOracleMemory.profile[m.title] = m.fact;
@@ -663,7 +663,7 @@ async function syncCloudToLocal() {
       oracleMemory: localOracleMemory
     };
   } catch (error) {
-    console.error('âŒ Erro ao carregar da nuvem:', error);
+    console.error('❌ Erro ao carregar da nuvem:', error);
     return null;
   }
 }
@@ -688,13 +688,13 @@ async function syncAllToCloud(localData) {
       inventory: localData.inventory
     });
 
-    // 2. Sincroniza tarefas (apenas novas, nÃ£o sobrescreve tudo)
+    // 2. Sincroniza tarefas (apenas novas, não sobrescreve tudo)
     if (localData.dailyTasks && localData.dailyTasks.length > 0) {
       const existingTasks = await getTasks();
       const existingIds = new Set(existingTasks.map(t => t.id));
       
       for (const task of localData.dailyTasks) {
-        // Se Ã© uma tarefa nova (id numÃ©rico local, nÃ£o UUID)
+        // Se é uma tarefa nova (id numérico local, não UUID)
         if (typeof task.id === 'number' && !existingIds.has(task.id)) {
           await addTask({
             title: task.text,
@@ -706,7 +706,7 @@ async function syncAllToCloud(localData) {
       }
     }
 
-    // 3. Sincroniza finanÃ§as
+    // 3. Sincroniza finanças
     if (localData.finances && localData.finances.length > 0) {
       const existingFinances = await getFinances();
       const existingIds = new Set(existingFinances.map(f => f.id));
@@ -723,12 +723,12 @@ async function syncAllToCloud(localData) {
       }
     }
 
-    // 4. Sincroniza memÃ³rias do orÃ¡culo
+    // 4. Sincroniza memórias do oráculo
     if (localData.oracleMemory) {
       const existingMemories = await getOracleMemories();
       const existingFacts = new Set(existingMemories.map(m => m.fact));
       
-      // Salva informaÃ§Ãµes de perfil
+      // Salva informações de perfil
       if (localData.oracleMemory.profile) {
         for (const [key, value] of Object.entries(localData.oracleMemory.profile)) {
           if (value && !existingFacts.has(value)) {
@@ -737,7 +737,7 @@ async function syncAllToCloud(localData) {
         }
       }
       
-      // Salva memÃ³rias aprendidas
+      // Salva memórias aprendidas
       if (localData.oracleMemory.learned) {
         for (const memory of localData.oracleMemory.learned) {
           if (!existingFacts.has(memory.text)) {
@@ -747,15 +747,15 @@ async function syncAllToCloud(localData) {
       }
     }
 
-    console.log('âœ… Todos os dados sincronizados com a nuvem');
+    console.log('✅ Todos os dados sincronizados com a nuvem');
     return true;
   } catch (error) {
-    console.error('âŒ Erro ao sincronizar:', error);
+    console.error('❌ Erro ao sincronizar:', error);
     return false;
   }
 }
 
-// Exporta funÃ§Ãµes para uso global
+// Exporta funções para uso global
 window.SupabaseService = {
   init: initSupabase,
   isConfigured: isSupabaseConfigured,
@@ -804,4 +804,4 @@ window.SupabaseService = {
   syncAllToCloud
 };
 
-console.log('ðŸ“¦ Supabase Service carregado');
+console.log('📦 Supabase Service carregado');
