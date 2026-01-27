@@ -16,16 +16,19 @@ const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
 
 // Importação do Supabase Client (via CDN)
-// Adicionado no index.html: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// Adicionado no index.html: <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 let supabase = null;
 let currentUser = null;
 
 // Inicializa o cliente Supabase
 function initSupabase() {
+  console.log('🔄 Tentando inicializar Supabase...');
+  
+  // Verifica se o objeto supabase está disponível globalmente
   if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('✅ Supabase inicializado');
+    console.log('✅ Supabase inicializado com sucesso!');
     console.log('📡 URL:', SUPABASE_URL);
     
     // Teste de conexão
@@ -33,7 +36,10 @@ function initSupabase() {
     
     return true;
   } else {
-    console.warn('⚠️ Supabase JS não carregado. Usando modo offline (localStorage).');
+    console.error('❌ Supabase JS NÃO carregado!');
+    console.error('Verifique se o script está no index.html:');
+    console.error('<script src="https://unpkg.com/@supabase/supabase-js@2"></script>');
+    console.log('window.supabase =', typeof window.supabase);
     return false;
   }
 }
