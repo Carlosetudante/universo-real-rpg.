@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Arquivos de log
+*.log
+npm-debug.log*
+
+# Arquivos de build
+dist/
+build/
+
+# Variáveis de ambiente
+.env
+.env.local
