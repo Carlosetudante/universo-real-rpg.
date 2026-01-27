@@ -424,10 +424,16 @@ async function addWorkSession(session) {
     .from('work_sessions')
     .insert({
       user_id: currentUser.id,
-      start_at: session.startAt,
-      end_at: session.endAt,
-      total_seconds: session.totalSeconds,
-      activity_type: session.activityType || 'work'
+      start_at: session.startAt || session.date || new Date().toISOString(),
+      end_at: session.endAt || null,
+      total_seconds: session.totalSeconds || Math.floor((session.duration || 0) / 1000),
+      activity_type: session.activityType || session.type || 'work',
+      notes: session.notes || JSON.stringify({
+        inputVal: session.inputVal,
+        financialVal: session.financialVal,
+        isUnpaid: session.isUnpaid,
+        week: session.week
+      })
     })
     .select()
     .single();
@@ -680,15 +686,29 @@ async function syncCloudToLocal() {
     }));
 
     // Converte sessões de trabalho
-    const localWorkLog = workSessions.map(w => ({
-      id: w.id,
-      date: w.session_date,
-      startTime: w.start_time,
-      endTime: w.end_time,
-      duration: w.duration,
-      production: w.production,
-      money: w.earnings
-    }));
+    const localWorkLog = workSessions.map(w => {
+      // Tenta parsear os dados extras do campo notes
+      let extraData = {};
+      if (w.notes) {
+        try {
+          extraData = JSON.parse(w.notes);
+        } catch (e) {
+          extraData = { notes: w.notes };
+        }
+      }
+      
+      return {
+        id: w.id,
+        date: w.start_at ? w.start_at.split('T')[0] : new Date().toISOString().split('T')[0],
+        timestamp: w.start_at ? new Date(w.start_at).getTime() : Date.now(),
+        duration: w.total_seconds ? w.total_seconds * 1000 : 0, // Converter segundos para ms
+        type: extraData.type || w.activity_type || 'time_tracking',
+        inputVal: extraData.inputVal !== undefined ? extraData.inputVal : (w.total_seconds ? w.total_seconds / 3600 : 0),
+        financialVal: extraData.financialVal || 0,
+        isUnpaid: extraData.isUnpaid || false,
+        week: extraData.week || null
+      };
+    });
 
     // Converte memórias do oráculo
     const localOracleMemory = {
@@ -712,6 +732,9 @@ async function syncCloudToLocal() {
     const extraData = typeof inventoryData === 'object' && !Array.isArray(inventoryData) 
       ? inventoryData 
       : { items: inventoryData };
+
+    // Usa o workLog da tabela work_sessions, ou o backup do inventory se estiver vazio
+    const finalWorkLog = localWorkLog.length > 0 ? localWorkLog : (extraData.workLogBackup || []);
 
     return {
       username: currentUser.email,
@@ -745,7 +768,7 @@ async function syncCloudToLocal() {
       // Dados de outras tabelas
       dailyTasks: localTasks,
       finances: localFinances,
-      workLog: localWorkLog,
+      workLog: finalWorkLog,
       oracleMemory: localOracleMemory
     };
   } catch (error) {
@@ -800,7 +823,9 @@ async function syncAllToCloud(localData) {
         zenMusic: localData.zenMusic || null,
         gratitudeJournal: localData.gratitudeJournal || [],
         taskHistory: localData.taskHistory || [],
-        expenseGroups: localData.expenseGroups || []
+        expenseGroups: localData.expenseGroups || [],
+        // Backup do workLog no campo inventory para não perder dados
+        workLogBackup: localData.workLog || []
       },
       last_claim: localData.lastClaim || null,
       play_time: localData.playTime || 0,
@@ -815,16 +840,37 @@ async function syncAllToCloud(localData) {
     if (localData.dailyTasks && localData.dailyTasks.length > 0) {
       const existingTasks = await getTasks();
       const existingIds = new Set(existingTasks.map(t => t.id));
+      // Também rastreia por título+data para evitar duplicatas
+      const existingTexts = new Set(existingTasks.map(t => `${t.title}_${t.created_at?.split('T')[0]}`));
       
       for (const task of localData.dailyTasks) {
-        // Se é uma tarefa nova (id numérico local, não UUID)
-        if (typeof task.id === 'number' && !existingIds.has(task.id)) {
-          await addTask({
+        // Verifica se já existe por ID ou por texto+data
+        const taskKey = `${task.text}_${task.date?.split('T')[0] || new Date().toISOString().split('T')[0]}`;
+        const alreadyExists = existingIds.has(task.id) || existingTexts.has(taskKey);
+        
+        // Se é uma tarefa nova (id numérico local, não UUID) e não existe no servidor
+        if (typeof task.id === 'number' && !alreadyExists) {
+          const newTask = await addTask({
             title: task.text,
             status: task.completed ? 'completed' : 'pending',
             xpReward: task.xpReward || 10,
             dueDate: task.dueDate
           });
+          
+          if (newTask) {
+            task.id = newTask.id;
+            // Adiciona ao set para evitar duplicatas na mesma sessão
+            existingTexts.add(taskKey);
+          }
+        } else if (typeof task.id === 'string' && existingIds.has(task.id)) {
+          // Atualiza tarefa existente (status pode ter mudado)
+          const existingTask = existingTasks.find(t => t.id === task.id);
+          if (existingTask && existingTask.status !== (task.completed ? 'completed' : 'pending')) {
+            await updateTask(task.id, {
+              status: task.completed ? 'completed' : 'pending',
+              completed_at: task.completed ? new Date().toISOString() : null
+            });
+          }
         }
       }
     }
@@ -836,17 +882,58 @@ async function syncAllToCloud(localData) {
       
       for (const fin of localData.finances) {
         if (typeof fin.id === 'number' && !existingIds.has(fin.id)) {
-          await addFinance({
+          const newFin = await addFinance({
             type: fin.type,
             category: fin.category,
             amount: fin.value,
             description: fin.desc
           });
+          
+          if (newFin) {
+            fin.id = newFin.id;
+          }
         }
       }
     }
 
-    // 4. Sincroniza memórias do oráculo
+    // 4. Sincroniza sessões de trabalho (workLog)
+    if (localData.workLog && localData.workLog.length > 0) {
+      const existingWorkSessions = await getWorkSessions();
+      const existingIds = new Set(existingWorkSessions.map(w => w.id));
+      
+      for (const work of localData.workLog) {
+        // Se é uma sessão nova (id numérico local ou timestamp, não UUID)
+        if ((typeof work.id === 'number' || typeof work.timestamp === 'number') && !existingIds.has(work.id)) {
+          try {
+            const newWork = await addWorkSession({
+              date: work.date,
+              startAt: work.date ? `${work.date}T00:00:00Z` : new Date().toISOString(),
+              totalSeconds: work.duration ? Math.floor(work.duration / 1000) : 0,
+              activityType: work.type || 'production',
+              inputVal: work.inputVal,
+              financialVal: work.financialVal,
+              isUnpaid: work.isUnpaid,
+              week: work.week,
+              notes: JSON.stringify({
+                inputVal: work.inputVal,
+                financialVal: work.financialVal,
+                isUnpaid: work.isUnpaid,
+                week: work.week,
+                type: work.type
+              })
+            });
+            
+            if (newWork) {
+              work.id = newWork.id;
+            }
+          } catch (e) {
+            console.warn('Erro ao sincronizar sessão de trabalho:', e);
+          }
+        }
+      }
+    }
+
+    // 5. Sincroniza memórias do oráculo
     if (localData.oracleMemory) {
       const existingMemories = await getOracleMemories();
       const existingFacts = new Set(existingMemories.map(m => m.fact));
@@ -928,5 +1015,3 @@ window.SupabaseService = {
 };
 
 console.log('📦 Supabase Service carregado');
-
-

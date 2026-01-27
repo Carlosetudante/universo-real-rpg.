@@ -3553,6 +3553,11 @@ if (elements.zenImageBtn && elements.zenImageInput) elements.zenImageBtn.addEven
 if (elements.zenToggleHudBtn) elements.zenToggleHudBtn.addEventListener('click', toggleZenHud);
 if (elements.zenTrackSelect) elements.zenTrackSelect.addEventListener('change', (e) => playZenTrack(parseInt(e.target.value)));
 if (elements.simpleFinanceBtn) elements.simpleFinanceBtn.addEventListener('click', () => window.location.href = './financeiro.html');
+
+// Botão de Carga Horária
+const cargaHorariaBtn = document.getElementById('cargaHorariaBtn');
+if (cargaHorariaBtn) cargaHorariaBtn.addEventListener('click', () => window.location.href = './carga-horaria.html');
+
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
 if (elements.zenImageInput) elements.zenImageInput.addEventListener('change', handleZenImageSelect);
 if (elements.zenBackgroundDisplay) elements.zenBackgroundDisplay.addEventListener('click', toggleZenImageSize);
@@ -5122,16 +5127,6 @@ const OracleChat = {
     
     gameState.dailyTasks.push(task);
     saveGame(true);
-    
-    // Sincroniza com Supabase se disponível
-    if (useSupabase()) {
-      SupabaseService.addTask({
-        title: data.title,
-        status: 'pending',
-        xpReward: data.xpReward,
-        dueDate: data.dueDate
-      }).catch(e => console.warn('Erro ao salvar tarefa no Supabase:', e));
-    }
     
     // Atualiza a lista de tarefas na UI
     if (typeof updateTasksUI === 'function') updateTasksUI();
