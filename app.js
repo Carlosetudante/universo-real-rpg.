@@ -3689,12 +3689,64 @@ const OracleNLU = {
     
     'memory.save': {
       patterns: [
-        /(?:lembra|lembrar|guarda|guardar|anota|anotar|salva|salvar)\s+(?:que\s+)?(.+)/i,
-        /(?:meu|minha)\s+(.+?)\s+(?:é|são)\s+(.+)/i
+        /(?:lembr[ae]|lembrar|guarda|guardar|anota|anotar|salva|salvar|sab[ei]a?)(?:-se)?(?:\s+que)?\s+(?:eu\s+)?(.+)/i,
+        /(?:meu|minha)\s+(.+?)\s+(?:é|são|se\s+chama)\s+(.+)/i
       ],
-      extract: (text, match) => ({
-        fact: match[1]?.trim() || text
-      })
+      extract: (text, match) => {
+        const fullText = match[1]?.trim() || text;
+        
+        // Detecta relacionamentos específicos
+        const relationships = {
+          namorada: /(?:namoro|namorando|to\s+com|estou\s+com|minha\s+namorada\s+(?:é|se\s+chama)?)\s+(?:a\s+)?(\w+)/i,
+          namorado: /(?:namoro|namorando|to\s+com|estou\s+com|meu\s+namorado\s+(?:é|se\s+chama)?)\s+(?:o\s+)?(\w+)/i,
+          esposa: /(?:casado\s+com|minha\s+esposa\s+(?:é|se\s+chama)?)\s+(?:a\s+)?(\w+)/i,
+          esposo: /(?:casada\s+com|meu\s+(?:esposo|marido)\s+(?:é|se\s+chama)?)\s+(?:o\s+)?(\w+)/i,
+          mae: /(?:minha\s+(?:mãe|mae)\s+(?:é|se\s+chama)?)\s+(?:a\s+)?(\w+)/i,
+          pai: /(?:meu\s+pai\s+(?:é|se\s+chama)?)\s+(?:o\s+)?(\w+)/i,
+          melhorAmigo: /(?:melhor\s+amig[oa]\s+(?:é|se\s+chama)?)\s+(?:o\s+|a\s+)?(\w+)/i,
+          pet: /(?:(?:meu|minha)\s+(?:pet|cachorro|gato|animal)\s+(?:é|se\s+chama)?)\s+(\w+)/i,
+          aniversario: /(?:(?:meu\s+)?aniversário\s+(?:é\s+)?(?:dia|em)?)\s+(\d{1,2}(?:\s+de\s+\w+|\s*\/\s*\d{1,2})?)/i
+        };
+        
+        for (const [key, pattern] of Object.entries(relationships)) {
+          const relMatch = fullText.match(pattern);
+          if (relMatch) {
+            return {
+              type: 'relationship',
+              key: key,
+              value: relMatch[1].trim(),
+              fact: fullText
+            };
+          }
+        }
+        
+        return { fact: fullText, type: 'general' };
+      }
+    },
+    
+    'memory.query': {
+      patterns: [
+        /(?:com\s+)?quem\s+(?:eu\s+)?(?:namoro|to\s+namorando|estou\s+namorando)/i,
+        /(?:qual|quem)\s+(?:é|são)\s+(?:meu|minha|o\s+nome\s+d[ao])\s+(namorad[ao]|espos[ao]|marido|mãe|mae|pai|melhor\s+amig[ao]|pet|cachorro|gato)/i,
+        /(?:como\s+)?(?:se\s+)?chama\s+(?:meu|minha)\s+(namorad[ao]|espos[ao]|marido|mãe|mae|pai|melhor\s+amig[ao]|pet|cachorro|gato)/i,
+        /(?:quando\s+é\s+)?(?:meu\s+)?aniversário/i,
+        /(?:o\s+que\s+)?(?:você\s+)?(?:sabe|lembra)\s+(?:sobre\s+)?(?:mim|de\s+mim|eu)/i
+      ],
+      extract: (text) => {
+        const lower = text.toLowerCase();
+        
+        // Detecta qual informação está sendo pedida
+        if (lower.match(/namor|namorad/)) return { queryType: 'namorada' };
+        if (lower.match(/espos[ao]|marido|casad/)) return { queryType: 'esposa' };
+        if (lower.match(/mãe|mae/)) return { queryType: 'mae' };
+        if (lower.match(/pai/)) return { queryType: 'pai' };
+        if (lower.match(/melhor\s+amig/)) return { queryType: 'melhorAmigo' };
+        if (lower.match(/pet|cachorro|gato/)) return { queryType: 'pet' };
+        if (lower.match(/aniversário|aniversario/)) return { queryType: 'aniversario' };
+        if (lower.match(/sabe|lembra.*(?:mim|eu)/)) return { queryType: 'all' };
+        
+        return { queryType: 'unknown' };
+      }
     }
   },
   
@@ -4907,15 +4959,107 @@ const OracleChat = {
         return this.getTasksList();
         
       case 'memory.save':
+        if (data.type === 'relationship' && data.key && data.value) {
+          // Salva relacionamento de forma estruturada
+          OracleMemory.setProfile(data.key, data.value);
+          OracleMemory.learn(data.fact);
+          
+          const relationLabels = {
+            namorada: 'sua namorada',
+            namorado: 'seu namorado',
+            esposa: 'sua esposa',
+            esposo: 'seu esposo/marido',
+            mae: 'sua mãe',
+            pai: 'seu pai',
+            melhorAmigo: 'seu melhor amigo(a)',
+            pet: 'seu pet',
+            aniversario: 'seu aniversário'
+          };
+          
+          const label = relationLabels[data.key] || data.key;
+          return `💕 Anotado! ${data.value} é ${label}. Vou lembrar disso!`;
+        }
+        
         if (data.fact) {
           OracleMemory.learn(data.fact);
           return `🧠 Anotado! Vou lembrar disso: "${data.fact}"`;
         }
         return null;
         
+      case 'memory.query':
+        return this.answerMemoryQuery(data.queryType);
+        
       default:
         return null;
     }
+  },
+  
+  // Responde perguntas sobre memórias salvas
+  answerMemoryQuery(queryType) {
+    const name = OracleMemory.getProfile('name');
+    const treatment = name || 'amigo';
+    
+    if (queryType === 'all') {
+      // Lista tudo que sabe sobre o usuário
+      const profile = OracleMemory.data?.profile || {};
+      const memories = OracleMemory.data?.learned || [];
+      
+      let response = `<strong>🧠 O que sei sobre você, ${treatment}:</strong><br><br>`;
+      
+      const labels = {
+        name: '👤 Nome',
+        gender: '⚧ Gênero',
+        namorada: '💕 Namorada',
+        namorado: '💕 Namorado',
+        esposa: '💍 Esposa',
+        esposo: '💍 Esposo',
+        mae: '👩 Mãe',
+        pai: '👨 Pai',
+        melhorAmigo: '🤝 Melhor amigo(a)',
+        pet: '🐾 Pet',
+        aniversario: '🎂 Aniversário',
+        birthday: '🎂 Aniversário'
+      };
+      
+      let hasInfo = false;
+      for (const [key, value] of Object.entries(profile)) {
+        if (value && labels[key]) {
+          response += `${labels[key]}: <strong>${value}</strong><br>`;
+          hasInfo = true;
+        }
+      }
+      
+      if (memories.length > 0) {
+        response += `<br><strong>📝 Coisas que você me contou:</strong><br>`;
+        memories.slice(-5).forEach(m => {
+          response += `• ${m.text}<br>`;
+        });
+        hasInfo = true;
+      }
+      
+      if (!hasInfo) {
+        return `Ainda não sei muito sobre você, ${treatment}. Me conta mais! Por exemplo: "lembre-se que eu namoro com [nome]" ou "meu aniversário é dia [data]"`;
+      }
+      
+      return response;
+    }
+    
+    // Busca informação específica
+    const value = OracleMemory.getProfile(queryType);
+    
+    const responseMap = {
+      namorada: value ? `💕 Você namora com <strong>${value}</strong>!` : `Você não me contou com quem namora, ${treatment}. Quer me contar?`,
+      namorado: value ? `💕 Você namora com <strong>${value}</strong>!` : `Você não me contou com quem namora, ${treatment}. Quer me contar?`,
+      esposa: value ? `💍 Sua esposa é <strong>${value}</strong>!` : `Você não me contou quem é sua esposa.`,
+      esposo: value ? `💍 Seu esposo é <strong>${value}</strong>!` : `Você não me contou quem é seu esposo.`,
+      mae: value ? `👩 Sua mãe é <strong>${value}</strong>!` : `Você não me contou o nome da sua mãe.`,
+      pai: value ? `👨 Seu pai é <strong>${value}</strong>!` : `Você não me contou o nome do seu pai.`,
+      melhorAmigo: value ? `🤝 Seu melhor amigo(a) é <strong>${value}</strong>!` : `Você não me contou quem é seu melhor amigo(a).`,
+      pet: value ? `🐾 Seu pet se chama <strong>${value}</strong>!` : `Você não me contou o nome do seu pet.`,
+      aniversario: value ? `🎂 Seu aniversário é <strong>${value}</strong>!` : `Você não me contou quando é seu aniversário.`
+    };
+    
+    return responseMap[queryType] || `Não tenho essa informação, ${treatment}. Quer me contar?`;
   },
   
   // Cria tarefa com detalhes extraídos pelo NLU
