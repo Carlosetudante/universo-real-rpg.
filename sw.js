@@ -1,13 +1,15 @@
-const CACHE_NAME = 'universo-real-v3';
+const CACHE_NAME = 'universo-real-v4';
 
 const urlsToCache = [
   './index.html',
   './financeiro.html',
   './style.css',
   './app.js',
+  './supabase.js',
   './workTimer.js',
   './logo.svg',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
 self.addEventListener('install', event => {
