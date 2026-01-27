@@ -3534,6 +3534,295 @@ if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener(
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
 // ========================================
+// SISTEMA DE LINGUAGEM NATURAL (NLU)
+// Detecta intenções e extrai dados automaticamente
+// ========================================
+
+const OracleNLU = {
+  // Mapa de intenções e padrões
+  intents: {
+    'task.create': {
+      patterns: [
+        /(?:cria|criar|adiciona|adicionar|nova|novo|faz|fazer|coloca|colocar|preciso|quero|tenho que|vou)\s+(?:uma?\s+)?(?:tarefa|task|missão|lembrete|reminder)?:?\s*(.+)/i,
+        /(?:lembra|lembrar|me lembra|lembre-me)\s+(?:de\s+)?(.+)/i,
+        /(?:preciso|tenho que|vou|devo)\s+(.+?)(?:\s+(?:amanhã|hoje|depois|mais tarde|às?\s+\d))?/i,
+        /(?:não posso esquecer|não esquecer)\s+(?:de\s+)?(.+)/i,
+        /(?:agenda|agendar|marcar|marca)\s+(?:uma?\s+)?(.+)/i
+      ],
+      extract: (text, match) => {
+        let title = match[1]?.trim() || text;
+        
+        // Limpa palavras extras
+        title = title
+          .replace(/^(?:que\s+)?(?:eu\s+)?(?:preciso|tenho que|devo|vou)\s+/i, '')
+          .replace(/^(?:de\s+)?/i, '')
+          .replace(/(?:\s+(?:pfv|pf|por favor|please))$/i, '')
+          .trim();
+        
+        // Detecta data/hora
+        const dateInfo = OracleNLU.extractDateTime(text);
+        
+        // Detecta XP baseado no tipo de tarefa
+        const xp = OracleNLU.estimateTaskXP(title);
+        
+        return {
+          title: title.charAt(0).toUpperCase() + title.slice(1),
+          dueDate: dateInfo.date,
+          dueTime: dateInfo.time,
+          xpReward: xp
+        };
+      }
+    },
+    
+    'task.complete': {
+      patterns: [
+        /(?:completei|fiz|terminei|acabei|concluí|feito|finalizei|pronto)\s+(?:a\s+)?(?:tarefa\s+)?(.+)?/i,
+        /(?:tarefa\s+)?(.+?)\s+(?:feita|feito|pronta|pronto|concluída|terminada)/i,
+        /(?:pode\s+)?(?:marcar?|marca)\s+(.+?)\s+(?:como\s+)?(?:feita|feito|concluída|pronta)/i
+      ],
+      extract: (text, match) => ({
+        taskName: match[1]?.trim() || null
+      })
+    },
+    
+    'finance.expense': {
+      patterns: [
+        /(?:gastei|paguei|comprei|perdi|saiu|foi)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s*(?:em|no|na|com|de|pra|para)?\s*(.+)?/i,
+        /(?:coloca|adiciona|registra|bota|põe)\s+(?:uma?\s+)?(?:saída|gasto|despesa)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com|de)?\s*(.+)?/i,
+        /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com)?\s*(.+)?/i,
+        /(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i
+      ],
+      extract: (text, match) => {
+        const amount = parseFloat(match[1].replace(',', '.'));
+        let description = match[2]?.trim() || null;
+        
+        // Limpa descrição
+        if (description) {
+          description = description
+            .replace(/^(?:o|a|um|uma|no|na|em|com|de|pra|para)\s+/i, '')
+            .replace(/(?:\s+(?:pfv|pf|por favor))$/i, '')
+            .trim();
+        }
+        
+        // Detecta categoria automaticamente
+        const category = OracleNLU.detectFinanceCategory(description || text);
+        
+        return {
+          amount,
+          description: description ? description.charAt(0).toUpperCase() + description.slice(1) : null,
+          category,
+          type: 'expense'
+        };
+      }
+    },
+    
+    'finance.income': {
+      patterns: [
+        /(?:recebi|ganhei|entrou|chegou)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s*(?:de|do|da|como|por)?\s*(.+)?/i,
+        /(?:coloca|adiciona|registra)\s+(?:uma?\s+)?(?:entrada|receita|ganho)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:de|do|da)?\s*(.+)?/i,
+        /(?:meu\s+)?(?:salário|pagamento|freelance)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i
+      ],
+      extract: (text, match) => {
+        const amount = parseFloat(match[1].replace(',', '.'));
+        let description = match[2]?.trim() || null;
+        
+        if (description) {
+          description = description
+            .replace(/^(?:o|a|um|uma|do|da|de)\s+/i, '')
+            .trim();
+        }
+        
+        return {
+          amount,
+          description: description ? description.charAt(0).toUpperCase() + description.slice(1) : null,
+          type: 'income'
+        };
+      }
+    },
+    
+    'work.start': {
+      patterns: [
+        /(?:iniciar?|começar?|start|vou|bora)\s+(?:a\s+)?(?:trabalhar|trabalho|timer|ponto)/i,
+        /(?:entrar?|bater?)\s+(?:o\s+)?ponto/i,
+        /(?:começando|iniciando)\s+(?:a\s+)?(?:trabalhar|trabalho)/i
+      ],
+      extract: () => ({})
+    },
+    
+    'work.stop': {
+      patterns: [
+        /(?:parar?|finalizar?|stop|encerrar?|terminar?|acabar?)\s+(?:de\s+)?(?:trabalhar|trabalho|timer|ponto)/i,
+        /(?:terminei|acabei|chega)\s+(?:de\s+)?(?:trabalhar|trabalho|por\s+hoje)/i,
+        /(?:sair?|bater?)\s+(?:o\s+)?ponto\s+(?:de\s+)?(?:saída)?/i
+      ],
+      extract: () => ({})
+    },
+    
+    'status.show': {
+      patterns: [
+        /(?:qual|como)\s+(?:é|está|tá)\s+(?:meu|o)\s+(?:status|nível|level|xp|progresso)/i,
+        /(?:meu|ver|mostra)\s+(?:status|nível|level|xp|progresso|perfil)/i,
+        /(?:como\s+)?(?:estou|tô|to)\s+(?:indo|evoluindo|progredindo)/i
+      ],
+      extract: () => ({})
+    },
+    
+    'finance.summary': {
+      patterns: [
+        /(?:como|qual)\s+(?:está|estão|tá|tão)\s+(?:minhas?|as?)\s+(?:finanças|financeiro|gastos|despesas|contas)/i,
+        /(?:resumo|relatório|balanço)\s+(?:financeiro|das?\s+finanças|dos?\s+gastos)/i,
+        /(?:quanto)\s+(?:gastei|tenho|sobrou|falta)/i
+      ],
+      extract: () => ({})
+    },
+    
+    'task.list': {
+      patterns: [
+        /(?:quais|minhas?|ver|mostra|lista)\s+(?:são\s+)?(?:as?\s+)?(?:tarefas|tasks|pendências|afazeres)/i,
+        /(?:o\s+que\s+)?(?:tenho|preciso)\s+(?:pra\s+)?fazer\s+(?:hoje|amanhã)?/i
+      ],
+      extract: () => ({})
+    },
+    
+    'memory.save': {
+      patterns: [
+        /(?:lembra|lembrar|guarda|guardar|anota|anotar|salva|salvar)\s+(?:que\s+)?(.+)/i,
+        /(?:meu|minha)\s+(.+?)\s+(?:é|são)\s+(.+)/i
+      ],
+      extract: (text, match) => ({
+        fact: match[1]?.trim() || text
+      })
+    }
+  },
+  
+  // Detecta a intenção do usuário
+  detectIntent(text) {
+    const cleanText = text.toLowerCase().trim();
+    
+    for (const [intentName, intent] of Object.entries(this.intents)) {
+      for (const pattern of intent.patterns) {
+        const match = cleanText.match(pattern);
+        if (match) {
+          const data = intent.extract(text, match);
+          return {
+            intent: intentName,
+            confidence: 0.9,
+            data,
+            originalText: text
+          };
+        }
+      }
+    }
+    
+    return {
+      intent: 'unknown',
+      confidence: 0,
+      data: {},
+      originalText: text
+    };
+  },
+  
+  // Extrai data e hora do texto
+  extractDateTime(text) {
+    const lower = text.toLowerCase();
+    const now = new Date();
+    let date = null;
+    let time = '09:00'; // Padrão
+    
+    // Detecta dia
+    if (lower.includes('hoje')) {
+      date = now.toISOString().split('T')[0];
+    } else if (lower.includes('amanhã') || lower.includes('amanha')) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      date = tomorrow.toISOString().split('T')[0];
+    } else if (lower.includes('depois de amanhã') || lower.includes('depois de amanha')) {
+      const dayAfter = new Date(now);
+      dayAfter.setDate(dayAfter.getDate() + 2);
+      date = dayAfter.toISOString().split('T')[0];
+    } else if (lower.match(/(?:na|nessa|essa|próxima)\s+(segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)/i)) {
+      const days = ['domingo', 'segunda', 'terça', 'terca', 'quarta', 'quinta', 'sexta', 'sábado', 'sabado'];
+      const match = lower.match(/(?:na|nessa|essa|próxima)\s+(segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)/i);
+      if (match) {
+        const targetDay = days.indexOf(match[1].toLowerCase().replace('terca', 'terça').replace('sabado', 'sábado'));
+        if (targetDay >= 0) {
+          const diff = (targetDay - now.getDay() + 7) % 7 || 7;
+          const targetDate = new Date(now);
+          targetDate.setDate(targetDate.getDate() + diff);
+          date = targetDate.toISOString().split('T')[0];
+        }
+      }
+    }
+    
+    // Detecta hora
+    const timeMatch = lower.match(/(?:às?|as)\s+(\d{1,2})(?::(\d{2}))?(?:\s*(?:h|hrs?|horas?))?/i);
+    if (timeMatch) {
+      const hour = timeMatch[1].padStart(2, '0');
+      const minute = timeMatch[2] || '00';
+      time = `${hour}:${minute}`;
+    } else if (lower.includes('de manhã') || lower.includes('pela manhã')) {
+      time = '09:00';
+    } else if (lower.includes('de tarde') || lower.includes('à tarde') || lower.includes('a tarde')) {
+      time = '14:00';
+    } else if (lower.includes('de noite') || lower.includes('à noite') || lower.includes('a noite')) {
+      time = '19:00';
+    }
+    
+    return { date, time };
+  },
+  
+  // Estima XP baseado no tipo de tarefa
+  estimateTaskXP(taskTitle) {
+    const lower = taskTitle.toLowerCase();
+    
+    const xpMap = {
+      // Alta recompensa (40-50 XP)
+      high: ['estudar', 'estudo', 'curso', 'academia', 'exercício', 'treino', 'meditar', 'ler', 'livro', 'projeto', 'trabalho importante'],
+      // Média recompensa (20-30 XP)
+      medium: ['mercado', 'compras', 'reunião', 'organizar', 'limpar', 'cozinhar', 'lavar', 'pagar', 'banco'],
+      // Baixa recompensa (10-15 XP)
+      low: ['ligar', 'responder', 'email', 'mensagem', 'verificar', 'checar']
+    };
+    
+    for (const keyword of xpMap.high) {
+      if (lower.includes(keyword)) return Math.floor(Math.random() * 11) + 40; // 40-50
+    }
+    for (const keyword of xpMap.medium) {
+      if (lower.includes(keyword)) return Math.floor(Math.random() * 11) + 20; // 20-30
+    }
+    for (const keyword of xpMap.low) {
+      if (lower.includes(keyword)) return Math.floor(Math.random() * 6) + 10; // 10-15
+    }
+    
+    return 20; // Padrão
+  },
+  
+  // Detecta categoria financeira automaticamente
+  detectFinanceCategory(text) {
+    if (!text) return 'Outros';
+    const lower = text.toLowerCase();
+    
+    const categories = {
+      'Alimentação': ['almoço', 'almoco', 'jantar', 'café', 'cafe', 'lanche', 'comida', 'restaurante', 'mercado', 'supermercado', 'feira', 'padaria', 'ifood', 'delivery', 'marmita'],
+      'Transporte': ['uber', '99', 'taxi', 'táxi', 'ônibus', 'onibus', 'metrô', 'metro', 'gasolina', 'combustível', 'combustivel', 'estacionamento', 'pedágio', 'pedagio'],
+      'Lazer': ['cinema', 'filme', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'passeio', 'viagem'],
+      'Saúde': ['farmácia', 'farmacia', 'remédio', 'remedio', 'médico', 'medico', 'consulta', 'exame', 'academia', 'plano de saúde'],
+      'Educação': ['curso', 'livro', 'escola', 'faculdade', 'material', 'apostila', 'mensalidade'],
+      'Moradia': ['aluguel', 'luz', 'água', 'agua', 'internet', 'gás', 'gas', 'condomínio', 'condominio', 'iptu'],
+      'Compras': ['roupa', 'sapato', 'tênis', 'tenis', 'loja', 'shopping', 'presente', 'eletrônico', 'eletronico']
+    };
+    
+    for (const [category, keywords] of Object.entries(categories)) {
+      for (const keyword of keywords) {
+        if (lower.includes(keyword)) return category;
+      }
+    }
+    
+    return 'Outros';
+  }
+};
+
+// ========================================
 // SISTEMA INTELIGENTE DO ORÁCULO 2.0
 // Com memória, aprendizado, voz e ações
 // ========================================
@@ -4502,29 +4791,180 @@ const OracleChat = {
     const autoLearnResult = this.autoLearnFromInput(cleanedInput, lowerInput);
     if (autoLearnResult) return autoLearnResult;
     
-    // 2. Comandos de AÇÃO (criar, adicionar, registrar)
+    // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE
+    const nluResult = OracleNLU.detectIntent(input);
+    if (nluResult.intent !== 'unknown' && nluResult.confidence > 0.5) {
+      const intentResponse = this.executeIntent(nluResult);
+      if (intentResponse) return intentResponse;
+    }
+    
+    // 3. Comandos de AÇÃO (criar, adicionar, registrar) - fallback
     const actionResult = this.handleActionCommands(lowerInput, cleanedInput);
     if (actionResult) return actionResult;
     
-    // 3. Consultas de INFORMAÇÃO
+    // 4. Consultas de INFORMAÇÃO
     const infoResult = this.handleInfoQueries(lowerInput);
     if (infoResult) return infoResult;
     
-    // 4. Comandos de MEMÓRIA (lembrar, aprender)
+    // 5. Comandos de MEMÓRIA (lembrar, aprender)
     const memoryResult = this.handleMemoryCommands(lowerInput, cleanedInput);
     if (memoryResult) return memoryResult;
     
-    // 5. Interações SOCIAIS
+    // 6. Interações SOCIAIS
     const socialResult = this.handleSocialInteractions(lowerInput);
     if (socialResult) return socialResult;
     
-    // 6. Ajuda
+    // 7. Ajuda
     if (lowerInput.includes('ajuda') || lowerInput.includes('help') || lowerInput === '?') {
       return this.getHelpMessage();
     }
     
-    // 7. Resposta padrão inteligente
+    // 8. Resposta padrão inteligente
     return this.getSmartDefault(lowerInput);
+  },
+  
+  // Executa a intenção detectada pelo NLU
+  executeIntent(nluResult) {
+    const { intent, data } = nluResult;
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    switch (intent) {
+      case 'task.create':
+        if (data.title) {
+          return this.createTaskWithDetails(data);
+        }
+        // Se não tem título, pergunta
+        this.pendingAction = { type: 'task_name' };
+        return `Claro, ${treatment}! 📝 Qual tarefa você quer criar?`;
+        
+      case 'task.complete':
+        return this.completeTask(data.taskName);
+        
+      case 'finance.expense':
+        if (data.amount) {
+          if (data.description) {
+            return this.addExpense(data.amount, data.description);
+          }
+          // Se não tem descrição, pergunta
+          this.pendingAction = { type: 'expense_description', value: data.amount };
+          return {
+            message: `Beleza, ${treatment}! 💸 Vou registrar <strong>R$ ${data.amount.toFixed(2)}</strong> de saída.<br><br>Qual nome devo colocar nessa despesa?`,
+            actions: [
+              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(data.amount, 'Alimentação')); } },
+              { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(data.amount, 'Transporte')); } },
+              { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(data.amount, 'Lazer')); } },
+              { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(data.amount, 'Compras')); } }
+            ]
+          };
+        }
+        return null;
+        
+      case 'finance.income':
+        if (data.amount) {
+          if (data.description) {
+            return this.addIncome(data.amount, data.description);
+          }
+          this.pendingAction = { type: 'income_description', value: data.amount };
+          return {
+            message: `Show, ${treatment}! 💰 Vou registrar <strong>R$ ${data.amount.toFixed(2)}</strong> de entrada.<br><br>De onde veio essa grana?`,
+            actions: [
+              { text: '💼 Salário', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(data.amount, 'Salário')); } },
+              { text: '💻 Freelance', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(data.amount, 'Freelance')); } },
+              { text: '🎁 Presente', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(data.amount, 'Presente')); } }
+            ]
+          };
+        }
+        return null;
+        
+      case 'work.start':
+        if (window.WorkTimer && !window.WorkTimer.isRunning()) {
+          window.WorkTimer.start();
+          return this.getSuccessMessage() + " Timer de trabalho iniciado! ⏱️ Bom trabalho!";
+        } else if (window.WorkTimer?.isRunning()) {
+          return "⏱️ O timer já está rodando! Quando terminar, é só pedir pra parar.";
+        }
+        return "Não consegui iniciar o timer. Tente pela aba de Trabalho.";
+        
+      case 'work.stop':
+        if (window.WorkTimer?.isRunning()) {
+          window.WorkTimer.stop();
+          return this.getSuccessMessage() + " Timer finalizado! Descanse um pouco! 😊";
+        }
+        return "⏱️ O timer não está rodando no momento.";
+        
+      case 'status.show':
+        return this.getStatusInfo();
+        
+      case 'finance.summary':
+        return this.getFinanceSummary();
+        
+      case 'task.list':
+        return this.getTasksList();
+        
+      case 'memory.save':
+        if (data.fact) {
+          OracleMemory.learn(data.fact);
+          return `🧠 Anotado! Vou lembrar disso: "${data.fact}"`;
+        }
+        return null;
+        
+      default:
+        return null;
+    }
+  },
+  
+  // Cria tarefa com detalhes extraídos pelo NLU
+  createTaskWithDetails(data) {
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    // Adiciona a tarefa
+    if (!gameState.dailyTasks) gameState.dailyTasks = [];
+    
+    const task = {
+      id: Date.now(),
+      text: data.title,
+      done: false,
+      createdAt: new Date().toISOString(),
+      dueDate: data.dueDate,
+      dueTime: data.dueTime,
+      xpReward: data.xpReward || 20
+    };
+    
+    gameState.dailyTasks.push(task);
+    saveGame(true);
+    
+    // Sincroniza com Supabase se disponível
+    if (useSupabase()) {
+      SupabaseService.addTask({
+        title: data.title,
+        status: 'pending',
+        xpReward: data.xpReward,
+        dueDate: data.dueDate
+      }).catch(e => console.warn('Erro ao salvar tarefa no Supabase:', e));
+    }
+    
+    // Atualiza a lista de tarefas na UI
+    if (typeof updateTasksUI === 'function') updateTasksUI();
+    
+    // Monta resposta
+    let response = `✅ Tarefa criada: <strong>"${data.title}"</strong>`;
+    
+    if (data.dueDate) {
+      const dateObj = new Date(data.dueDate + 'T' + (data.dueTime || '09:00'));
+      const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+      response += `<br>📅 Para: ${dateStr}`;
+      if (data.dueTime) {
+        response += ` às ${data.dueTime}`;
+      }
+    }
+    
+    response += `<br>⭐ Recompensa: <strong>${data.xpReward} XP</strong>`;
+    
+    return response + `<br><br>Boa sorte, ${treatment}! 💪`;
   },
   
   // Processa resposta para ação pendente
@@ -5853,6 +6293,122 @@ const OracleChat = {
     return CHARISMATIC_RESPONSES.notUnderstood[
       Math.floor(Math.random() * CHARISMATIC_RESPONSES.notUnderstood.length)
     ] + `<br><br>Dica: Diz <strong>"ajuda"</strong> pra ver o que sei fazer! 💡`;
+  },
+  
+  // Métodos auxiliares para NLU
+  getTasksList() {
+    if (!gameState) return "Não consegui acessar seus dados.";
+    
+    const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
+    const completed = (gameState.dailyTasks || []).filter(t => t.completed);
+    
+    if (pending.length === 0 && completed.length === 0) {
+      return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+    }
+    
+    let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
+    
+    if (pending.length > 0) {
+      response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
+      pending.forEach(t => {
+        response += `• ${t.text}`;
+        if (t.dueDate) {
+          const date = new Date(t.dueDate + 'T00:00');
+          response += ` <small>(${date.toLocaleDateString('pt-BR')})</small>`;
+        }
+        response += `<br>`;
+      });
+      response += '<br>';
+    }
+    
+    if (completed.length > 0) {
+      response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
+      completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
+    }
+    
+    if (pending.length > 0) {
+      response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
+    }
+    
+    return response;
+  },
+  
+  getFinanceSummary() {
+    if (!gameState || !gameState.finances) {
+      return "📊 Você ainda não tem registros financeiros. Diz algo como <strong>gastei 50 no almoço</strong> para começar!";
+    }
+    
+    const finances = gameState.finances;
+    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+    const balance = income - expenses;
+    
+    // Agrupa gastos por categoria
+    const categories = {};
+    finances.filter(f => f.type === 'expense').forEach(f => {
+      const cat = f.category || 'Outros';
+      categories[cat] = (categories[cat] || 0) + f.value;
+    });
+    
+    let response = `<strong>💰 Resumo Financeiro:</strong><br><br>`;
+    response += `📈 Entradas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>`;
+    response += `📉 Saídas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>`;
+    response += `💵 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br><br>`;
+    
+    if (Object.keys(categories).length > 0) {
+      response += `<strong>📊 Gastos por categoria:</strong><br>`;
+      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+      sortedCats.slice(0, 5).forEach(([cat, val]) => {
+        response += `• ${cat}: R$ ${val.toFixed(2)}<br>`;
+      });
+    }
+    
+    response += `<br>${balance >= 0 ? '✅ Suas finanças estão no verde!' : '⚠️ Atenção com os gastos!'}`;
+    
+    return response;
+  },
+  
+  getStatusInfo() {
+    if (!gameState) return "Não consegui acessar seus dados.";
+    
+    const name = OracleMemory.getProfile('name');
+    const treatment = name || 'Aventureiro';
+    
+    const level = gameState.level || 1;
+    const xp = gameState.xp || 0;
+    const pendingTasks = (gameState.dailyTasks || []).filter(t => !t.completed).length;
+    
+    // Calcula saldo financeiro
+    const finances = gameState.finances || [];
+    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+    const balance = income - expenses;
+    
+    // Trabalho de hoje
+    const today = new Date().toISOString().split('T')[0];
+    const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
+    const todayProd = todayLogs.reduce((sum, l) => sum + (l.production || 0), 0);
+    const todayMoney = todayLogs.reduce((sum, l) => sum + (l.money || 0), 0);
+    
+    let response = `<strong>🎮 Status de ${treatment}:</strong><br><br>`;
+    response += `⭐ Nível: <strong>${level}</strong> | XP: <strong>${xp}/100</strong><br>`;
+    response += `📝 Tarefas pendentes: <strong>${pendingTasks}</strong><br>`;
+    response += `💰 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>`;
+    
+    if (todayProd > 0 || todayMoney > 0) {
+      response += `<br><strong>📊 Hoje:</strong><br>`;
+      response += `🍕 Produção: ${todayProd} massas<br>`;
+      response += `💵 Ganho: R$ ${todayMoney.toFixed(2)}<br>`;
+    }
+    
+    // Dica personalizada
+    if (pendingTasks > 3) {
+      response += `<br>💡 Você tem muitas tarefas! Foque nas mais importantes.`;
+    } else if (pendingTasks === 0) {
+      response += `<br>🎉 Sem tarefas pendentes! Que tal criar uma nova meta?`;
+    }
+    
+    return response;
   },
   
   getSuccessMessage() {
