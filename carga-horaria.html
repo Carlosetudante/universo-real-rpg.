@@ -11,6 +11,9 @@
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="logo.svg">
 
+  <!-- Supabase CDN -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   
@@ -395,19 +398,87 @@
       freelancer: { label: 'Freelancer', unit: 'projetos', icon: '💻' }
     };
 
-    function init() {
-      const session = localStorage.getItem('ur_session');
-      const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+    // Supabase config
+    const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
+    let supabaseClient = null;
 
-      if (session && users[session]) {
-        currentUser = session;
-        gameState = users[session].character;
+    async function init() {
+      // Tenta carregar do Supabase primeiro
+      if (typeof window.supabase !== 'undefined') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
-        if (!gameState.workLog) gameState.workLog = [];
-        if (!gameState.job) gameState.job = { type: 'pizzaria', config: {} };
-      } else {
-        gameState = { workLog: [], job: { type: 'pizzaria', config: {} } };
-        showToast('⚠️ Faça login no jogo para ver seus dados completos.');
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          
+          if (session && session.user) {
+            console.log('✅ Sessão Supabase encontrada');
+            currentUser = session.user.email;
+            
+            // Carrega perfil da nuvem
+            const { data: profile } = await supabaseClient
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (profile) {
+              // Extrai dados do inventory (onde guardamos dados extras)
+              const inventoryData = profile.inventory || {};
+              const extraData = typeof inventoryData === 'object' && !Array.isArray(inventoryData) 
+                ? inventoryData 
+                : { items: inventoryData };
+              
+              gameState = {
+                workLog: extraData.workLog || [],
+                job: extraData.job || { type: 'pizzaria', config: {} }
+              };
+              
+              // Também carrega work_sessions da tabela específica
+              const { data: workSessions } = await supabaseClient
+                .from('work_sessions')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('start_at', { ascending: false });
+              
+              if (workSessions && workSessions.length > 0) {
+                // Converte para formato local
+                const cloudWorkLog = workSessions.map(w => ({
+                  id: w.id,
+                  date: w.start_at?.split('T')[0],
+                  startTime: w.start_at,
+                  endTime: w.end_at,
+                  duration: w.total_seconds * 1000,
+                  production: 0,
+                  money: 0
+                }));
+                // Mescla com workLog existente
+                gameState.workLog = [...cloudWorkLog, ...gameState.workLog];
+              }
+              
+              console.log('📊 Dados carregados:', gameState.workLog.length, 'registros');
+            }
+          }
+        } catch (e) {
+          console.warn('Erro ao carregar do Supabase:', e);
+        }
+      }
+      
+      // Fallback: tenta localStorage
+      if (!currentUser) {
+        const session = localStorage.getItem('ur_session');
+        const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+
+        if (session && users[session]) {
+          currentUser = session;
+          gameState = users[session].character;
+          
+          if (!gameState.workLog) gameState.workLog = [];
+          if (!gameState.job) gameState.job = { type: 'pizzaria', config: {} };
+        } else {
+          gameState = { workLog: [], job: { type: 'pizzaria', config: {} } };
+          showToast('⚠️ Faça login no jogo para ver seus dados completos.');
+        }
       }
 
       setupFilters();
