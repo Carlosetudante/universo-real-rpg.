@@ -476,7 +476,12 @@ function clearSession() {
   localStorage.removeItem('ur_session');
 }
 
-// Função de login local
+// Verifica se o Supabase está configurado e disponível
+function useSupabase() {
+  return typeof SupabaseService !== 'undefined' && SupabaseService.isConfigured();
+}
+
+// Função de login (Supabase ou Local)
 async function login() {
   const username = elements.loginUsername.value.trim();
   const password = elements.loginPassword.value;
@@ -487,9 +492,57 @@ async function login() {
   try {
     elements.loginBtn.disabled = true;
     elements.loginBtn.textContent = 'Entrando...';
+
+    // Tenta login com Supabase primeiro
+    if (useSupabase()) {
+      const { data, error } = await SupabaseService.signIn(username, password);
+      if (error) throw error;
+
+      // Carrega perfil do banco
+      const profile = await SupabaseService.getProfile();
+      if (profile) {
+        gameState = normalizeGameState({
+          username: data.user.email,
+          name: profile.character_name,
+          race: profile.character_class,
+          title: profile.title,
+          auraColor: profile.aura_color,
+          level: profile.level,
+          xp: profile.xp,
+          streak: profile.streak,
+          skillPoints: profile.skill_points,
+          attributes: profile.attributes || {},
+          achievements: profile.achievements || [],
+          inventory: profile.inventory || [],
+          lastClaim: profile.last_claim,
+          playTime: profile.play_time
+        });
+      } else {
+        gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
+      }
+
+      // Salvar localmente também (para funcionar offline)
+      if (elements.rememberUser && elements.rememberUser.checked) {
+        localStorage.setItem('ur_last_user', username);
+      }
+
+      showToast('✅ Login realizado com sucesso!');
+      isLoggedIn = true;
+      loginTime = new Date();
+      saveSession(username);
+      hideAuthModal();
+      updateUI();
+      if (typeof checkAchievements === 'function') checkAchievements();
+      checkBackupAvailability();
+      checkBillsDueToday();
+      elements.loginUsername.value = '';
+      elements.loginPassword.value = '';
+      return;
+    }
+
+    // Fallback: Login local (localStorage)
     const users = getUsers();
     if (!users[username]) {
-      // Tenta encontrar usuário com letras maiúsculas/minúsculas diferentes
       const foundKey = Object.keys(users).find(k => k.toLowerCase() === username.toLowerCase());
       if (foundKey) {
         throw new Error(`Usuário não encontrado! Você quis dizer "${foundKey}"?`);
@@ -501,7 +554,6 @@ async function login() {
       throw new Error('Senha incorreta!');
     }
     
-    // Salvar usuário na memória se a opção estiver marcada
     if (elements.rememberUser && elements.rememberUser.checked) {
       localStorage.setItem('ur_last_user', username);
     } else {
@@ -561,9 +613,9 @@ function recoverPassword() {
   }
 }
 
-// Função de cadastro local
+// Função de cadastro (Supabase ou Local)
 async function register() {
-  const username = elements.registerUsername.value.trim();
+  const username = elements.registerUsername.value.trim(); // Email para Supabase
   const password = elements.registerPassword.value;
   const confirmPassword = elements.registerConfirmPassword.value;
   const name = elements.registerName.value.trim();
@@ -576,22 +628,62 @@ async function register() {
     showToast('⚠️ Preencha todos os campos obrigatórios!');
     return;
   }
-  if (password.length < 4) {
-    showToast('⚠️ A senha deve ter pelo menos 4 caracteres!');
+  if (password.length < 6) {
+    showToast('⚠️ A senha deve ter pelo menos 6 caracteres!');
     return;
   }
   if (password !== confirmPassword) {
     showToast('⚠️ As senhas não coincidem!');
     return;
   }
+
   try {
     elements.registerBtn.disabled = true;
     elements.registerBtn.textContent = 'Criando...';
+
+    // Dados do personagem
+    const characterData = {
+      name,
+      race,
+      title: 'Viajante',
+      auraColor,
+      attributes: Object.fromEntries(ATTRIBUTES.map(a => [a.id, 1]))
+    };
+
+    // Tenta criar conta no Supabase primeiro
+    if (useSupabase()) {
+      // Verifica se é email válido
+      if (!username.includes('@')) {
+        showToast('⚠️ Para usar com Supabase, o username deve ser um email válido!');
+        elements.registerBtn.disabled = false;
+        elements.registerBtn.textContent = 'Criar Personagem';
+        return;
+      }
+
+      const { data, error } = await SupabaseService.signUp(username, password, characterData);
+      if (error) throw error;
+
+      showToast('🎉 Conta criada! Verifique seu email para confirmar.', 5000);
+      
+      // Limpa os campos
+      elements.registerUsername.value = '';
+      elements.registerPassword.value = '';
+      elements.registerConfirmPassword.value = '';
+      elements.registerName.value = '';
+      elements.registerQuestion.value = '';
+      elements.registerAnswer.value = '';
+
+      // Mostra tela de login
+      showLoginForm();
+      return;
+    }
+
+    // Fallback: Cadastro local (localStorage)
     let users = getUsers();
     if (users[username]) {
       throw new Error('Usuário já existe!');
     }
-    // Criação do personagem inicial
+    
     let character = {
       username,
       name,
@@ -612,7 +704,7 @@ async function register() {
       xpHistory: {},
       lastTaskReset: new Date().toISOString()
     };
-    character = normalizeGameState(character); // Garante que todos os campos padrão (como Pomodoro) existam
+    character = normalizeGameState(character);
     users[username] = { password, character, security: { question, answer } };
     setUsers(users);
     showToast('🎉 Personagem criado com sucesso!', 4000);
@@ -639,6 +731,15 @@ async function register() {
 }
 
 async function logout() {
+  try {
+    // Logout do Supabase se estiver usando
+    if (useSupabase()) {
+      await SupabaseService.signOut();
+    }
+  } catch (e) {
+    console.warn('Erro ao deslogar do Supabase:', e);
+  }
+  
   showToast('👋 Até logo!');
   isLoggedIn = false;
   gameState = null;
@@ -648,6 +749,51 @@ async function logout() {
 }
 
 async function checkSession() {
+  // Inicializa o Supabase se disponível
+  if (typeof SupabaseService !== 'undefined') {
+    SupabaseService.init();
+  }
+
+  // Tenta recuperar sessão do Supabase primeiro
+  if (useSupabase()) {
+    try {
+      const session = await SupabaseService.getSession();
+      if (session && session.user) {
+        const profile = await SupabaseService.getProfile();
+        if (profile) {
+          gameState = normalizeGameState({
+            username: session.user.email,
+            name: profile.character_name,
+            race: profile.character_class,
+            title: profile.title,
+            auraColor: profile.aura_color,
+            level: profile.level,
+            xp: profile.xp,
+            streak: profile.streak,
+            skillPoints: profile.skill_points,
+            attributes: profile.attributes || {},
+            achievements: profile.achievements || [],
+            inventory: profile.inventory || [],
+            lastClaim: profile.last_claim,
+            playTime: profile.play_time
+          });
+          isLoggedIn = true;
+          loginTime = new Date();
+          hideAuthModal();
+          checkDailyTaskReset();
+          updateUI();
+          if (typeof checkAchievements === 'function') checkAchievements();
+          checkBackupAvailability();
+          checkBillsDueToday();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao verificar sessão Supabase:', e);
+    }
+  }
+
+  // Fallback: Verifica sessão local
   const username = getSession();
   if (!username) {
     showAuthModal();
@@ -660,7 +806,7 @@ async function checkSession() {
     isLoggedIn = true;
     loginTime = new Date();
     hideAuthModal();
-    checkDailyTaskReset(); // Verifica se virou o dia para resetar tarefas/aplicar penalidade
+    checkDailyTaskReset();
     updateUI();
     if (typeof checkAchievements === 'function') checkAchievements();
     checkBackupAvailability();
@@ -739,6 +885,13 @@ async function saveGame(arg) {
 
       users[username].character = gameState;
       setUsers(users);
+      
+      // Sincroniza com Supabase (em background)
+      if (useSupabase()) {
+        SupabaseService.syncLocalToCloud(gameState).catch(e => {
+          console.warn('Erro ao sincronizar com nuvem:', e);
+        });
+      }
       
       // Backup Automático
       createAutoBackup();
