@@ -12,6 +12,8 @@
   <link rel="apple-touch-icon" href="logo.svg">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Supabase Client (Auth + Database) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <!-- Splash Screen (Tela de Abertura) -->
@@ -711,6 +713,8 @@
     </div>
   </div>
 
+  <!-- Supabase Service (antes do app.js) -->
+  <script src="supabase.js"></script>
   <script src="app.js"></script>
   <!-- Sistema de Timer de Trabalho em Segundo Plano -->
   <script src="workTimer.js"></script>
