@@ -3380,180 +3380,2831 @@ if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click',
 if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
-// --- Sistema de Chat (Oráculo) ---
+// ========================================
+// SISTEMA INTELIGENTE DO ORÁCULO 2.0
+// Com memória, aprendizado, voz e ações
+// ========================================
 
-// Definição das Personalidades
-const ORACLE_PERSONALITIES = {
-  robot: {
-    greeting: (name) => `Olá, ${name}. Sistemas online.`,
-    xp: (level, xp, missing) => `Você está no <strong>Nível ${level}</strong> com <strong>${xp} XP</strong>. Faltam ${missing} XP para o próximo nível.`,
-    finance: (balance) => `Seu saldo atual é de <strong>R$ ${balance}</strong>.`,
-    tasks: (count, list) => `Você tem <strong>${count} tarefas pendentes</strong>:<br>${list}`,
-    noTasks: () => `Você não tem tarefas pendentes hoje.`,
-    motivation: (quote) => `<em>"${quote}"</em><br><br>Continue processando.`,
-    work: (total) => `Hoje você registrou <strong>${total}</strong> unidades de produção.`,
-    help: () => `Posso informar sobre: <strong>Status</strong>, <strong>Finanças</strong>, <strong>Tarefas</strong>, <strong>Motivação</strong>.`,
-    default: () => `Comando não reconhecido. Tente "saldo", "tarefas" ou "xp".`,
-    suggestion: (text) => `Sugestão: ${text}`
+// Sistema de Memória do Oráculo - Com detecção inteligente
+const OracleMemory = {
+  key: 'oracle_memory',
+  
+  // Estrutura padrão da memória
+  defaultMemory: {
+    facts: [],
+    preferences: {},
+    conversations: 0,
+    lastTalk: null,
+    profile: {
+      name: null,
+      gender: null, // 'male', 'female', 'neutral'
+      nickname: null,
+      age: null,
+      occupation: null,
+      interests: [],
+      dislikes: []
+    },
+    customResponses: {}
   },
-  wise: {
-    greeting: (name) => `Saudações, viajante ${name}.`,
-    xp: (level, xp, missing) => `Sua jornada o levou ao <strong>Nível ${level}</strong>. A experiência acumulada é de <strong>${xp}</strong>. Apenas ${missing} passos o separam da ascensão.`,
-    finance: (balance) => `As riquezas materiais somam <strong>R$ ${balance}</strong>. Use-as com sabedoria.`,
-    tasks: (count, list) => `O destino lhe reserva <strong>${count} desafios</strong>:<br>${list}`,
-    noTasks: () => `Sua mente está livre de obrigações por enquanto. Aproveite a paz.`,
-    motivation: (quote) => `Reflita sobre estas palavras:<br><em>"${quote}"</em>`,
-    work: (total) => `O fruto do seu labor hoje rendeu <strong>${total}</strong> criações.`,
-    help: () => `Posso iluminar seu caminho sobre: <strong>Status</strong>, <strong>Riquezas</strong>, <strong>Deveres</strong> ou <strong>Sabedoria</strong>.`,
-    default: () => `Minha visão está turva. Pergunte sobre seu caminho (xp), ouro (saldo) ou destino (tarefas).`,
-    suggestion: (text) => `Os astros sugerem: ${text}`
+  
+  get() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(this.key));
+      return { ...this.defaultMemory, ...stored, profile: { ...this.defaultMemory.profile, ...(stored?.profile || {}) } };
+    } catch {
+      return { ...this.defaultMemory };
+    }
   },
-  coach: {
-    greeting: (name) => `E AÍ, ${name.toUpperCase()}! PRONTO PARA VENCER?`,
-    xp: (level, xp, missing) => `<strong>NÍVEL ${level}</strong>! Você tem <strong>${xp} XP</strong>! Vamos lá, só mais ${missing} para subir! FOCO!`,
-    finance: (balance) => `Você tem <strong>R$ ${balance}</strong> no caixa! Vamos fazer esse número crescer!`,
-    tasks: (count, list) => `Temos <strong>${count} missões</strong> para derrubar hoje:<br>${list}<br>PRA CIMA DELES!`,
-    noTasks: () => `Tudo limpo! Você destruiu todas as tarefas! Descanse, campeão!`,
-    motivation: (quote) => `PEGA ESSA VISÃO:<br><em>"${quote}"</em><br>AGORA VAI LÁ E FAZ ACONTECER!`,
-    work: (total) => `MONSTRO! Você fez <strong>${total}</strong> hoje! Continue nesse ritmo!`,
-    help: () => `Quer saber seu placar? Pergunte sobre <strong>XP</strong>, <strong>Grana</strong>, <strong>Tarefas</strong> ou peça uma <strong>Motivação</strong>!`,
-    default: () => `NÃO ENTENDI! FALA DIREITO, CAMPEÃO! Tenta: saldo, tarefas, xp!`,
-    suggestion: (text) => `DICA DE CAMPEÃO: ${text}`
+  
+  save(data) {
+    localStorage.setItem(this.key, JSON.stringify(data));
+    this.updateMemoryDisplay();
+  },
+  
+  // Aprende um fato genérico
+  learn(fact, category = 'general') {
+    const mem = this.get();
+    const existing = mem.facts.find(f => f.text.toLowerCase() === fact.toLowerCase());
+    if (!existing) {
+      mem.facts.push({ text: fact, category, date: new Date().toISOString() });
+      if (mem.facts.length > 100) mem.facts.shift();
+      this.save(mem);
+      return true;
+    }
+    return false;
+  },
+  
+  // Define informação do perfil
+  setProfile(key, value) {
+    const mem = this.get();
+    if (!mem.profile) mem.profile = {};
+    mem.profile[key] = value;
+    this.save(mem);
+  },
+  
+  // Obtém informação do perfil
+  getProfile(key) {
+    const mem = this.get();
+    return mem.profile?.[key];
+  },
+  
+  // Adiciona interesse
+  addInterest(interest) {
+    const mem = this.get();
+    if (!mem.profile.interests) mem.profile.interests = [];
+    if (!mem.profile.interests.includes(interest.toLowerCase())) {
+      mem.profile.interests.push(interest.toLowerCase());
+      this.save(mem);
+      return true;
+    }
+    return false;
+  },
+  
+  // Obtém gênero para pronomes
+  getGenderPronoun(type = 'subject') {
+    const gender = this.getProfile('gender');
+    const pronouns = {
+      male: { subject: 'ele', object: 'o', possessive: 'seu', treatment: 'cara', adj: 'o' },
+      female: { subject: 'ela', object: 'a', possessive: 'sua', treatment: 'querida', adj: 'a' },
+      neutral: { subject: 'você', object: 'você', possessive: 'seu', treatment: 'amigo', adj: 'o' }
+    };
+    return pronouns[gender]?.[type] || pronouns.neutral[type];
+  },
+  
+  // Detecta gênero automaticamente por nome
+  detectGenderByName(name) {
+    const nameLower = name.toLowerCase().trim();
+    
+    // Nomes femininos comuns (terminações e nomes específicos)
+    const femininePatterns = [
+      /a$/, /ia$/, /na$/, /la$/, /ra$/, /da$/, /ta$/, /sa$/, /za$/, /cia$/, /lia$/, /nia$/
+    ];
+    const feminineNames = [
+      'ana', 'maria', 'julia', 'carla', 'fernanda', 'patricia', 'camila', 'amanda', 'beatriz',
+      'larissa', 'leticia', 'gabriela', 'mariana', 'rafaela', 'carolina', 'bianca', 'bruna',
+      'daniela', 'eduarda', 'fabiana', 'giovana', 'helena', 'isabela', 'jessica', 'karen',
+      'luana', 'manoela', 'natalia', 'olivia', 'priscila', 'raquel', 'sabrina', 'tatiana',
+      'vanessa', 'yasmin', 'alice', 'sophia', 'laura', 'valentina', 'heloisa', 'lorena',
+      'marina', 'vitoria', 'clara', 'sarah', 'rebeca', 'isadora', 'luiza', 'emanuella'
+    ];
+    
+    // Nomes masculinos comuns
+    const masculineNames = [
+      'carlos', 'pedro', 'lucas', 'gabriel', 'matheus', 'rafael', 'bruno', 'daniel', 'diego',
+      'eduardo', 'felipe', 'gustavo', 'henrique', 'igor', 'joao', 'kevin', 'leonardo', 'marcos',
+      'nicolas', 'otavio', 'paulo', 'rodrigo', 'sergio', 'thiago', 'victor', 'william',
+      'arthur', 'bernardo', 'caio', 'david', 'enzo', 'fabio', 'guilherme', 'hugo', 'ivan',
+      'jose', 'kaique', 'luan', 'miguel', 'noah', 'andre', 'alex', 'anderson', 'vinicius',
+      'murilo', 'heitor', 'lorenzo', 'theo', 'davi', 'samuel', 'benjamin', 'pietro'
+    ];
+    
+    // Primeiro verifica nomes específicos
+    if (feminineNames.includes(nameLower)) return 'female';
+    if (masculineNames.includes(nameLower)) return 'male';
+    
+    // Depois verifica padrões de terminação
+    for (const pattern of femininePatterns) {
+      if (pattern.test(nameLower)) return 'female';
+    }
+    
+    // Terminações masculinas comuns
+    if (/[o|r|l|s|n|e]$/.test(nameLower) && !nameLower.endsWith('a')) {
+      return 'male';
+    }
+    
+    return 'neutral'; // Se não conseguir determinar
+  },
+  
+  remember(keyword) {
+    const mem = this.get();
+    return mem.facts.filter(f => f.text.toLowerCase().includes(keyword.toLowerCase()));
+  },
+  
+  setPreference(key, value) {
+    const mem = this.get();
+    mem.preferences[key] = value;
+    this.save(mem);
+  },
+  
+  getPreference(key) {
+    return this.get().preferences[key];
+  },
+  
+  incrementConversations() {
+    const mem = this.get();
+    mem.conversations++;
+    mem.lastTalk = new Date().toISOString();
+    this.save(mem);
+  },
+  
+  updateMemoryDisplay() {
+    const count = document.getElementById('oracleMemoryCount');
+    if (count) {
+      const mem = this.get();
+      const totalMemories = mem.facts.length + (mem.profile.name ? 1 : 0) + (mem.profile.interests?.length || 0);
+      count.textContent = totalMemories;
+    }
+  },
+  
+  // Retorna resumo do perfil
+  getProfileSummary() {
+    const mem = this.get();
+    const p = mem.profile;
+    let summary = [];
+    if (p.name) summary.push(`👤 Nome: ${p.name}`);
+    if (p.gender) summary.push(`⚧ Gênero: ${p.gender === 'male' ? 'Masculino' : p.gender === 'female' ? 'Feminino' : 'Não informado'}`);
+    if (p.age) summary.push(`🎂 Idade: ${p.age} anos`);
+    if (p.city) summary.push(`🏙️ Cidade: ${p.city}`);
+    if (p.occupation) summary.push(`💼 Profissão: ${p.occupation}`);
+    if (p.interests?.length) summary.push(`🎮 Interesses: ${p.interests.join(', ')}`);
+    if (p.goals) summary.push(`🎯 Objetivo: ${p.goals}`);
+    if (p.favoriteColor) summary.push(`🎨 Cor favorita: ${p.favoriteColor}`);
+    if (p.favoriteFood) summary.push(`🍽️ Comida favorita: ${p.favoriteFood}`);
+    if (p.lastMood) {
+      const moodEmojis = { happy: '😊', sad: '😢', stressed: '😰', tired: '😴', motivated: '💪', bored: '😐' };
+      const moodNames = { happy: 'Feliz', sad: 'Triste', stressed: 'Estressado', tired: 'Cansado', motivated: 'Motivado', bored: 'Entediado' };
+      summary.push(`${moodEmojis[p.lastMood] || '😐'} Último humor: ${moodNames[p.lastMood] || p.lastMood}`);
+    }
+    return summary;
   }
 };
 
-function getTimeBasedSuggestion() {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "🌅 <strong>Bom dia!</strong> Já bebeu água hoje? Que tal definir uma meta para o dia?";
-  if (hour >= 12 && hour < 14) return "☀️ <strong>Hora do almoço!</strong> Uma pausa agora ajuda a manter o foco à tarde.";
-  if (hour >= 14 && hour < 18) return "☕ <strong>Boa tarde!</strong> Se sentir cansaço, faça um alongamento rápido de 5 minutos.";
-  if (hour >= 18 && hour < 22) return "🌙 <strong>Boa noite!</strong> Ótimo momento para revisar suas conquistas do dia ou ler um livro.";
-  return "🦉 <strong>Madrugada...</strong> O descanso é essencial para recuperar seu XP. Tente dormir um pouco!";
-}
-
-function toggleChat() {
-  elements.chatModal.classList.toggle('active');
-  if (elements.chatModal.classList.contains('active')) {
-    setTimeout(() => elements.chatInput.focus(), 100);
-    
-    // Atualiza o select com a personalidade salva
-    if (elements.oraclePersonalitySelect && gameState) {
-      elements.oraclePersonalitySelect.value = gameState.oraclePersonality || 'robot';
+// Personalidades do Oráculo 2.0
+const ORACLE_PERSONALITIES_V2 = {
+  assistant: {
+    name: 'Assistente',
+    emoji: '🧠',
+    greeting: (name) => `Olá, ${name}! 👋 Como posso te ajudar hoje? Posso criar tarefas, verificar suas finanças, dar dicas ou simplesmente conversar!`,
+    style: {
+      formal: false,
+      enthusiastic: true,
+      helpful: true
     }
-
-    if (elements.chatMessages.children.length === 0) {
-      const p = ORACLE_PERSONALITIES[gameState.oraclePersonality || 'robot'];
-      addBotMessage(p.greeting(gameState.name));
-      setTimeout(() => addBotMessage(p.suggestion(getTimeBasedSuggestion())), 600);
+  },
+  wise: {
+    name: 'Sábio',
+    emoji: '🧙‍♂️',
+    greeting: (name) => `Saudações, ${name}. A sabedoria antiga me guia para auxiliar sua jornada. O que busca descobrir?`,
+    style: {
+      formal: true,
+      enthusiastic: false,
+      mystical: true
+    }
+  },
+  coach: {
+    name: 'Coach',
+    emoji: '🏋️',
+    greeting: (name) => `E AÍ, ${name.toUpperCase()}! 💪 BORA CONQUISTAR O DIA! O que vamos DESTRUIR hoje?`,
+    style: {
+      formal: false,
+      enthusiastic: true,
+      motivational: true
+    }
+  },
+  friend: {
+    name: 'Amigo',
+    emoji: '😊',
+    greeting: (name) => `Eai, ${name}! Que bom te ver por aqui! 😄 Conta pra mim, como tá indo? Posso te ajudar em algo?`,
+    style: {
+      formal: false,
+      casual: true,
+      friendly: true
     }
   }
-}
+};
 
-function addUserMessage(text) {
-  const div = document.createElement('div');
-  div.className = 'chat-message user';
-  div.textContent = text;
-  elements.chatMessages.appendChild(div);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-}
+// Respostas carismáticas por contexto
+const CHARISMATIC_RESPONSES = {
+  success: [
+    "✨ Feito! Você tá mandando muito bem!",
+    "🎯 Pronto! Mais uma missão cumprida!",
+    "💪 Concluído com sucesso! Continue assim!",
+    "🚀 Executado! Nada te para!",
+    "✅ Feito e bem feito! Orgulho de você!"
+  ],
+  encouragement: [
+    "Você consegue! Acredito em você! 💪",
+    "Um passo de cada vez, você vai longe! 🚶‍♂️",
+    "Lembre-se: todo expert já foi iniciante! 🌱",
+    "Seus esforços vão valer a pena! ⭐",
+    "Continue assim, você está no caminho certo! 🛤️"
+  ],
+  greeting_morning: [
+    "Bom dia, raio de sol! ☀️ Pronto pra brilhar?",
+    "Uma linda manhã para conquistar o mundo! 🌅",
+    "Novo dia, novas oportunidades! Vamos nessa? 💫"
+  ],
+  greeting_afternoon: [
+    "Boa tarde! Como está sendo o dia? ☕",
+    "Ei! Já fez uma pausa hoje? Cuide-se! 🌿",
+    "Tarde produtiva? Conta comigo! 💼"
+  ],
+  greeting_night: [
+    "Boa noite! Hora de relaxar um pouco? 🌙",
+    "Noite chegou! Que tal revisar suas conquistas do dia? ⭐",
+    "Descanse bem! Amanhã tem mais! 😴"
+  ],
+  notUnderstood: [
+    "Hmm, não entendi bem... Pode reformular? 🤔",
+    "Desculpa, não peguei essa. Tenta de outro jeito? 💭",
+    "Ops, essa me pegou! Pode explicar melhor? 😅"
+  ]
+};
 
-function addBotMessage(text) {
-  const div = document.createElement('div');
-  div.className = 'chat-message bot';
-  div.innerHTML = text; // Permite HTML básico (negrito, quebras)
-  elements.chatMessages.appendChild(div);
-  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-  playSound('click'); // Som sutil ao receber mensagem
-}
-
-function processUserMessage() {
-  const text = elements.chatInput.value.trim();
-  if (!text) return;
-
-  addUserMessage(text);
-  elements.chatInput.value = '';
-
-  // Simula "pensando"
-  setTimeout(() => {
-    const response = getOracleResponse(text.toLowerCase());
-    addBotMessage(response);
-  }, 600);
-}
-
-function getOracleResponse(input) {
-  const pKey = gameState.oraclePersonality || 'robot';
-  const p = ORACLE_PERSONALITIES[pKey];
+// Sistema de Reconhecimento de Voz
+const VoiceRecognition = {
+  recognition: null,
+  isListening: false,
+  hasPermission: false,
+  conversationMode: false, // Modo conversa contínua (telefone)
   
-  // 1. Status / XP / Nível
-  if (input.includes('xp') || input.includes('nível') || input.includes('nivel') || input.includes('status')) {
-    const missing = 100 - gameState.xp;
-    return p.xp(gameState.level, gameState.xp, missing);
+  init() {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = true; // Mostra resultados parciais
+      this.recognition.lang = 'pt-BR';
+      
+      this.recognition.onresult = (event) => {
+        const result = event.results[event.results.length - 1];
+        const transcript = result[0].transcript;
+        
+        // Se for resultado final
+        if (result.isFinal) {
+          const chatInput = document.getElementById('chatInput');
+          if (chatInput) {
+            chatInput.value = transcript;
+            OracleChat.processMessage();
+          }
+          
+          // Se está em modo conversa, continua ouvindo após a resposta
+          if (this.conversationMode) {
+            // Aguarda o Oráculo terminar de falar antes de ouvir novamente
+            setTimeout(() => {
+              if (this.conversationMode && !OracleSpeech.isSpeaking) {
+                this.startListening();
+              }
+            }, 500);
+          }
+        } else {
+          // Mostra texto parcial no input
+          const chatInput = document.getElementById('chatInput');
+          if (chatInput) {
+            chatInput.value = transcript;
+            chatInput.placeholder = 'Ouvindo...';
+          }
+        }
+      };
+      
+      this.recognition.onend = () => {
+        this.isListening = false;
+        this.updateButton();
+        
+        // Se está em modo conversa e não foi cancelado manualmente, reinicia
+        if (this.conversationMode && !OracleSpeech.isSpeaking) {
+          setTimeout(() => {
+            if (this.conversationMode) {
+              this.startListening();
+            }
+          }, 300);
+        }
+      };
+      
+      this.recognition.onerror = (event) => {
+        console.warn('Erro no reconhecimento de voz:', event.error);
+        this.isListening = false;
+        this.updateButton();
+        
+        if (event.error === 'not-allowed') {
+          this.hasPermission = false;
+          OracleChat.addSystemMessage('⚠️ Permissão de microfone negada. Clique no ícone de cadeado na barra de endereço para permitir.');
+        } else if (event.error === 'no-speech') {
+          // Silêncio - reinicia se em modo conversa
+          if (this.conversationMode) {
+            setTimeout(() => this.startListening(), 100);
+          }
+        } else if (event.error === 'aborted') {
+          // Ignorar - foi cancelado intencionalmente
+        }
+      };
+      
+      this.recognition.onstart = () => {
+        this.hasPermission = true;
+        this.isListening = true;
+        this.updateButton();
+      };
+      
+      return true;
+    }
+    return false;
+  },
+  
+  // Pede permissão do microfone uma vez
+  async requestPermission() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Para o stream imediatamente - só queríamos a permissão
+      stream.getTracks().forEach(track => track.stop());
+      this.hasPermission = true;
+      return true;
+    } catch (e) {
+      console.warn('Permissão de microfone negada:', e);
+      this.hasPermission = false;
+      return false;
+    }
+  },
+  
+  async toggle() {
+    if (!this.recognition) {
+      if (!this.init()) {
+        OracleChat.addSystemMessage('⚠️ Seu navegador não suporta reconhecimento de voz.');
+        return;
+      }
+    }
+    
+    if (this.isListening) {
+      this.stopListening();
+    } else {
+      // Pede permissão se ainda não tem
+      if (!this.hasPermission) {
+        const granted = await this.requestPermission();
+        if (!granted) {
+          OracleChat.addSystemMessage('⚠️ Precisamos de permissão do microfone para ouvir você.');
+          return;
+        }
+      }
+      this.startListening();
+    }
+  },
+  
+  startListening() {
+    if (!this.recognition || this.isListening) return;
+    
+    try {
+      this.recognition.start();
+      this.isListening = true;
+      OracleChat.updateStatus(this.conversationMode ? '🎤 Modo Conversa Ativo' : 'Ouvindo... 🎤');
+      this.updateButton();
+    } catch (e) {
+      // Se já está rodando, ignora o erro
+      if (e.name !== 'InvalidStateError') {
+        console.warn('Erro ao iniciar voz:', e);
+      }
+    }
+  },
+  
+  stopListening() {
+    if (!this.recognition) return;
+    
+    try {
+      this.recognition.stop();
+    } catch (e) {}
+    
+    this.isListening = false;
+    this.updateButton();
+  },
+  
+  // Inicia/Para modo de conversa contínua (estilo telefone)
+  toggleConversationMode() {
+    this.conversationMode = !this.conversationMode;
+    
+    if (this.conversationMode) {
+      OracleChat.addSystemMessage('📞 Modo Conversa ativado! Fale naturalmente, vou te ouvir e responder por voz.');
+      OracleSpeech.speak('Modo conversa ativado! Pode falar comigo naturalmente.');
+      this.toggle();
+    } else {
+      this.stopListening();
+      OracleSpeech.stop();
+      OracleChat.addSystemMessage('📞 Modo Conversa desativado.');
+    }
+    
+    this.updateButton();
+  },
+  
+  updateButton() {
+    const btn = document.getElementById('oracleVoiceBtn');
+    if (btn) {
+      btn.classList.toggle('listening', this.isListening);
+      btn.classList.toggle('conversation-mode', this.conversationMode);
+      btn.title = this.conversationMode ? 'Modo Conversa (clique para desativar)' : 
+                  this.isListening ? 'Ouvindo... (clique para parar)' : 'Clique para falar';
+    }
   }
+};
 
-  // 2. Finanças / Saldo / Dinheiro
-  if (input.includes('saldo') || input.includes('dinheiro') || input.includes('finança') || input.includes('gasto')) {
-    let balance = 0;
-    (gameState.finances || []).forEach(t => {
-      if (t.type === 'income') balance += t.value;
-      else balance -= t.value;
+// Sistema de Síntese de Voz (Text-to-Speech) - Oráculo fala
+const OracleSpeech = {
+  synth: window.speechSynthesis,
+  voice: null,
+  isSpeaking: false,
+  enabled: true,
+  rate: 1.0,
+  pitch: 1.0,
+  
+  init() {
+    if (!this.synth) {
+      console.warn('Síntese de voz não suportada');
+      return false;
+    }
+    
+    // Carrega vozes disponíveis
+    this.loadVoices();
+    
+    // Algumas vezes as vozes carregam assincronamente
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = () => this.loadVoices();
+    }
+    
+    return true;
+  },
+  
+  loadVoices() {
+    const voices = this.synth.getVoices();
+    
+    // Tenta encontrar uma voz em português brasileiro
+    this.voice = voices.find(v => v.lang === 'pt-BR') ||
+                 voices.find(v => v.lang.startsWith('pt')) ||
+                 voices.find(v => v.default) ||
+                 voices[0];
+    
+    if (this.voice) {
+      console.log('Voz selecionada:', this.voice.name);
+    }
+  },
+  
+  speak(text, callback) {
+    if (!this.synth || !this.enabled) {
+      if (callback) callback();
+      return;
+    }
+    
+    // Cancela qualquer fala anterior
+    this.stop();
+    
+    // Remove tags HTML do texto
+    const cleanText = text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    if (!cleanText) {
+      if (callback) callback();
+      return;
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.voice = this.voice;
+    utterance.lang = 'pt-BR';
+    utterance.rate = this.rate;
+    utterance.pitch = this.pitch;
+    
+    utterance.onstart = () => {
+      this.isSpeaking = true;
+    };
+    
+    utterance.onend = () => {
+      this.isSpeaking = false;
+      if (callback) callback();
+      
+      // Se está em modo conversa, volta a ouvir
+      if (VoiceRecognition.conversationMode) {
+        setTimeout(() => {
+          VoiceRecognition.startListening();
+        }, 300);
+      }
+    };
+    
+    utterance.onerror = (e) => {
+      console.warn('Erro na síntese de voz:', e);
+      this.isSpeaking = false;
+      if (callback) callback();
+    };
+    
+    this.synth.speak(utterance);
+  },
+  
+  stop() {
+    if (this.synth) {
+      this.synth.cancel();
+      this.isSpeaking = false;
+    }
+  },
+  
+  toggle() {
+    this.enabled = !this.enabled;
+    if (!this.enabled) {
+      this.stop();
+    }
+    return this.enabled;
+  }
+};
+
+// Sistema Principal do Oráculo
+const OracleChat = {
+  personality: 'assistant',
+  pendingAction: null, // Guarda ação pendente aguardando resposta do usuário
+  
+  init() {
+    this.personality = gameState?.oraclePersonality || 'assistant';
+    this.pendingAction = null;
+    this.setupListeners();
+    OracleMemory.updateMemoryDisplay();
+    VoiceRecognition.init();
+    OracleSpeech.init();
+  },
+  
+  setupListeners() {
+    // Botão de abrir chat
+    const chatBtn = document.getElementById('chatBtn');
+    if (chatBtn) chatBtn.addEventListener('click', () => this.toggle());
+    
+    // Botão de fechar
+    const closeBtn = document.getElementById('closeChatBtn');
+    if (closeBtn) closeBtn.addEventListener('click', () => this.toggle());
+    
+    // Botão de enviar
+    const sendBtn = document.getElementById('sendMessageBtn');
+    if (sendBtn) sendBtn.addEventListener('click', () => this.processMessage());
+    
+    // Input (Enter)
+    const input = document.getElementById('chatInput');
+    if (input) {
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') this.processMessage();
+      });
+    }
+    
+    // Botão de voz - clique único para ouvir uma vez, clique duplo para modo conversa
+    const voiceBtn = document.getElementById('oracleVoiceBtn');
+    if (voiceBtn) {
+      let clickTimeout = null;
+      let lastClick = 0;
+      
+      voiceBtn.addEventListener('click', (e) => {
+        const now = Date.now();
+        const timeDiff = now - lastClick;
+        lastClick = now;
+        
+        // Duplo clique (menos de 300ms)
+        if (timeDiff < 300 && timeDiff > 0) {
+          clearTimeout(clickTimeout);
+          VoiceRecognition.toggleConversationMode();
+        } else {
+          // Clique único - aguarda para ver se é duplo clique
+          clickTimeout = setTimeout(() => {
+            if (!VoiceRecognition.conversationMode) {
+              VoiceRecognition.toggle();
+            }
+          }, 300);
+        }
+      });
+      
+      // Dica visual
+      voiceBtn.title = 'Clique: ouvir | Duplo clique: modo conversa';
+    }
+    
+    // Botão de configurações (engrenagem) - Mostra perfil do usuário
+    const settingsBtn = document.getElementById('oracleSettingsBtn');
+    if (settingsBtn) settingsBtn.addEventListener('click', () => this.showUserProfile());
+    
+    // Seletor de personalidade
+    const personalitySelect = document.getElementById('oraclePersonalitySelect');
+    if (personalitySelect) {
+      personalitySelect.addEventListener('change', (e) => this.changePersonality(e.target.value));
+    }
+    
+    // Botões de ação rápida
+    document.querySelectorAll('.oracle-quick-btn').forEach(btn => {
+      btn.addEventListener('click', () => this.handleQuickAction(btn.dataset.action));
     });
-    return p.finance(balance.toLocaleString('pt-BR', {minimumFractionDigits: 2}));
-  }
-
-  // 3. Tarefas / Pendências
-  if (input.includes('tarefa') || input.includes('fazer') || input.includes('pendente')) {
-    const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
-    if (pending.length === 0) {
-      return p.noTasks();
+  },
+  
+  // Mostra tudo que o Oráculo sabe sobre o usuário
+  showUserProfile() {
+    const profileSummary = OracleMemory.getProfileSummary();
+    const memories = OracleMemory.remember('');
+    const profile = OracleMemory.get().profile || {};
+    
+    let response = `<strong>📋 Tudo que sei sobre você:</strong><br><br>`;
+    
+    // Perfil completo
+    if (profileSummary.length > 0) {
+      response += `<strong>👤 Seu Perfil:</strong><br>`;
+      profileSummary.forEach(item => {
+        response += `${item}<br>`;
+      });
+      response += '<br>';
+    } else {
+      response += `<em>Ainda não sei muito sobre você...</em><br><br>`;
     }
-    const list = pending.map(t => `• ${t.text}`).join('<br>');
-    return p.tasks(pending.length, list);
+    
+    // Memórias/Fatos aprendidos
+    if (memories.length > 0) {
+      response += `<strong>💭 Coisas que você me ensinou:</strong><br>`;
+      memories.forEach(m => {
+        const date = new Date(m.date).toLocaleDateString('pt-BR');
+        response += `• ${m.text} <small style="opacity:0.6">(${date})</small><br>`;
+      });
+      response += '<br>';
+    }
+    
+    // Estatísticas
+    const mem = OracleMemory.get();
+    response += `<strong>📊 Estatísticas:</strong><br>`;
+    response += `💬 Conversas: ${mem.conversationCount || 0}<br>`;
+    response += `🧠 Total de memórias: ${memories.length}<br>`;
+    
+    if (mem.firstInteraction) {
+      const firstDate = new Date(mem.firstInteraction).toLocaleDateString('pt-BR');
+      response += `📅 Primeira conversa: ${firstDate}<br>`;
+    }
+    
+    // Ações rápidas
+    response += `<br><strong>⚡ Ações:</strong>`;
+    
+    this.addBotMessage(response, [
+      { text: '💬 Bora conversar', action: () => { 
+        this.addUserMessage('bora conversar');
+        const resp = this.startConversationMode();
+        this.addBotMessage(resp);
+      }},
+      { text: '🗑️ Limpar memória', action: () => {
+        if (confirm('Tem certeza que quer apagar tudo que sei sobre você?')) {
+          localStorage.removeItem(OracleMemory.key);
+          OracleMemory.updateMemoryDisplay();
+          this.addBotMessage('🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊');
+          OracleMemory.setProfile('conversationMode', true);
+          OracleMemory.setProfile('lastQuestion', 'name');
+        }
+      }},
+      { text: '❌ Fechar', action: () => {} }
+    ]);
+  },
+  
+  toggle() {
+    const modal = document.getElementById('chatModal');
+    if (!modal) return;
+    
+    modal.classList.toggle('active');
+    
+    if (modal.classList.contains('active')) {
+      setTimeout(() => document.getElementById('chatInput')?.focus(), 100);
+      
+      const messages = document.getElementById('chatMessages');
+      if (messages && messages.children.length === 0) {
+        this.showWelcome();
+      }
+      
+      OracleMemory.incrementConversations();
+    }
+  },
+  
+  showWelcome() {
+    const p = ORACLE_PERSONALITIES_V2[this.personality];
+    
+    // Prioriza o nome salvo na memória do Oráculo, depois o nome do gameState
+    const memorizedName = OracleMemory.getProfile('name');
+    const name = memorizedName || gameState?.name || 'Viajante';
+    const gender = OracleMemory.getProfile('gender');
+    
+    this.updateAvatar(p.emoji);
+    
+    // Saudação personalizada baseada no gênero
+    let greeting = p.greeting(name);
+    if (gender === 'male' && this.personality === 'friend') {
+      greeting = `E aí, ${name}! Beleza, mano? 😎 Conta comigo pra o que precisar!`;
+    } else if (gender === 'female' && this.personality === 'friend') {
+      greeting = `Oi, ${name}! Tudo bem, linda? 💖 Conta comigo pra o que precisar!`;
+    }
+    
+    this.addBotMessage(greeting);
+    
+    // Se não conhece o nome ainda, pergunta
+    if (!memorizedName && !gameState?.name) {
+      setTimeout(() => {
+        this.addBotMessage("A propósito, como posso te chamar? 🤔");
+      }, 1000);
+    } else {
+      setTimeout(() => {
+        this.addBotMessage(this.getTimeGreeting());
+      }, 800);
+    }
+  },
+  
+  getTimeGreeting() {
+    const hour = new Date().getHours();
+    let greetings;
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : 'amigo';
+    
+    if (hour >= 5 && hour < 12) {
+      greetings = [
+        `Bom dia, ${treatment}! ☀️ Pronto pra brilhar?`,
+        "Uma linda manhã para conquistar o mundo! 🌅",
+        "Novo dia, novas oportunidades! Vamos nessa? 💫"
+      ];
+    } else if (hour >= 12 && hour < 18) {
+      greetings = [
+        `Boa tarde, ${treatment}! Como está sendo o dia? ☕`,
+        "Ei! Já fez uma pausa hoje? Cuide-se! 🌿",
+        "Tarde produtiva? Conta comigo! 💼"
+      ];
+    } else {
+      greetings = [
+        `Boa noite, ${treatment}! Hora de relaxar um pouco? 🌙`,
+        "Noite chegou! Que tal revisar suas conquistas do dia? ⭐",
+        "Descanse bem! Amanhã tem mais! 😴"
+      ];
+    }
+    
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  },
+  
+  updateAvatar(emoji) {
+    const avatar = document.getElementById('oracleAvatarEmoji');
+    if (avatar) avatar.textContent = emoji;
+  },
+  
+  updateStatus(text) {
+    const status = document.getElementById('oracleStatusText');
+    if (status) {
+      status.textContent = text;
+      setTimeout(() => {
+        status.textContent = 'Online • Pronto para ajudar';
+      }, 3000);
+    }
+  },
+  
+  changePersonality(key) {
+    if (ORACLE_PERSONALITIES_V2[key]) {
+      this.personality = key;
+      if (gameState) {
+        gameState.oraclePersonality = key;
+        saveGame(true);
+      }
+      const p = ORACLE_PERSONALITIES_V2[key];
+      this.updateAvatar(p.emoji);
+      this.addSystemMessage(`Personalidade alterada para: ${p.name}`);
+    }
+  },
+  
+  handleQuickAction(action) {
+    const actions = {
+      status: 'Qual meu status atual?',
+      tasks: 'Quais são minhas tarefas?',
+      finance: 'Como estão minhas finanças?',
+      work: 'Como foi meu trabalho hoje?',
+      help: 'O que você pode fazer?'
+    };
+    
+    if (actions[action]) {
+      const input = document.getElementById('chatInput');
+      if (input) {
+        input.value = actions[action];
+        this.processMessage();
+      }
+    }
+  },
+  
+  processMessage() {
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+    
+    const text = input.value.trim();
+    if (!text) return;
+    
+    this.addUserMessage(text);
+    input.value = '';
+    
+    // Mostra "pensando"
+    this.showThinking();
+    
+    // Processa com delay para parecer natural
+    setTimeout(() => {
+      this.removeThinking();
+      const response = this.generateResponse(text);
+      if (typeof response === 'string') {
+        this.addBotMessage(response);
+      } else if (response.message) {
+        this.addBotMessage(response.message, response.actions);
+      }
+    }, 600 + Math.random() * 400);
+  },
+  
+  // Limpa texto removendo expressões de cortesia para processamento
+  cleanInput(text) {
+    return text
+      .replace(/\b(pfv|pf|por favor|please|plz|plis|pfvr|porfa)\b/gi, '')
+      .replace(/\b(obg|obrigad[oa]|valeu|vlw|thanks|thx)\b/gi, '')
+      .trim();
+  },
+  
+  // Detecta se o usuário foi educado/cortês
+  detectPoliteness(text) {
+    const lower = text.toLowerCase();
+    const politeWords = ['pfv', 'pf', 'por favor', 'please', 'plz', 'plis', 'pfvr', 'porfa', 
+                         'obrigado', 'obrigada', 'obg', 'valeu', 'vlw', 'thanks', 'thx', 'tmj',
+                         'agradeço', 'grato', 'grata', 'gentil'];
+    return politeWords.some(word => lower.includes(word));
+  },
+  
+  // Expande abreviações e gírias para melhor compreensão
+  expandAbbreviations(text) {
+    const abbreviations = {
+      'vc': 'você',
+      'tb': 'também',
+      'tbm': 'também',
+      'td': 'tudo',
+      'hj': 'hoje',
+      'amn': 'amanhã',
+      'dps': 'depois',
+      'qdo': 'quando',
+      'qnd': 'quando',
+      'pq': 'porque',
+      'oq': 'o que',
+      'qto': 'quanto',
+      'qt': 'quanto',
+      'mto': 'muito',
+      'mt': 'muito',
+      'msm': 'mesmo',
+      'msg': 'mensagem',
+      'ctz': 'certeza',
+      'blz': 'beleza',
+      'flw': 'falou',
+      'tmb': 'também',
+      'nd': 'nada',
+      'ngm': 'ninguém',
+      'qlqr': 'qualquer',
+      'cmg': 'comigo',
+      'ctg': 'contigo',
+      'n': 'não',
+      's': 'sim',
+      'ss': 'sim sim',
+      'nn': 'não não',
+      'kk': '',  // risada
+      'kkk': '', // risada
+      'rs': '',  // risada
+      'haha': '', // risada
+      'slc': '', // interjeição
+      'mn': 'mano',
+      'mna': 'mana',
+      'vdd': 'verdade',
+      'fds': 'fim de semana',
+      'hrs': 'horas',
+      'min': 'minutos',
+      'seg': 'segundos',
+      'tava': 'estava',
+      'to': 'estou',
+      'ta': 'está',
+      'pra': 'para',
+      'pro': 'para o',
+      'pros': 'para os',
+      'num': 'não',
+      'neh': 'né',
+      'ne': 'né',
+      'bjs': 'beijos',
+      'abs': 'abraços',
+      'add': 'adicionar',
+      'deleta': 'deletar',
+      'info': 'informação',
+      'gnt': 'gente',
+      'vcs': 'vocês',
+      'dms': 'demais',
+      'fzr': 'fazer',
+      'qr': 'quer',
+      'tds': 'todos',
+      'agr': 'agora',
+      'ent': 'então',
+      'entt': 'então',
+      'entao': 'então',
+      'p/': 'para',
+      'c/': 'com',
+      's/': 'sem'
+    };
+    
+    let result = text.toLowerCase();
+    for (const [abbr, full] of Object.entries(abbreviations)) {
+      const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+      result = result.replace(regex, full);
+    }
+    return result;
+  },
+  
+  generateResponse(input) {
+    const wasPolite = this.detectPoliteness(input);
+    const cleanedInput = this.cleanInput(input);
+    const expandedInput = this.expandAbbreviations(cleanedInput);
+    const lowerInput = expandedInput.toLowerCase().trim();
+    
+    // Salva se foi educado para personalizar resposta
+    if (wasPolite) {
+      OracleMemory.setProfile('isPolite', true);
+    }
+    
+    // 0. PRIMEIRO: Verifica se há ação pendente aguardando resposta
+    if (this.pendingAction) {
+      const pendingResult = this.handlePendingAction(cleanedInput, lowerInput);
+      if (pendingResult) return pendingResult;
+    }
+    
+    // 1. DETECÇÃO AUTOMÁTICA de informações pessoais (sempre roda primeiro)
+    const autoLearnResult = this.autoLearnFromInput(cleanedInput, lowerInput);
+    if (autoLearnResult) return autoLearnResult;
+    
+    // 2. Comandos de AÇÃO (criar, adicionar, registrar)
+    const actionResult = this.handleActionCommands(lowerInput, cleanedInput);
+    if (actionResult) return actionResult;
+    
+    // 3. Consultas de INFORMAÇÃO
+    const infoResult = this.handleInfoQueries(lowerInput);
+    if (infoResult) return infoResult;
+    
+    // 4. Comandos de MEMÓRIA (lembrar, aprender)
+    const memoryResult = this.handleMemoryCommands(lowerInput, cleanedInput);
+    if (memoryResult) return memoryResult;
+    
+    // 5. Interações SOCIAIS
+    const socialResult = this.handleSocialInteractions(lowerInput);
+    if (socialResult) return socialResult;
+    
+    // 6. Ajuda
+    if (lowerInput.includes('ajuda') || lowerInput.includes('help') || lowerInput === '?') {
+      return this.getHelpMessage();
+    }
+    
+    // 7. Resposta padrão inteligente
+    return this.getSmartDefault(lowerInput);
+  },
+  
+  // Processa resposta para ação pendente
+  handlePendingAction(input, lowerInput) {
+    const action = this.pendingAction;
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    // Se o usuário cancelou
+    if (lowerInput.match(/^(cancela|cancelar|deixa|deixa pra lá|esquece|nada|não|nao)$/i)) {
+      this.pendingAction = null;
+      return `Sem problemas, ${treatment}! 😊 Se precisar de algo, é só falar!`;
+    }
+    
+    switch(action.type) {
+      case 'expense_description':
+        // Usuário está dando a descrição para o gasto
+        let desc = input.trim();
+        if (desc.length < 2) {
+          return "Hmm, pode dar um nome melhor? Tipo: almoço, mercado, uber... 🤔";
+        }
+        
+        this.pendingAction = null;
+        desc = desc.charAt(0).toUpperCase() + desc.slice(1);
+        return this.addExpense(action.value, desc);
+        
+      case 'expense_category':
+        // Usuário escolhendo categoria
+        const categories = ['alimentação', 'transporte', 'lazer', 'saúde', 'educação', 'moradia', 'outros'];
+        const chosenCat = categories.find(c => lowerInput.includes(c)) || 'outros';
+        
+        this.pendingAction = null;
+        return this.addExpenseWithCategory(action.value, action.description, chosenCat);
+        
+      case 'income_description':
+        // Usuário dando descrição para receita
+        let incDesc = input.trim();
+        if (incDesc.length < 2) {
+          return "Como devo chamar essa entrada? Salário, freelance, presente... 🤔";
+        }
+        
+        this.pendingAction = null;
+        incDesc = incDesc.charAt(0).toUpperCase() + incDesc.slice(1);
+        return this.addIncome(action.value, incDesc);
+        
+      case 'task_name':
+        // Usuário dando nome para tarefa
+        let taskName = input.trim();
+        if (taskName.length < 2) {
+          return "Qual é a tarefa? Me conta o que precisa fazer! 📝";
+        }
+        
+        this.pendingAction = null;
+        return this.createTask(taskName);
+        
+      case 'savings_confirm':
+        // Confirmar ação de poupança
+        if (lowerInput.match(/^(sim|s|yes|y|claro|pode|bora|isso|confirma)$/i)) {
+          this.pendingAction = null;
+          return this.addSavings(action.value);
+        } else if (lowerInput.match(/^(não|nao|n|no|cancela)$/i)) {
+          this.pendingAction = null;
+          return `Ok, ${treatment}! Cancelado. 😊`;
+        }
+        return "Posso guardar? Responde 'sim' ou 'não'! 🤔";
+    }
+    
+    // Se não entendeu a resposta, cancela a ação pendente
+    this.pendingAction = null;
+    return null; // Continua o processamento normal
+  },
+  
+  // Detecta automaticamente informações pessoais na conversa
+  autoLearnFromInput(originalInput, lowerInput) {
+    let learned = [];
+    let response = null;
+    
+    // Detecta NOME - Padrões naturais
+    const namePatterns = [
+      /(?:me chamo|meu nome [eé]|sou o|sou a|pode me chamar de|chama(?:r)? de)\s+([a-záàâãéèêíïóôõöúç]+)/i,
+      /^(?:eu sou|sou)\s+(?:o|a)?\s*([a-záàâãéèêíïóôõöúç]+)$/i,
+      /(?:meu nome):?\s*([a-záàâãéèêíïóôõöúç]+)/i,
+      /^([a-záàâãéèêíïóôõöúç]+),?\s+(?:aqui|presente|na área)/i
+    ];
+    
+    for (const pattern of namePatterns) {
+      const match = originalInput.match(pattern);
+      if (match && match[1]) {
+        const name = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+        
+        // Ignora palavras comuns que não são nomes
+        const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá'];
+        if (ignoreWords.includes(name.toLowerCase())) continue;
+        
+        const currentName = OracleMemory.getProfile('name');
+        if (currentName !== name) {
+          OracleMemory.setProfile('name', name);
+          
+          // Detecta gênero pelo nome
+          const gender = OracleMemory.detectGenderByName(name);
+          OracleMemory.setProfile('gender', gender);
+          
+          const genderText = gender === 'male' ? 'Prazer em conhecer, cara!' : 
+                            gender === 'female' ? 'Prazer em conhecer, querida!' : 
+                            'Prazer em conhecer!';
+          
+          return `Opa, ${name}! 😊 ${genderText} Vou lembrar de você! ${gender === 'male' ? '💪' : gender === 'female' ? '💖' : '✨'}`;
+        }
+        break;
+      }
+    }
+    
+    // Detecta GÊNERO explícito
+    if (lowerInput.match(/sou (homem|mulher|menino|menina|garoto|garota|cara|mina|mano|mana)/)) {
+      const match = lowerInput.match(/sou (homem|mulher|menino|menina|garoto|garota|cara|mina|mano|mana)/);
+      const genderWord = match[1];
+      const isMale = ['homem', 'menino', 'garoto', 'cara', 'mano'].includes(genderWord);
+      const gender = isMale ? 'male' : 'female';
+      
+      if (OracleMemory.getProfile('gender') !== gender) {
+        OracleMemory.setProfile('gender', gender);
+        learned.push('gênero');
+      }
+    }
+    
+    // Detecta PROFISSÃO/OCUPAÇÃO
+    const occupationPatterns = [
+      /(?:trabalho como|sou|eu sou|trabalho de)\s+(programador|desenvolvedor|médico|médica|professor|professora|estudante|engenheiro|engenheira|advogado|advogada|designer|vendedor|vendedora|motorista|freelancer|autônomo|autônoma|empresário|empresária|cozinheiro|cozinheira|atleta|músico|música|artista|escritor|escritora|psicólogo|psicóloga)/i,
+      /(?:minha profissão [eé]|minha ocupação [eé])\s+([a-záàâãéèêíïóôõöúç\s]+)/i
+    ];
+    
+    for (const pattern of occupationPatterns) {
+      const match = originalInput.match(pattern);
+      if (match && match[1]) {
+        const occupation = match[1].trim();
+        if (OracleMemory.getProfile('occupation') !== occupation) {
+          OracleMemory.setProfile('occupation', occupation);
+          learned.push(`sua profissão (${occupation})`);
+        }
+        break;
+      }
+    }
+    
+    // Detecta INTERESSES / GOSTOS
+    const interestPatterns = [
+      /(?:gosto de|adoro|amo|curto|sou fã de)\s+([a-záàâãéèêíïóôõöúç\s,]+)/i,
+      /(?:meu hobby [eé]|meu passatempo [eé])\s+([a-záàâãéèêíïóôõöúç\s]+)/i
+    ];
+    
+    for (const pattern of interestPatterns) {
+      const match = originalInput.match(pattern);
+      if (match && match[1]) {
+        const interests = match[1].split(/,|e\s/).map(i => i.trim()).filter(i => i.length > 2);
+        interests.forEach(interest => {
+          if (OracleMemory.addInterest(interest)) {
+            learned.push(`que você gosta de ${interest}`);
+          }
+        });
+        break;
+      }
+    }
+    
+    // Detecta IDADE
+    const ageMatch = originalInput.match(/(?:tenho|fiz|completei)\s+(\d{1,2})\s*(?:anos|aninhos)/i);
+    if (ageMatch) {
+      const age = parseInt(ageMatch[1]);
+      if (age > 0 && age < 120 && OracleMemory.getProfile('age') !== age) {
+        OracleMemory.setProfile('age', age);
+        learned.push(`sua idade (${age} anos)`);
+      }
+    }
+    
+    // Se aprendeu algo, confirma
+    if (learned.length > 0) {
+      const treatment = OracleMemory.getGenderPronoun('treatment');
+      return `Legal, ${treatment}! 🧠 Aprendi ${learned.join(' e ')}. Pode contar comigo pra lembrar! ✨`;
+    }
+    
+    return null; // Não aprendeu nada, continua processamento normal
+  },
+  
+  handleActionCommands(lowerInput, originalInput) {
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    const isPolite = OracleMemory.getProfile('isPolite');
+    const politeResponse = isPolite ? ' 😊' : '';
+    
+    // CRIAR TAREFA
+    if (lowerInput.match(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i)) {
+      const taskText = originalInput.replace(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i, '').trim();
+      
+      if (taskText && taskText.length > 2) {
+        return this.createTask(taskText);
+      } else {
+        // Pergunta interativa
+        this.pendingAction = { type: 'task_name' };
+        return {
+          message: `Claro, ${treatment}! Qual tarefa você quer criar? 📝`,
+          actions: [
+            { text: '📚 Estudar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Estudar')); } },
+            { text: '🏃 Exercitar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Fazer exercícios')); } },
+            { text: '🧹 Organizar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Organizar ambiente')); } }
+          ]
+        };
+      }
+    }
+    
+    // ==== COMANDOS NATURAIS DE FINANÇAS ====
+    
+    // SAÍDA/GASTO - Formas naturais: "coloque uma saída de 50", "gastei 100", "paguei 50 no almoço"
+    const expensePatterns = [
+      /(?:coloque?|coloca|adiciona|registra|bota|põe?)\s+(?:uma?\s+)?(?:saída|saida|gasto|despesa)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:gastei|paguei|comprei|perdi)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:saiu|foi)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /^(?:adicionar?|registrar?|novo?)\s*(?:gasto|despesa|saída)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i
+    ];
+    
+    for (const pattern of expensePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const value = parseFloat(match[1].replace(',', '.'));
+        
+        // Extrair descrição do restante da frase
+        let desc = originalInput
+          .replace(pattern, '')
+          .replace(/^[\s,\.]+|[\s,\.]+$/g, '')
+          .replace(/^(com|no|na|em|de|pra|para|por causa)\s+/i, '')
+          .trim();
+        
+        // Se não encontrou descrição, tenta extrair de outras partes
+        if (!desc || desc.length < 2) {
+          const descMatch = originalInput.match(/(?:com|no|na|em|de|pra|para)\s+(.+?)(?:\s+de\s+\d|$)/i);
+          desc = descMatch ? descMatch[1].trim() : null;
+        }
+        
+        // Se ainda não tem descrição, PERGUNTA ao usuário
+        if (!desc || desc.length < 2) {
+          this.pendingAction = { type: 'expense_description', value: value };
+          return {
+            message: `Beleza, ${treatment}! 💸 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de saída.${politeResponse}<br><br>Qual nome devo colocar nessa despesa?`,
+            actions: [
+              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Alimentação')); } },
+              { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Transporte')); } },
+              { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Lazer')); } },
+              { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Compras')); } }
+            ]
+          };
+        }
+        
+        return this.addExpense(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+      }
+    }
+    
+    // ENTRADA/RECEITA - Formas naturais: "recebi 500", "ganhei 1000", "entrou 200"
+    const incomePatterns = [
+      /(?:coloque?|coloca|adiciona|registra|bota|põe?)\s+(?:uma?\s+)?(?:entrada|receita|ganho)\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:recebi|ganhei|entrou|chegou)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:tive\s+(?:uma?\s+)?(?:entrada|receita|ganho)\s+de)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /^(?:adicionar?|registrar?|nova?)\s*(?:receita|entrada|ganho|salário)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i
+    ];
+    
+    for (const pattern of incomePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const value = parseFloat(match[1].replace(',', '.'));
+        let desc = originalInput
+          .replace(pattern, '')
+          .replace(/^[\s,\.]+|[\s,\.]+$/g, '')
+          .replace(/^(de|do|da|por|como)\s+/i, '')
+          .trim();
+        
+        if (!desc || desc.length < 2) {
+          const descMatch = originalInput.match(/(?:de|do|da|como|por)\s+(.+?)(?:\s+de\s+\d|$)/i);
+          desc = descMatch ? descMatch[1].trim() : null;
+        }
+        
+        // Se não tem descrição, PERGUNTA ao usuário
+        if (!desc || desc.length < 2) {
+          this.pendingAction = { type: 'income_description', value: value };
+          return {
+            message: `Show, ${treatment}! 💰 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de entrada.${politeResponse}<br><br>De onde veio essa grana?`,
+            actions: [
+              { text: '💼 Salário', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Salário')); } },
+              { text: '💻 Freelance', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Freelance')); } },
+              { text: '🎁 Presente', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Presente')); } },
+              { text: '📈 Investimento', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Investimento')); } }
+            ]
+          };
+        }
+        
+        return this.addIncome(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+      }
+    }
+    
+    // ECONOMIA/POUPANÇA - "guardar 100", "poupar 200", "economizar 50"
+    const savingsPatterns = [
+      /(?:guardar?|guarda|poupar?|poupa|economizar?|economiza|reservar?|reserva|separar?|separa)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:coloque?|coloca|adiciona)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s+(?:na\s+)?(?:poupança|economia|reserva)/i,
+      /(?:vou\s+)?(?:guardar?|poupar?|economizar?)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i
+    ];
+    
+    for (const pattern of savingsPatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const value = parseFloat(match[1].replace(',', '.'));
+        return this.addSavings(value);
+      }
+    }
+    
+    // RETIRAR DA POUPANÇA - "retirar 100 da poupança", "tirar 50 da economia"
+    const withdrawPatterns = [
+      /(?:retirar?|retira|tirar?|tira|sacar?|saca|pegar?|pega|usar?|usa)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s+(?:da|das?)\s+(?:poupança|economia|reserva|economias)/i,
+      /(?:preciso\s+de|vou\s+usar|usar)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)\s+(?:da|das?)\s+(?:poupança|economia|reserva)/i
+    ];
+    
+    for (const pattern of withdrawPatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const value = parseFloat(match[1].replace(',', '.'));
+        return this.withdrawSavings(value);
+      }
+    }
+    
+    // DEFINIR META DE ECONOMIA
+    const goalPatterns = [
+      /(?:minha\s+)?meta\s+(?:é|de)\s+(?:economizar?\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:quero|preciso)\s+(?:economizar?|guardar?|juntar?)\s+(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i,
+      /(?:definir?|define|colocar?|coloca)\s+meta\s+(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/i
+    ];
+    
+    for (const pattern of goalPatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const value = parseFloat(match[1].replace(',', '.'));
+        return this.setSavingsGoal(value);
+      }
+    }
+    
+    // VER POUPANÇA/ECONOMIAS
+    if (lowerInput.match(/(?:quanto\s+)?(?:tenho|tem)\s+(?:na|de)\s+(?:poupança|economia|reserva|guardado)|(?:minha|ver)\s+(?:poupança|economia|reserva)/i)) {
+      return this.getSavingsStatus();
+    }
+    
+    // COMPLETAR TAREFA
+    if (lowerInput.match(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i)) {
+      const taskName = originalInput.replace(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i, '').trim();
+      return this.completeTask(taskName);
+    }
+    
+    // DELETAR TAREFA
+    if (lowerInput.match(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i)) {
+      const taskName = originalInput.replace(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i, '').trim();
+      return this.deleteTask(taskName);
+    }
+    
+    // INICIAR/PARAR TRABALHO
+    if (lowerInput.match(/^(iniciar?|começar?|start|vou\s+trabalhar|bora\s+trabalhar) ?(trabalho|timer|cronômetro)?/i)) {
+      if (window.WorkTimer && !window.WorkTimer.isRunning()) {
+        window.WorkTimer.start();
+        return this.getSuccessMessage() + " Timer de trabalho iniciado! ⏱️ Bom trabalho!";
+      } else if (window.WorkTimer?.isRunning()) {
+        return "⏱️ O timer já está rodando! Quando terminar, é só pedir pra parar.";
+      }
+      return "Não consegui iniciar o timer. Tente pela aba de Trabalho.";
+    }
+    
+    if (lowerInput.match(/^(parar?|finalizar?|stop|encerrar?|terminei|acabei|chega) ?(trabalho|timer|cronômetro|de\s+trabalhar)?/i)) {
+      if (window.WorkTimer?.isRunning()) {
+        window.WorkTimer.stop();
+        return this.getSuccessMessage() + " Timer finalizado! Descanse um pouco! 😊";
+      }
+      return "⏱️ Não há timer rodando no momento.";
+    }
+    
+    // ADICIONAR XP MANUAL
+    if (lowerInput.match(/(?:adicionar?|adiciona|dar?|dá|ganhar?|ganha)\s+(\d+)\s*(?:de\s+)?xp/i)) {
+      const match = lowerInput.match(/(\d+)/);
+      if (match && gameState) {
+        const xp = parseInt(match[1]);
+        gameState.xp = (gameState.xp || 0) + xp;
+        while (gameState.xp >= 100) {
+          gameState.xp -= 100;
+          gameState.level = (gameState.level || 1) + 1;
+        }
+        saveGame();
+        return `⭐ +${xp} XP adicionado! Você está no nível ${gameState.level} com ${gameState.xp}/100 XP!`;
+      }
+    }
+    
+    // LIMPAR TAREFAS CONCLUÍDAS
+    if (lowerInput.match(/(?:limpar?|limpa|remover?|remove|apagar?|apaga)\s+(?:tarefas?\s+)?(?:concluídas?|completas?|feitas?)/i)) {
+      if (gameState && gameState.dailyTasks) {
+        const before = gameState.dailyTasks.length;
+        gameState.dailyTasks = gameState.dailyTasks.filter(t => !t.completed);
+        const removed = before - gameState.dailyTasks.length;
+        saveGame();
+        if (typeof renderTasks === 'function') renderTasks();
+        return removed > 0 
+          ? `🧹 ${removed} tarefa(s) concluída(s) removida(s)!`
+          : "Não há tarefas concluídas para limpar.";
+      }
+    }
+    
+    // RENOMEAR/ALTERAR GASTO
+    // Padrões: "renomear gasto almoço para lanche", "alterar nome do gasto X para Y", "mudar gasto de X para Y"
+    const renameExpensePatterns = [
+      /(?:renomear?|renomeia|alterar?|altera|mudar?|muda|trocar?|troca|editar?|edita)\s+(?:o\s+)?(?:nome\s+)?(?:do\s+)?(?:gasto|despesa|saída)\s+(?:de\s+)?["']?(.+?)["']?\s+(?:para|pra|por)\s+["']?(.+?)["']?$/i,
+      /(?:renomear?|renomeia|alterar?|altera|mudar?|muda|trocar?|troca|editar?|edita)\s+["']?(.+?)["']?\s+(?:para|pra|por)\s+["']?(.+?)["']?\s+(?:no\s+)?(?:gasto|despesa)/i
+    ];
+    
+    for (const pattern of renameExpensePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const oldName = match[1].trim();
+        const newName = match[2].trim();
+        return this.renameExpense(oldName, newName);
+      }
+    }
+    
+    // VER GASTOS / LISTAR DESPESAS (para poder escolher qual renomear)
+    if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:meus?\s+)?(?:gastos?|despesas?|saídas?)/i) ||
+        lowerInput.match(/(?:meus?\s+)?(?:gastos?|despesas?|saídas?)\s+(?:recentes?)?/i)) {
+      return this.listExpenses();
+    }
+    
+    // DELETAR/REMOVER GASTO
+    const deleteExpensePatterns = [
+      /(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:o\s+)?(?:gasto|despesa|saída)\s+(?:de\s+)?["']?(.+?)["']?$/i,
+      /(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+["']?(.+?)["']?\s+(?:dos?\s+)?(?:gastos?|despesas?)/i
+    ];
+    
+    for (const pattern of deleteExpensePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const name = match[1].trim();
+        return this.deleteExpense(name);
+      }
+    }
+    
+    // RENOMEAR/ALTERAR ENTRADA/RECEITA
+    const renameIncomePatterns = [
+      /(?:renomear?|renomeia|alterar?|altera|mudar?|muda|trocar?|troca|editar?|edita)\s+(?:o\s+)?(?:nome\s+)?(?:da?\s+)?(?:entrada|receita|ganho)\s+(?:de\s+)?["']?(.+?)["']?\s+(?:para|pra|por)\s+["']?(.+?)["']?$/i
+    ];
+    
+    for (const pattern of renameIncomePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const oldName = match[1].trim();
+        const newName = match[2].trim();
+        return this.renameIncome(oldName, newName);
+      }
+    }
+    
+    // VER RECEITAS / LISTAR ENTRADAS
+    if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)/i) ||
+        lowerInput.match(/(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)\s+(?:recentes?)?/i)) {
+      return this.listIncomes();
+    }
+    
+    // DELETAR/REMOVER ENTRADA
+    const deleteIncomePatterns = [
+      /(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?(?:entrada|receita|ganho)\s+(?:de\s+)?["']?(.+?)["']?$/i
+    ];
+    
+    for (const pattern of deleteIncomePatterns) {
+      const match = originalInput.match(pattern);
+      if (match) {
+        const name = match[1].trim();
+        return this.deleteIncome(name);
+      }
+    }
+    
+    return null;
+  },
+  
+  // Adicionar à poupança
+  addSavings(value) {
+    if (!gameState) return "Erro ao registrar. Tente pela interface.";
+    
+    if (!gameState.savings) gameState.savings = { total: 0, goal: 0, history: [] };
+    
+    gameState.savings.total = (gameState.savings.total || 0) + value;
+    gameState.savings.history = gameState.savings.history || [];
+    gameState.savings.history.push({
+      id: Date.now(),
+      type: 'deposit',
+      value: value,
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    
+    const goal = gameState.savings.goal;
+    let response = this.getSuccessMessage() + `<br><br>💰 <strong>R$ ${value.toFixed(2)}</strong> guardado na poupança!`;
+    response += `<br>📊 Total acumulado: <strong>R$ ${gameState.savings.total.toFixed(2)}</strong>`;
+    
+    if (goal > 0) {
+      const percent = Math.min(100, (gameState.savings.total / goal * 100)).toFixed(1);
+      response += `<br>🎯 Progresso da meta: ${percent}%`;
+      if (gameState.savings.total >= goal) {
+        response += `<br><br>🎉 <strong>PARABÉNS!</strong> Você atingiu sua meta de R$ ${goal.toFixed(2)}!`;
+      }
+    }
+    
+    return response;
+  },
+  
+  // Retirar da poupança
+  withdrawSavings(value) {
+    if (!gameState) return "Erro ao registrar. Tente pela interface.";
+    
+    if (!gameState.savings || gameState.savings.total < value) {
+      const available = gameState.savings?.total || 0;
+      return `⚠️ Você só tem R$ ${available.toFixed(2)} na poupança. Não dá pra retirar R$ ${value.toFixed(2)}.`;
+    }
+    
+    gameState.savings.total -= value;
+    gameState.savings.history = gameState.savings.history || [];
+    gameState.savings.history.push({
+      id: Date.now(),
+      type: 'withdraw',
+      value: value,
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    
+    return `💸 R$ ${value.toFixed(2)} retirado da poupança.<br>📊 Saldo restante: <strong>R$ ${gameState.savings.total.toFixed(2)}</strong>`;
+  },
+  
+  // Definir meta de economia
+  setSavingsGoal(value) {
+    if (!gameState) return "Erro ao registrar.";
+    
+    if (!gameState.savings) gameState.savings = { total: 0, goal: 0, history: [] };
+    gameState.savings.goal = value;
+    saveGame();
+    
+    const current = gameState.savings.total || 0;
+    const percent = value > 0 ? Math.min(100, (current / value * 100)).toFixed(1) : 0;
+    
+    return `🎯 Meta de economia definida: <strong>R$ ${value.toFixed(2)}</strong><br>` +
+           `📊 Progresso atual: R$ ${current.toFixed(2)} (${percent}%)<br><br>` +
+           `💡 Use "<strong>guardar [valor]</strong>" para adicionar à poupança!`;
+  },
+  
+  // Ver status da poupança
+  getSavingsStatus() {
+    if (!gameState) return "Erro ao acessar dados.";
+    
+    const savings = gameState.savings || { total: 0, goal: 0, history: [] };
+    const total = savings.total || 0;
+    const goal = savings.goal || 0;
+    
+    let response = `<strong>💰 Sua Poupança:</strong><br><br>`;
+    response += `📊 Total guardado: <strong>R$ ${total.toFixed(2)}</strong><br>`;
+    
+    if (goal > 0) {
+      const percent = Math.min(100, (total / goal * 100)).toFixed(1);
+      const remaining = Math.max(0, goal - total);
+      response += `🎯 Meta: R$ ${goal.toFixed(2)}<br>`;
+      response += `📈 Progresso: ${percent}%<br>`;
+      response += `⏳ Faltam: R$ ${remaining.toFixed(2)}<br>`;
+    } else {
+      response += `<br>💡 Dica: Defina uma meta! Ex: "<strong>minha meta é 1000</strong>"`;
+    }
+    
+    // Histórico recente
+    if (savings.history && savings.history.length > 0) {
+      response += `<br><strong>📜 Últimas movimentações:</strong><br>`;
+      savings.history.slice(-3).reverse().forEach(h => {
+        const date = new Date(h.date).toLocaleDateString('pt-BR');
+        const icon = h.type === 'deposit' ? '➕' : '➖';
+        response += `${icon} R$ ${h.value.toFixed(2)} (${date})<br>`;
+      });
+    }
+    
+    return response;
+  },
+  
+  // Deletar tarefa
+  deleteTask(taskName) {
+    if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas para deletar.";
+    
+    if (!taskName) {
+      const tasks = gameState.dailyTasks;
+      if (tasks.length === 0) return "Você não tem tarefas para deletar.";
+      
+      return {
+        message: "Qual tarefa você quer deletar? 🗑️",
+        actions: tasks.slice(0, 4).map(t => ({
+          text: `🗑️ ${t.text.substring(0, 20)}${t.text.length > 20 ? '...' : ''}`,
+          action: () => this.deleteTask(t.text)
+        }))
+      };
+    }
+    
+    const lowerTask = taskName.toLowerCase();
+    const taskIndex = gameState.dailyTasks.findIndex(t => 
+      t.text.toLowerCase().includes(lowerTask) || lowerTask.includes(t.text.toLowerCase())
+    );
+    
+    if (taskIndex !== -1) {
+      const deleted = gameState.dailyTasks.splice(taskIndex, 1)[0];
+      saveGame();
+      if (typeof renderTasks === 'function') renderTasks();
+      return `🗑️ Tarefa "<strong>${deleted.text}</strong>" deletada!`;
+    }
+    
+    return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
+  },
+  
+  handleInfoQueries(lowerInput) {
+    // STATUS/XP
+    if (lowerInput.match(/(status|xp|nível|nivel|experiência|level)/i)) {
+      if (!gameState) return "Não consegui acessar seus dados. Tente recarregar a página.";
+      
+      const missing = 100 - gameState.xp;
+      const streakEmoji = gameState.streak >= 7 ? '🔥' : (gameState.streak >= 3 ? '⚡' : '✨');
+      
+      return `<strong>📊 Seu Status Atual:</strong><br><br>
+        🎮 <strong>Nível ${gameState.level}</strong><br>
+        ⭐ XP: ${gameState.xp}/100 (faltam ${missing})<br>
+        ${streakEmoji} Sequência: ${gameState.streak} dias<br>
+        🏅 Conquistas: ${(gameState.achievements || []).length}<br><br>
+        <em>Continue assim e você vai longe!</em>`;
+    }
+    
+    // FINANÇAS/SALDO
+    if (lowerInput.match(/(saldo|dinheiro|finança|financeiro|grana|quanto tenho)/i)) {
+      if (!gameState) return "Não consegui acessar seus dados.";
+      
+      let income = 0, expense = 0;
+      (gameState.finances || []).forEach(t => {
+        if (t.type === 'income') income += t.value;
+        else expense += t.value;
+      });
+      const balance = income - expense;
+      const emoji = balance >= 0 ? '💰' : '⚠️';
+      
+      return `<strong>${emoji} Resumo Financeiro:</strong><br><br>
+        📈 Entradas: <span style="color:#4ade80">R$ ${income.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span><br>
+        📉 Saídas: <span style="color:#f87171">R$ ${expense.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span><br>
+        💵 <strong>Saldo: R$ ${balance.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong><br><br>
+        ${balance >= 0 ? 'Suas finanças estão no verde! 🎉' : 'Atenção com os gastos! 🧐'}`;
+    }
+    
+    // TAREFAS
+    if (lowerInput.match(/(tarefa|task|pendente|fazer|to-?do|missão|missões)/i)) {
+      if (!gameState) return "Não consegui acessar seus dados.";
+      
+      const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
+      const completed = (gameState.dailyTasks || []).filter(t => t.completed);
+      
+      if (pending.length === 0 && completed.length === 0) {
+        return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+      }
+      
+      let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
+      
+      if (pending.length > 0) {
+        response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
+        pending.forEach(t => response += `• ${t.text}<br>`);
+        response += '<br>';
+      }
+      
+      if (completed.length > 0) {
+        response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
+        completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
+      }
+      
+      if (pending.length > 0) {
+        response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
+      }
+      
+      return response;
+    }
+    
+    // TRABALHO
+    if (lowerInput.match(/(trabalho|produção|massa|timer|cronômetro)/i)) {
+      if (!gameState) return "Não consegui acessar seus dados.";
+      
+      const today = new Date().toISOString().split('T')[0];
+      const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
+      
+      let totalTime = 0;
+      let totalProd = 0;
+      let totalMoney = 0;
+      
+      todayLogs.forEach(l => {
+        if (l.type === 'time_tracking') {
+          totalTime += l.duration || 0;
+        } else {
+          totalProd += l.inputVal || 0;
+        }
+        totalMoney += l.financialVal || 0;
+      });
+      
+      const hours = Math.floor(totalTime / 3600000);
+      const mins = Math.floor((totalTime % 3600000) / 60000);
+      const isRunning = window.WorkTimer?.isRunning();
+      
+      return `<strong>💼 Resumo do Trabalho Hoje:</strong><br><br>
+        ⏱️ Tempo: ${hours}h ${mins}m ${isRunning ? '(timer ativo!)' : ''}<br>
+        📦 Produção: ${totalProd} unidades<br>
+        💵 Ganhos: R$ ${totalMoney.toFixed(2)}<br><br>
+        ${isRunning ? '🟢 Timer rodando! Quando terminar, diga: <strong>parar trabalho</strong>' : '💡 Diga <strong>iniciar trabalho</strong> para começar o timer!'}`;
+    }
+    
+    return null;
+  },
+  
+  handleMemoryCommands(lowerInput, originalInput) {
+    // APRENDER/LEMBRAR
+    if (lowerInput.startsWith('lembre') || lowerInput.startsWith('lembra')) {
+      const fact = originalInput.replace(/^lembr[ae]/i, '').replace(/^(que|de|:)/i, '').trim();
+      if (fact.length > 3) {
+        if (OracleMemory.learn(fact)) {
+          return `🧠 Entendido! Vou lembrar que: "<em>${fact}</em>". Pode contar comigo!`;
+        }
+        return "Já sei disso! 😊";
+      }
+      return "O que você quer que eu lembre? Ex: <strong>lembre que minha cor favorita é azul</strong>";
+    }
+    
+    // BUSCAR MEMÓRIA
+    if (lowerInput.startsWith('o que você sabe') || lowerInput.includes('você lembra') || lowerInput.includes('me conhece')) {
+      const keyword = originalInput.replace(/(o que você sabe|você lembra|me conhece|sobre)/gi, '').trim();
+      
+      // Primeiro mostra o perfil se perguntou sobre si mesmo
+      if (!keyword || keyword === 'mim' || keyword === 'eu' || lowerInput.includes('me conhece')) {
+        const profileSummary = OracleMemory.getProfileSummary();
+        const memories = OracleMemory.remember('');
+        
+        let response = `🧠 <strong>O que sei sobre você:</strong><br><br>`;
+        
+        if (profileSummary.length > 0) {
+          response += `<strong>📋 Perfil:</strong><br>`;
+          profileSummary.forEach(item => {
+            response += `• ${item}<br>`;
+          });
+          response += '<br>';
+        }
+        
+        if (memories.length > 0) {
+          response += `<strong>💭 Memórias:</strong><br>`;
+          memories.slice(-5).forEach(m => {
+            response += `• ${m.text}<br>`;
+          });
+        }
+        
+        if (profileSummary.length === 0 && memories.length === 0) {
+          const name = OracleMemory.getProfile('name');
+          if (name) {
+            response = `Sei que você se chama <strong>${name}</strong>! 😊 Me conta mais sobre você!`;
+          } else {
+            response = `Ainda estou te conhecendo! Me conta: qual seu nome? O que você gosta de fazer? 😊`;
+          }
+        }
+        
+        return response;
+      }
+      
+      const memories = OracleMemory.remember(keyword);
+      
+      if (memories.length === 0) {
+        return `Ainda não tenho memórias sobre "${keyword}". Me ensina! Diz: <strong>lembre que...</strong>`;
+      }
+      
+      let response = `🧠 <strong>Minhas memórias sobre "${keyword}":</strong><br><br>`;
+      memories.slice(-5).forEach(m => {
+        response += `• ${m.text}<br>`;
+      });
+      return response;
+    }
+    
+    // QUAL MEU NOME / COMO ME CHAMO
+    if (lowerInput.match(/(qual (é )?meu nome|como (eu )?me chamo|sabe meu nome|lembra meu nome)/i)) {
+      const name = OracleMemory.getProfile('name');
+      const gender = OracleMemory.getProfile('gender');
+      
+      if (name) {
+        const genderResponse = gender === 'male' ? 'Claro que sei, cara!' : 
+                               gender === 'female' ? 'Claro que sei, querida!' : 
+                               'Claro que sei!';
+        return `${genderResponse} Você é ${gender === 'male' ? 'o' : gender === 'female' ? 'a' : ''} <strong>${name}</strong>! 😊`;
+      }
+      return `Ainda não sei seu nome! Me conta: como posso te chamar? 🤔`;
+    }
+    
+    // ESQUECE / APAGA MEMÓRIA
+    if (lowerInput.match(/^(esquece|apaga|delete|remove|limpa)\s+(tudo|memória|memorias|perfil)/i)) {
+      const mem = OracleMemory.get();
+      if (lowerInput.includes('tudo') || lowerInput.includes('perfil')) {
+        localStorage.removeItem(OracleMemory.key);
+        return `🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊`;
+      }
+      mem.facts = [];
+      OracleMemory.save(mem);
+      return `🗑️ Fatos apagados, mas ainda lembro quem você é! 😊`;
+    }
+    
+    return null;
+  },
+  
+  handleSocialInteractions(lowerInput) {
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    // SAUDAÇÕES
+    if (lowerInput.match(/^(oi|olá|ola|hey|eai|e aí|fala|salve|bom dia|boa tarde|boa noite)/i)) {
+      const personalGreeting = name ? `, ${name}` : '';
+      return this.getTimeGreeting() + ` Em que posso ajudar${personalGreeting}?`;
+    }
+    
+    // COMO VOCÊ ESTÁ
+    if (lowerInput.match(/(como (você está|vc ta|vc está|vai você)|tudo bem)/i)) {
+      const responses = [
+        `Estou ótimo, ${treatment}! Pronto pra te ajudar! 😊 E você?`,
+        "Funcionando a todo vapor! 🚀 Como posso ajudar?",
+        "Muito bem! Cada conversa me deixa mais feliz! 💫"
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+    
+    // ============ DETECÇÃO DE EMOÇÕES ============
+    
+    // FELIZ / BOM HUMOR
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(feliz|alegre|animad|empolgad|contente|radiante|bem|ótimo|otimo|incrível|maravilhos)/i) || 
+        lowerInput.match(/(que\s+)?dia\s+(lindo|maravilhos|perfeito|incrível)/i) ||
+        lowerInput.match(/^(to|tô|estou)\s+(muito\s+)?(bem|feliz|alegre)/i)) {
+      
+      // Salva o humor na memória
+      OracleMemory.setProfile('lastMood', 'happy');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const happyResponses = [
+        `Que maravilha, ${treatment}! 🎉 Sua energia positiva é contagiante! O que te deixou assim tão feliz?`,
+        `Adoro ver você assim! 😄✨ Conta pra mim, o que aconteceu de bom?`,
+        `Isso é ótimo demais! 🥳 ${name ? name + ', ' : ''}compartilha essa felicidade comigo! O que rolou?`,
+        `Que demais! 💫 A alegria é a melhor energia que existe! Me conta mais!`,
+        `Fico muito feliz em saber disso! 🌟 ${name ? 'Você ' : ''}merece toda essa felicidade! O que te animou?`
+      ];
+      
+      return happyResponses[Math.floor(Math.random() * happyResponses.length)];
+    }
+    
+    // TRISTE / DESANIMADO
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(triste|mal|para baixo|desanimad|deprimid|down|arrasad|péssim|pessim|horrível|horrivel|abatid)/i) ||
+        lowerInput.match(/(dia|momento|fase)\s+(difícil|dificil|ruim|complicad|pesad)/i)) {
+      
+      OracleMemory.setProfile('lastMood', 'sad');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const sadResponses = [
+        `Ei, ${treatment}... 💙 Sinto muito que você esteja assim. Quer desabafar? Tô aqui pra ouvir.`,
+        `Poxa... 🫂 Dias difíceis fazem parte, mas você não precisa enfrentar sozinho. O que tá acontecendo?`,
+        `${name ? name + ', ' : ''}Eu me importo com você. 💜 Me conta o que tá te deixando pra baixo?`,
+        `Às vezes a vida pesa mesmo... 🌧️ Mas toda tempestade passa. Quer conversar sobre isso?`,
+        `Tô aqui por você, ${treatment}. 🤍 Desabafa comigo, o que tá rolando?`
+      ];
+      
+      return sadResponses[Math.floor(Math.random() * sadResponses.length)];
+    }
+    
+    // ESTRESSADO / ANSIOSO
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(estressad|ansios|nervos|preocupad|sobrecarregad|sob pressão|tenso|tensa|agitad)/i) ||
+        lowerInput.match(/(muita?\s+)?(ansiedade|stress|estresse|pressão)/i)) {
+      
+      OracleMemory.setProfile('lastMood', 'stressed');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const stressResponses = [
+        `Respira fundo, ${treatment}... 🌬️ Uma coisa de cada vez. O que tá te preocupando mais?`,
+        `Ei, calma... 🧘 Você vai dar conta. Me conta o que tá gerando essa pressão?`,
+        `${name ? name + ', ' : ''}Ansiedade é difícil mesmo... 💆 Vamos conversar. O que tá tirando sua paz?`,
+        `Tá tudo bem sentir isso, ${treatment}. 🫂 Quer me contar o que tá acontecendo?`,
+        `Uma respiração de cada vez... 🌸 Tô aqui. O que posso fazer pra te ajudar?`
+      ];
+      
+      return stressResponses[Math.floor(Math.random() * stressResponses.length)];
+    }
+    
+    // CANSADO / EXAUSTO
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(cansad|exaust|esgotad|morto|morta|destruíd|sem energia)/i) ||
+        lowerInput.match(/(que\s+)?(cansaço|exaustão|fadiga)/i)) {
+      
+      OracleMemory.setProfile('lastMood', 'tired');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const tiredResponses = [
+        `Poxa, ${treatment}... 😴 Você tem descansado? Seu corpo tá pedindo uma pausa.`,
+        `Ei, respeita seus limites! 🛋️ ${name ? name + ', você ' : 'Você '}merece descansar. O que te cansou tanto?`,
+        `Descanso é produtividade também! 💤 Tá trabalhando muito? Me conta o que tá rolando.`,
+        `${name ? name + ', ' : ''}Cuida de você, tá? 🌙 Um descanso de qualidade faz milagres.`,
+        `Seu bem-estar vem primeiro! ☕ Que tal uma pausa? O que te deixou assim?`
+      ];
+      
+      return tiredResponses[Math.floor(Math.random() * tiredResponses.length)];
+    }
+    
+    // ANIMADO / MOTIVADO
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(motivad|determinad|focad|produtiv|energizad|inspirad|cheio de energia|pronto|preparad)/i) ||
+        lowerInput.match(/(bora|vamos|vamo)\s*(nessa|que|fazer|trabalhar|produzir)/i)) {
+      
+      OracleMemory.setProfile('lastMood', 'motivated');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const motivatedResponses = [
+        `ISSO AÍ, ${treatment.toUpperCase()}! 🔥 Essa energia é contagiante! O que você vai conquistar hoje?`,
+        `Bora pra cima! 🚀 ${name ? name + ', com ' : 'Com '}essa atitude você vai longe! Qual é o plano?`,
+        `Adoro essa energia! 💪 Aproveita esse momento! O que vai fazer com essa motivação?`,
+        `É assim que se fala! ⚡ ${name ? name + ', você ' : 'Você '}tá on fire! Me conta seus planos!`,
+        `Essa determinação é inspiradora! 🌟 Vai lá e arrasa! Posso ajudar em algo?`
+      ];
+      
+      return motivatedResponses[Math.floor(Math.random() * motivatedResponses.length)];
+    }
+    
+    // ENTEDIADO
+    if (lowerInput.match(/(estou|to|tô|me sinto?|sinto)\s*(muito\s+)?(entediad|sem nada|sem saber o que fazer|sem fazer nada|aborrecid)/i) ||
+        lowerInput.match(/(que\s+)?(tédio|monotonia)/i) ||
+        lowerInput.match(/nada (pra|para) fazer/i)) {
+      
+      OracleMemory.setProfile('lastMood', 'bored');
+      OracleMemory.setProfile('lastMoodDate', new Date().toISOString());
+      
+      const boredResponses = [
+        `Tédio é a oportunidade perfeita pra fazer algo novo! 🎯 Que tal criar uma tarefa? Ou completar alguma pendência?`,
+        `Hmm, ${treatment}... 🤔 E se você aproveitasse pra aprender algo novo ou organizar suas coisas?`,
+        `Tédio pode ser bom! ✨ É hora de ser criativo. Quer que eu sugira algumas atividades?`,
+        `Bora ocupar esse tempo! 🎮 Você tem tarefas pendentes? Ou quer bater um papo comigo?`,
+        `${name ? name + ', que ' : 'Que '}tal transformar esse tédio em produtividade? 📚 Posso te ajudar a organizar algo!`
+      ];
+      
+      return boredResponses[Math.floor(Math.random() * boredResponses.length)];
+    }
+    
+    // AGRADECIMENTO - Detecta gênero por "obrigado/obrigada"
+    if (lowerInput.match(/^(obrigad[oa]|valeu|thanks|vlw|tmj)/i)) {
+      // Aprende gênero pelo agradecimento se ainda não sabe
+      if (!gender) {
+        if (lowerInput.includes('obrigado')) {
+          OracleMemory.setProfile('gender', 'male');
+        } else if (lowerInput.includes('obrigada')) {
+          OracleMemory.setProfile('gender', 'female');
+        }
+      }
+      
+      const responses = [
+        `Por nada, ${treatment}! Sempre que precisar! 😊`,
+        "Disponha! É pra isso que estou aqui! 💪",
+        "Imagina! Foi um prazer ajudar! ✨"
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+    
+    // MOTIVAÇÃO (pedido explícito)
+    if (lowerInput.match(/(preciso de |me dá |quero )(uma )?motiva/i) || lowerInput.match(/me (motiva|inspira|anima)/i)) {
+      const quote = ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)];
+      const encouragement = CHARISMATIC_RESPONSES.encouragement[
+        Math.floor(Math.random() * CHARISMATIC_RESPONSES.encouragement.length)
+      ];
+      const personalTouch = name ? `<br><br>${name}, você consegue! 💪` : '';
+      return `<em>"${quote}"</em><br><br>${encouragement}${personalTouch}`;
+    }
+    
+    // ELOGIO AO ORÁCULO
+    if (lowerInput.match(/(você é (legal|demais|incrível)|gosto de você|te amo)/i)) {
+      const personalResponse = name ? `Também gosto muito de você, ${name}!` : 'Também adoro conversar com você!';
+      return `Awwn, que fofo! 🥰 ${personalResponse} Vamos continuar evoluindo juntos!`;
+    }
+    
+    // ============ MODO CONVERSA / CONHECER USUÁRIO ============
+    
+    // Quando o usuário quer conversar
+    if (lowerInput.match(/(vamos|bora|quer)\s*(conversar|bater papo|papear|trocar ideia)/i) || 
+        lowerInput.match(/^(conversa comigo|fala comigo|me (faz|faça) companhia)/i)) {
+      return this.startConversationMode();
+    }
+    
+    // Respostas a perguntas do Oráculo (quando ele pergunta sobre o usuário)
+    const conversationResult = this.handleConversationResponses(lowerInput);
+    if (conversationResult) return conversationResult;
+    
+    return null;
+  },
+  
+  // Inicia modo de conversa para conhecer o usuário
+  startConversationMode() {
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    // Verifica o que já sabe sobre o usuário para fazer perguntas diferentes
+    const profile = OracleMemory.get().profile || {};
+    const unknownTopics = [];
+    
+    if (!profile.name) unknownTopics.push('name');
+    if (!profile.age) unknownTopics.push('age');
+    if (!profile.occupation) unknownTopics.push('occupation');
+    if (!profile.interests || profile.interests.length === 0) unknownTopics.push('interests');
+    if (!profile.goals) unknownTopics.push('goals');
+    if (!profile.favoriteColor) unknownTopics.push('favoriteColor');
+    if (!profile.favoriteFood) unknownTopics.push('favoriteFood');
+    if (!profile.city) unknownTopics.push('city');
+    
+    // Salva que está em modo conversa
+    OracleMemory.setProfile('conversationMode', true);
+    OracleMemory.setProfile('lastQuestion', unknownTopics[0] || 'general');
+    
+    const questions = {
+      name: `Bora lá! 😊 Pra começar, como posso te chamar?`,
+      age: `${name ? name + ', ' : ''}Quantos anos você tem? 🎂 Ou se preferir não dizer, tudo bem!`,
+      occupation: `E o que você faz da vida, ${treatment}? 💼 Trabalha, estuda...?`,
+      interests: `Me conta, ${treatment}, o que você curte fazer nas horas vagas? 🎮🎵📚`,
+      goals: `Quais são seus sonhos e objetivos? 🎯 Pode ser qualquer coisa!`,
+      favoriteColor: `Qual sua cor favorita? 🎨 Parece bobeira mas eu curto saber essas coisas!`,
+      favoriteFood: `E comida? Qual é a sua favorita? 🍕🍔🍜`,
+      city: `De onde você é, ${treatment}? 🏙️ Qual cidade?`,
+      general: `${name ? name + ', ' : ''}Adoro conversar! 💬 Me conta algo sobre você que eu ainda não sei!`
+    };
+    
+    const topic = unknownTopics[0] || 'general';
+    return questions[topic];
+  },
+  
+  // Processa respostas durante a conversa
+  handleConversationResponses(lowerInput) {
+    const profile = OracleMemory.get().profile || {};
+    const lastQuestion = profile.lastQuestion;
+    const name = profile.name;
+    const gender = profile.gender;
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    // Se não está em modo conversa, ignora
+    if (!profile.conversationMode) return null;
+    
+    let learned = null;
+    let nextQuestion = null;
+    
+    // Processa baseado na última pergunta
+    switch(lastQuestion) {
+      case 'name':
+        // Usuário está respondendo qual é o nome dele
+        if (lowerInput.length >= 2) {
+          // Limpa o input para extrair apenas o nome
+          let userName = lowerInput
+            .replace(/^(me chamo|meu nome [eé]|sou o|sou a|pode me chamar de|eu sou|sou)\s*/i, '')
+            .replace(/^(o|a)\s+/i, '')
+            .trim();
+          
+          // Pega só a primeira palavra (o nome)
+          userName = userName.split(/\s+/)[0];
+          
+          // Ignora palavras comuns que não são nomes
+          const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá', 'sim', 'não', 'nao', 'ok', 'tudo'];
+          if (userName.length >= 2 && !ignoreWords.includes(userName.toLowerCase())) {
+            userName = userName.charAt(0).toUpperCase() + userName.slice(1).toLowerCase();
+            OracleMemory.setProfile('name', userName);
+            
+            // Detecta gênero pelo nome
+            const detectedGender = OracleMemory.detectGenderByName(userName);
+            if (detectedGender) {
+              OracleMemory.setProfile('gender', detectedGender);
+            }
+            
+            learned = userName;
+            const genderGreeting = detectedGender === 'male' ? 'cara' : detectedGender === 'female' ? 'querida' : 'amigo';
+            nextQuestion = `Prazer, ${userName}! 😊 Que bom te conhecer, ${genderGreeting}! Quantos anos você tem? 🎂`;
+            OracleMemory.setProfile('lastQuestion', 'age');
+          }
+        }
+        break;
+        
+      case 'age':
+        const ageMatch = lowerInput.match(/(\d{1,2})\s*(anos)?/);
+        if (ageMatch) {
+          const age = parseInt(ageMatch[1]);
+          OracleMemory.setProfile('age', age);
+          learned = `${age} anos`;
+          
+          if (age < 18) {
+            nextQuestion = `${age} aninhos! 🌟 Jovem e cheio de energia! E o que você estuda?`;
+          } else if (age < 30) {
+            nextQuestion = `${age} anos! 💫 Fase boa da vida! O que você faz profissionalmente?`;
+          } else {
+            nextQuestion = `${age} anos de experiência! 🌟 O que você faz da vida?`;
+          }
+          OracleMemory.setProfile('lastQuestion', 'occupation');
+        } else if (lowerInput.match(/^(não|nao|n|prefiro não|não quero|pula|próxima)/i)) {
+          // Usuário não quer responder
+          nextQuestion = `Sem problemas! 😊 E o que você faz da vida? Trabalha, estuda...? 💼`;
+          OracleMemory.setProfile('lastQuestion', 'occupation');
+          learned = 'skip';
+        }
+        break;
+        
+      case 'occupation':
+        if (lowerInput.length > 2) {
+          // Extrai a ocupação
+          let occupation = lowerInput
+            .replace(/^(eu )?(sou|trabalho como|trabalho de|trabalho com|faço|estudo)/i, '')
+            .replace(/^(um|uma|a|o)\s+/i, '')
+            .trim();
+          
+          if (occupation.length > 2) {
+            occupation = occupation.charAt(0).toUpperCase() + occupation.slice(1);
+            OracleMemory.setProfile('occupation', occupation);
+            learned = occupation;
+            nextQuestion = `Que legal, ${occupation}! 💼 E o que você gosta de fazer pra se divertir?`;
+            OracleMemory.setProfile('lastQuestion', 'interests');
+          }
+        }
+        break;
+        
+      case 'interests':
+        if (lowerInput.length > 2) {
+          const interests = lowerInput
+            .replace(/^(eu )?(gosto de|curto|adoro|amo)/i, '')
+            .split(/,|e\s+/)
+            .map(i => i.trim())
+            .filter(i => i.length > 2);
+          
+          if (interests.length > 0) {
+            const currentInterests = profile.interests || [];
+            const newInterests = [...new Set([...currentInterests, ...interests])];
+            OracleMemory.setProfile('interests', newInterests);
+            learned = interests.join(', ');
+            const currentName = OracleMemory.getProfile('name');
+            nextQuestion = `${interests.join(', ')}? Show demais! 🎉 ${currentName ? currentName + ', qual ' : 'Qual '}é o seu maior sonho ou objetivo?`;
+            OracleMemory.setProfile('lastQuestion', 'goals');
+          }
+        }
+        break;
+        
+      case 'goals':
+        if (lowerInput.length > 3) {
+          const goal = lowerInput
+            .replace(/^(meu (sonho|objetivo) [ée]|quero|eu quero|pretendo|planejo)/i, '')
+            .trim();
+          
+          if (goal.length > 3) {
+            const currentName = OracleMemory.getProfile('name');
+            OracleMemory.setProfile('goals', goal);
+            OracleMemory.learn(`Meu objetivo é ${goal}`);
+            learned = goal;
+            nextQuestion = `Que objetivo incrível! 🎯 ${currentName ? 'Torço por você, ' + currentName : 'Torço por você'}! Qual sua cor favorita?`;
+            OracleMemory.setProfile('lastQuestion', 'favoriteColor');
+          }
+        }
+        break;
+        
+      case 'favoriteColor':
+        const colors = lowerInput.match(/(azul|vermelho|vermelha|verde|amarelo|amarela|roxo|roxa|rosa|laranja|preto|preta|branco|branca|cinza|marrom|dourado|dourada|prata|violeta|lilás|turquesa|bege|coral|salmão|magenta|ciano)/i);
+        if (colors) {
+          const color = colors[1];
+          OracleMemory.setProfile('favoriteColor', color);
+          learned = color;
+          nextQuestion = `${color.charAt(0).toUpperCase() + color.slice(1)}! 🎨 Boa escolha! E qual sua comida favorita?`;
+          OracleMemory.setProfile('lastQuestion', 'favoriteFood');
+        } else if (lowerInput.length > 2) {
+          // Aceita qualquer cor que o usuário digitar
+          const color = lowerInput.trim();
+          OracleMemory.setProfile('favoriteColor', color);
+          learned = color;
+          nextQuestion = `${color.charAt(0).toUpperCase() + color.slice(1)}! 🎨 Legal! E qual sua comida favorita?`;
+          OracleMemory.setProfile('lastQuestion', 'favoriteFood');
+        }
+        break;
+        
+      case 'favoriteFood':
+        if (lowerInput.length > 2) {
+          const food = lowerInput
+            .replace(/^(é|minha (comida )?favorita [ée]|eu (gosto|amo|adoro))/i, '')
+            .replace(/^(de\s+)?/i, '')
+            .trim();
+          
+          if (food.length > 2) {
+            OracleMemory.setProfile('favoriteFood', food);
+            learned = food;
+            nextQuestion = `${food.charAt(0).toUpperCase() + food.slice(1)}! 🍽️ Delícia! De onde você é? Qual cidade?`;
+            OracleMemory.setProfile('lastQuestion', 'city');
+          }
+        }
+        break;
+        
+      case 'city':
+        if (lowerInput.length > 2) {
+          const city = lowerInput
+            .replace(/^(eu )?(sou de|moro em|vim de|nasci em)/i, '')
+            .replace(/^(a|o|na|no|em)\s+/i, '')
+            .trim();
+          
+          if (city.length > 2) {
+            const cityFormatted = city.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            OracleMemory.setProfile('city', cityFormatted);
+            learned = cityFormatted;
+            
+            // Fim da conversa estruturada
+            OracleMemory.setProfile('conversationMode', false);
+            OracleMemory.setProfile('lastQuestion', null);
+            
+            const currentName = OracleMemory.getProfile('name');
+            const currentGender = OracleMemory.getProfile('gender');
+            const finalTreatment = currentGender === 'male' ? 'cara' : currentGender === 'female' ? 'querida' : (currentName || 'amigo');
+            
+            return `${cityFormatted}! 🏙️ Legal demais!<br><br>` +
+                   `<strong>✨ Agora te conheço melhor, ${finalTreatment}!</strong> Foi muito bom esse papo! ` +
+                   `Quando quiser conversar mais, é só me chamar! 😊<br><br>` +
+                   `💡 Dica: Diz "você me conhece?" pra ver tudo que sei sobre você!`;
+          }
+        }
+        break;
+    }
+    
+    // Se aprendeu algo, retorna a próxima pergunta
+    if (learned && learned !== 'skip' && nextQuestion) {
+      return `Anotado! 📝 ${nextQuestion}`;
+    }
+    
+    // Se pulou (skip), apenas retorna a próxima pergunta
+    if (learned === 'skip' && nextQuestion) {
+      return nextQuestion;
+    }
+    
+    // Se está em modo conversa mas não entendeu a resposta
+    if (profile.conversationMode && lastQuestion) {
+      // Tenta entender respostas genéricas de pular
+      if (lowerInput.match(/^(não sei|não quero|pula|próxima|next|prefiro não|n|nao|não)/i)) {
+        const nextTopics = ['name', 'age', 'occupation', 'interests', 'goals', 'favoriteColor', 'favoriteFood', 'city'];
+        const currentIndex = nextTopics.indexOf(lastQuestion);
+        const nextTopic = nextTopics[currentIndex + 1];
+        
+        if (nextTopic) {
+          OracleMemory.setProfile('lastQuestion', nextTopic);
+          return this.getNextConversationQuestion(nextTopic);
+        } else {
+          OracleMemory.setProfile('conversationMode', false);
+          OracleMemory.setProfile('lastQuestion', null);
+          return `Tudo bem! 😊 Quando quiser conversar mais, é só me chamar!`;
+        }
+      }
+      
+      // Se não entendeu a resposta, tenta ajudar
+      const helpMessages = {
+        'name': 'Qual é o seu nome? Pode me falar só o primeiro nome! 😊',
+        'age': 'Quantos anos você tem? Só o número tá bom! 🎂',
+        'occupation': 'O que você faz? Trabalha, estuda? 💼',
+        'interests': 'O que você curte fazer nas horas vagas? 🎮',
+        'goals': 'Qual é o seu sonho ou objetivo? 🎯',
+        'favoriteColor': 'Qual sua cor favorita? 🎨',
+        'favoriteFood': 'Qual sua comida favorita? 🍕',
+        'city': 'De onde você é? Qual cidade? 🏙️'
+      };
+      
+      // Se digitou algo muito curto ou não reconhecido, repete a pergunta de forma mais clara
+      if (lowerInput.length < 2 || !learned) {
+        return helpMessages[lastQuestion] || 'Não entendi... pode repetir? 🤔';
+      }
+    }
+    
+    return null;
+  },
+  
+  getNextConversationQuestion(topic) {
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    const questions = {
+      name: `Tudo bem! 😊 Como posso te chamar?`,
+      age: `Sem problemas! 😊 ${name ? name + ', quantos ' : 'Quantos '}anos você tem?`,
+      occupation: `Tudo bem! E o que você faz, ${treatment}? Trabalha, estuda...? 💼`,
+      interests: `Ok! O que você curte fazer nas horas vagas? 🎮`,
+      goals: `Entendi! Quais são seus sonhos e objetivos? 🎯`,
+      favoriteColor: `Tranquilo! Qual sua cor favorita? 🎨`,
+      favoriteFood: `De boa! E comida, qual é a favorita? 🍕`,
+      city: `Show! De onde você é? Qual cidade? 🏙️`
+    };
+    
+    return questions[topic] || `Me conta mais sobre você, ${treatment}! 😊`;
+  },
+  
+  getHelpMessage() {
+    const name = OracleMemory.getProfile('name');
+    const greeting = name ? `${name}, aqui está` : 'Aqui está';
+    
+    return `<strong>🤖 ${greeting} o que posso fazer:</strong><br><br>
+      <strong>� Conversa:</strong><br>
+      • "estou feliz/triste/cansado" - Compartilhe seus sentimentos<br>
+      • "bora conversar" - Vamos nos conhecer melhor!<br>
+      • Me conta sobre você naturalmente 😊<br><br>
+      <strong>📊 Consultas:</strong><br>
+      • "meu status" - Ver XP e nível<br>
+      • "minhas finanças" - Ver saldo<br>
+      • "minhas tarefas" - Ver pendências<br>
+      • "minha poupança" - Ver economias<br>
+      • "você me conhece?" - Ver meu perfil<br><br>
+      <strong>💰 Finanças:</strong><br>
+      • "gastei 50 no almoço" - Registrar despesa<br>
+      • "recebi 1000" - Registrar entrada<br>
+      • "guardar 200" - Poupança<br>
+      • "minha meta é 5000" - Meta de economia<br><br>
+      <strong>📝 Tarefas & Trabalho:</strong><br>
+      • "criar tarefa estudar" - Nova tarefa<br>
+      • "completar estudar" - Finalizar tarefa<br>
+      • "bora trabalhar" / "terminei" - Timer<br><br>
+      <em>Pode desabafar, perguntar, ou só bater papo! 😊</em>`;
+  },
+
+  getSmartDefault(input) {
+    const name = OracleMemory.getProfile('name');
+    const treatment = name || 'amigo';
+    
+    // Tenta encontrar algo relacionado na memória
+    const memories = OracleMemory.remember(input);
+    if (memories.length > 0) {
+      return `Lembro que você me disse: "<em>${memories[0].text}</em>". Isso ajuda, ${treatment}? 🤔`;
+    }
+    
+    return CHARISMATIC_RESPONSES.notUnderstood[
+      Math.floor(Math.random() * CHARISMATIC_RESPONSES.notUnderstood.length)
+    ] + `<br><br>Dica: Diz <strong>"ajuda"</strong> pra ver o que sei fazer! 💡`;
+  },
+  
+  getSuccessMessage() {
+    return CHARISMATIC_RESPONSES.success[
+      Math.floor(Math.random() * CHARISMATIC_RESPONSES.success.length)
+    ];
+  },
+  
+  // Ações reais
+  createTask(text) {
+    if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
+    
+    if (!gameState.dailyTasks) gameState.dailyTasks = [];
+    
+    gameState.dailyTasks.push({
+      id: Date.now(),
+      text: text,
+      completed: false,
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    if (typeof renderDailyTasks === 'function') renderDailyTasks();
+    
+    return this.getSuccessMessage() + `<br><br>📝 Tarefa criada: <strong>${text}</strong><br><br>Quando terminar, diz: <strong>completar ${text}</strong>`;
+  },
+  
+  completeTask(taskName) {
+    if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
+    
+    const task = gameState.dailyTasks.find(t => 
+      !t.completed && t.text.toLowerCase().includes(taskName.toLowerCase())
+    );
+    
+    if (task) {
+      task.completed = true;
+      task.completedAt = new Date().toISOString();
+      
+      // Dar XP
+      gameState.xp = (gameState.xp || 0) + 10;
+      if (gameState.xp >= 100) {
+        gameState.level = (gameState.level || 1) + 1;
+        gameState.xp -= 100;
+      }
+      
+      saveGame();
+      if (typeof renderDailyTasks === 'function') renderDailyTasks();
+      if (typeof updateUI === 'function') updateUI();
+      
+      return this.getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+10 XP 🎉`;
+    }
+    
+    return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
+  },
+  
+  addExpense(value, desc) {
+    if (!gameState) return "Erro ao registrar. Tente pela interface.";
+    
+    if (!gameState.finances) gameState.finances = [];
+    
+    // Detecta categoria automaticamente pela descrição
+    const category = this.detectCategory(desc);
+    
+    gameState.finances.push({
+      id: Date.now(),
+      desc: desc,
+      value: value,
+      type: 'expense',
+      category: category,
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    const name = OracleMemory.getProfile('name');
+    const gender = OracleMemory.getProfile('gender');
+    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+    
+    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
+  },
+  
+  addExpenseWithCategory(value, desc, category) {
+    if (!gameState) return "Erro ao registrar. Tente pela interface.";
+    
+    if (!gameState.finances) gameState.finances = [];
+    
+    gameState.finances.push({
+      id: Date.now(),
+      desc: desc,
+      value: value,
+      type: 'expense',
+      category: category.charAt(0).toUpperCase() + category.slice(1),
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
+  },
+  
+  // RENOMEAR GASTO
+  renameExpense(oldName, newName) {
+    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+    
+    const expenses = gameState.finances.filter(t => t.type === 'expense');
+    
+    // Busca por nome parcial (case insensitive)
+    const found = expenses.filter(e => 
+      e.desc.toLowerCase().includes(oldName.toLowerCase())
+    );
+    
+    if (found.length === 0) {
+      return `❌ Não encontrei nenhum gasto com o nome "<strong>${oldName}</strong>".<br><br>` +
+             `💡 Dica: Diga "<strong>ver meus gastos</strong>" para listar todos os seus gastos.`;
+    }
+    
+    if (found.length === 1) {
+      // Apenas um gasto encontrado - renomeia direto
+      const expense = found[0];
+      const oldDesc = expense.desc;
+      expense.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      
+      // Recalcula categoria se necessário
+      expense.category = this.detectCategory(expense.desc);
+      
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      
+      return `✅ Gasto renomeado com sucesso!<br><br>` +
+             `📝 De: <strong>${oldDesc}</strong><br>` +
+             `📝 Para: <strong>${expense.desc}</strong><br>` +
+             `<small>Categoria: ${expense.category}</small>`;
+    }
+    
+    // Múltiplos gastos encontrados - mostra opções
+    this.pendingAction = { type: 'rename_expense_select', newName: newName, matches: found };
+    
+    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${oldName}</strong>".<br>Qual você quer renomear?<br><br>`;
+    
+    const actions = found.slice(0, 5).map((e, i) => ({
+      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+      action: () => {
+        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+        e.category = this.detectCategory(e.desc);
+        saveGame();
+        if (typeof renderFinances === 'function') renderFinances();
+        this.pendingAction = null;
+        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado com sucesso!`);
+      }
+    }));
+    
+    return { message: response, actions: actions };
+  },
+  
+  // LISTAR GASTOS
+  listExpenses() {
+    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+    
+    const expenses = gameState.finances
+      .filter(t => t.type === 'expense')
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10); // Últimos 10
+    
+    if (expenses.length === 0) {
+      return "📊 Você ainda não registrou nenhum gasto.<br><br>💡 Dica: Diga \"<strong>gastei 50 no almoço</strong>\" para registrar.";
+    }
+    
+    let response = `📊 <strong>Seus últimos gastos:</strong><br><br>`;
+    
+    expenses.forEach((e, i) => {
+      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+    });
+    
+    response += `<br>💡 Para renomear: "<strong>renomear gasto X para Y</strong>"<br>`;
+    response += `💡 Para deletar: "<strong>deletar gasto X</strong>"`;
+    
+    return response;
+  },
+  
+  // DELETAR GASTO
+  deleteExpense(name) {
+    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+    
+    const expenses = gameState.finances.filter(t => t.type === 'expense');
+    
+    // Busca por nome parcial
+    const found = expenses.filter(e => 
+      e.desc.toLowerCase().includes(name.toLowerCase())
+    );
+    
+    if (found.length === 0) {
+      return `❌ Não encontrei nenhum gasto com o nome "<strong>${name}</strong>".`;
+    }
+    
+    if (found.length === 1) {
+      const expense = found[0];
+      
+      // Pede confirmação
+      this.pendingAction = { type: 'confirm_delete_expense', expense: expense };
+      
+      return {
+        message: `⚠️ Tem certeza que quer deletar o gasto "<strong>${expense.desc}</strong>" de R$ ${expense.value.toFixed(2)}?`,
+        actions: [
+          { 
+            text: '✅ Sim, deletar', 
+            action: () => {
+              gameState.finances = gameState.finances.filter(f => f.id !== expense.id);
+              saveGame();
+              if (typeof renderFinances === 'function') renderFinances();
+              this.pendingAction = null;
+              this.addBotMessage(`🗑️ Gasto "<strong>${expense.desc}</strong>" deletado!`);
+            }
+          },
+          { 
+            text: '❌ Não, cancelar', 
+            action: () => {
+              this.pendingAction = null;
+              this.addBotMessage('Ok, cancelado! 👍');
+            }
+          }
+        ]
+      };
+    }
+    
+    // Múltiplos encontrados
+    this.pendingAction = { type: 'delete_expense_select', matches: found };
+    
+    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${name}</strong>".<br>Qual você quer deletar?<br><br>`;
+    
+    const actions = found.slice(0, 5).map(e => ({
+      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+      action: () => {
+        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+        saveGame();
+        if (typeof renderFinances === 'function') renderFinances();
+        this.pendingAction = null;
+        this.addBotMessage(`🗑️ Gasto "<strong>${e.desc}</strong>" deletado!`);
+      }
+    }));
+    
+    return { message: response, actions: actions };
+  },
+  
+  // Detecta categoria automaticamente
+  detectCategory(desc) {
+    const lower = desc.toLowerCase();
+    
+    const categories = {
+      'Alimentação': ['almoço', 'jantar', 'café', 'lanche', 'comida', 'restaurante', 'pizza', 'hamburguer', 'sushi', 'mercado', 'supermercado', 'feira', 'padaria', 'açougue', 'ifood', 'rappi', 'delivery'],
+      'Transporte': ['uber', '99', 'taxi', 'gasolina', 'combustível', 'estacionamento', 'pedágio', 'ônibus', 'metrô', 'passagem', 'carro', 'moto', 'bicicleta'],
+      'Lazer': ['cinema', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'parque', 'viagem', 'passeio', 'diversão'],
+      'Saúde': ['farmácia', 'remédio', 'médico', 'consulta', 'exame', 'hospital', 'dentista', 'academia', 'suplemento', 'vitamina'],
+      'Educação': ['curso', 'livro', 'escola', 'faculdade', 'mensalidade', 'material', 'apostila', 'aula'],
+      'Moradia': ['aluguel', 'condomínio', 'luz', 'água', 'gás', 'internet', 'telefone', 'celular', 'conta'],
+      'Compras': ['roupa', 'sapato', 'tênis', 'shopping', 'loja', 'presente', 'eletrônico', 'celular']
+    };
+    
+    for (const [cat, keywords] of Object.entries(categories)) {
+      if (keywords.some(kw => lower.includes(kw))) {
+        return cat;
+      }
+    }
+    
+    return 'Outros';
+  },
+  
+  addIncome(value, desc) {
+    if (!gameState) return "Erro ao registrar. Tente pela interface.";
+    
+    if (!gameState.finances) gameState.finances = [];
+    
+    gameState.finances.push({
+      id: Date.now(),
+      desc: desc,
+      value: value,
+      type: 'income',
+      category: 'Extra',
+      date: new Date().toISOString()
+    });
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return this.getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}`;
+  },
+  
+  // RENOMEAR RECEITA/ENTRADA
+  renameIncome(oldName, newName) {
+    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+    
+    const incomes = gameState.finances.filter(t => t.type === 'income');
+    
+    const found = incomes.filter(e => 
+      e.desc.toLowerCase().includes(oldName.toLowerCase())
+    );
+    
+    if (found.length === 0) {
+      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${oldName}</strong>".<br><br>` +
+             `💡 Dica: Diga "<strong>ver minhas entradas</strong>" para listar.`;
+    }
+    
+    if (found.length === 1) {
+      const income = found[0];
+      const oldDesc = income.desc;
+      income.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      
+      return `✅ Entrada renomeada!<br><br>` +
+             `📝 De: <strong>${oldDesc}</strong><br>` +
+             `📝 Para: <strong>${income.desc}</strong>`;
+    }
+    
+    // Múltiplos encontrados
+    this.pendingAction = { type: 'rename_income_select', newName: newName, matches: found };
+    
+    const actions = found.slice(0, 5).map(e => ({
+      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+      action: () => {
+        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+        saveGame();
+        if (typeof renderFinances === 'function') renderFinances();
+        this.pendingAction = null;
+        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado!`);
+      }
+    }));
+    
+    return { message: `🔍 Encontrei ${found.length} entradas. Qual renomear?`, actions: actions };
+  },
+  
+  // LISTAR RECEITAS/ENTRADAS
+  listIncomes() {
+    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+    
+    const incomes = gameState.finances
+      .filter(t => t.type === 'income')
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 10);
+    
+    if (incomes.length === 0) {
+      return "📊 Você ainda não registrou nenhuma entrada.<br><br>💡 Dica: Diga \"<strong>recebi 1000 de salário</strong>\" para registrar.";
+    }
+    
+    let response = `📊 <strong>Suas últimas entradas:</strong><br><br>`;
+    
+    incomes.forEach((e, i) => {
+      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+    });
+    
+    response += `<br>💡 Para renomear: "<strong>renomear entrada X para Y</strong>"`;
+    
+    return response;
+  },
+  
+  // DELETAR RECEITA/ENTRADA
+  deleteIncome(name) {
+    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+    
+    const incomes = gameState.finances.filter(t => t.type === 'income');
+    
+    const found = incomes.filter(e => 
+      e.desc.toLowerCase().includes(name.toLowerCase())
+    );
+    
+    if (found.length === 0) {
+      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${name}</strong>".`;
+    }
+    
+    if (found.length === 1) {
+      const income = found[0];
+      
+      this.pendingAction = { type: 'confirm_delete_income', income: income };
+      
+      return {
+        message: `⚠️ Deletar entrada "<strong>${income.desc}</strong>" de R$ ${income.value.toFixed(2)}?`,
+        actions: [
+          { 
+            text: '✅ Sim, deletar', 
+            action: () => {
+              gameState.finances = gameState.finances.filter(f => f.id !== income.id);
+              saveGame();
+              if (typeof renderFinances === 'function') renderFinances();
+              this.pendingAction = null;
+              this.addBotMessage(`🗑️ Entrada "<strong>${income.desc}</strong>" deletada!`);
+            }
+          },
+          { 
+            text: '❌ Cancelar', 
+            action: () => {
+              this.pendingAction = null;
+              this.addBotMessage('Ok, cancelado! 👍');
+            }
+          }
+        ]
+      };
+    }
+    
+    // Múltiplos encontrados
+    const actions = found.slice(0, 5).map(e => ({
+      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+      action: () => {
+        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+        saveGame();
+        if (typeof renderFinances === 'function') renderFinances();
+        this.pendingAction = null;
+        this.addBotMessage(`🗑️ Entrada "<strong>${e.desc}</strong>" deletada!`);
+      }
+    }));
+    
+    return { message: `🔍 Encontrei ${found.length} entradas. Qual deletar?`, actions: actions };
+  },
+
+  // UI Methods
+  addUserMessage(text) {
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    
+    const div = document.createElement('div');
+    div.className = 'chat-message user';
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  },
+  
+  addBotMessage(text, actions = null) {
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    
+    const div = document.createElement('div');
+    div.className = 'chat-message bot';
+    div.innerHTML = text;
+    
+    if (actions && actions.length > 0) {
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'oracle-action-btns';
+      
+      actions.forEach(action => {
+        const btn = document.createElement('button');
+        btn.className = 'oracle-action-btn';
+        btn.textContent = action.text;
+        btn.addEventListener('click', () => {
+          action.action();
+          actionsDiv.remove();
+        });
+        actionsDiv.appendChild(btn);
+      });
+      
+      div.appendChild(actionsDiv);
+    }
+    
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    playSound('click');
+    
+    // Se estiver em modo conversa, fala a resposta
+    if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
+      // Remove emojis e tags HTML para falar
+      const cleanText = text.replace(/<[^>]*>/g, '').replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F300}-\u{1F5FF}]/gu, '').trim();
+      if (cleanText) {
+        OracleSpeech.speak(cleanText);
+      }
+    }
+  },
+  
+  addSystemMessage(text) {
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    
+    const div = document.createElement('div');
+    div.className = 'chat-message system';
+    div.innerHTML = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  },
+  
+  showThinking() {
+    const messages = document.getElementById('chatMessages');
+    if (!messages) return;
+    
+    const div = document.createElement('div');
+    div.className = 'chat-message thinking';
+    div.id = 'oracleThinking';
+    div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  },
+  
+  removeThinking() {
+    const thinking = document.getElementById('oracleThinking');
+    if (thinking) thinking.remove();
   }
+};
 
-  // 4. Motivação / Triste
-  if (input.includes('triste') || input.includes('desanimado') || input.includes('motiva') || input.includes('frase')) {
-    const quote = ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)];
-    return p.motivation(quote);
-  }
-
-  // 5. Trabalho
-  if (input.includes('trabalho') || input.includes('produção') || input.includes('massa')) {
-    const today = new Date().toISOString().split('T')[0];
-    const todayLogs = (gameState.workLog || []).filter(l => l.date === today && l.type !== 'time_tracking');
-    let total = 0;
-    todayLogs.forEach(l => total += l.inputVal);
-    return p.work(total);
-  }
-
-  // 6. Ajuda / Oi
-  if (input.includes('oi') || input.includes('olá') || input.includes('ajuda')) {
-    return p.help();
-  }
-
-  // 7. Sugestão / Dica
-  if (input.includes('sugestão') || input.includes('dica') || input.includes('recomend')) {
-    return p.suggestion(getTimeBasedSuggestion());
-  }
-
-  // Padrão
-  return p.default();
-}
-
-if (elements.chatBtn) elements.chatBtn.addEventListener('click', toggleChat);
-if (elements.closeChatBtn) elements.closeChatBtn.addEventListener('click', toggleChat);
-if (elements.sendMessageBtn) elements.sendMessageBtn.addEventListener('click', processUserMessage);
-if (elements.chatInput) elements.chatInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') processUserMessage();
+// Inicializa o Oráculo quando o DOM estiver pronto
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => OracleChat.init(), 500);
 });
-if (elements.oraclePersonalitySelect) {
-  elements.oraclePersonalitySelect.addEventListener('change', (e) => {
-    if (gameState) {
-      gameState.oraclePersonality = e.target.value;
-      saveGame(true);
-      addBotMessage(`<em>[Personalidade alterada para: ${e.target.options[e.target.selectedIndex].text}]</em>`);
-    }
-  });
-}
+
+// Expõe globalmente para compatibilidade
+window.toggleChat = () => OracleChat.toggle();
 
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {

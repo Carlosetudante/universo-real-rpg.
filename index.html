@@ -618,24 +618,71 @@
     <button class="fab-main" id="fabMainBtn">➕</button>
   </div>
 
-  <!-- Modal do Chat (Oráculo) -->
+  <!-- Modal do Chat (Oráculo) - Sistema Inteligente -->
   <div id="chatModal" class="modal">
-    <div class="modal-content" style="height: 80vh; display: flex; flex-direction: column; padding: 0;">
-      <div style="padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2);">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <h2 style="margin: 0; font-size: 1.2rem;">🤖 Oráculo</h2>
-          <select id="oraclePersonalitySelect" class="ghost" style="padding: 2px 8px; font-size: 11px; height: auto; border-radius: 6px;">
-            <option value="robot">🤖 Robô</option>
-            <option value="wise">🧙‍♂️ Sábio</option>
-            <option value="coach">🏋️ Treinador</option>
-          </select>
+    <div class="oracle-container">
+      <!-- Header do Oráculo -->
+      <div class="oracle-header">
+        <div class="oracle-header-left">
+          <div class="oracle-avatar">
+            <div class="oracle-avatar-ring"></div>
+            <span id="oracleAvatarEmoji">🤖</span>
+          </div>
+          <div class="oracle-info">
+            <h2 id="oracleTitle">Oráculo</h2>
+            <div class="oracle-status">
+              <span class="oracle-status-dot"></span>
+              <span id="oracleStatusText">Online • Pronto para ajudar</span>
+            </div>
+          </div>
         </div>
-        <button class="ghost" id="closeChatBtn" style="padding: 4px 10px;">✕</button>
+        <div class="oracle-header-right">
+          <select id="oraclePersonalitySelect" class="oracle-personality-select">
+            <option value="assistant">🧠 Assistente</option>
+            <option value="wise">🧙‍♂️ Sábio</option>
+            <option value="coach">🏋️ Coach</option>
+            <option value="friend">😊 Amigo</option>
+          </select>
+          <button class="oracle-close-btn" id="closeChatBtn" title="Fechar">✕</button>
+        </div>
       </div>
-      <div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px;"></div>
-      <div style="padding: 15px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-        <input type="text" id="chatInput" placeholder="Pergunte algo (ex: saldo, xp, tarefas)..." style="margin: 0;">
-        <button class="btn" id="sendMessageBtn" style="width: auto;">Enviar</button>
+
+      <!-- Sugestões Rápidas -->
+      <div class="oracle-quick-actions" id="oracleQuickActions">
+        <button class="oracle-quick-btn" data-action="status">📊 Meu Status</button>
+        <button class="oracle-quick-btn" data-action="tasks">📝 Tarefas</button>
+        <button class="oracle-quick-btn" data-action="finance">💰 Finanças</button>
+        <button class="oracle-quick-btn" data-action="work">💼 Trabalho</button>
+        <button class="oracle-quick-btn" data-action="help">❓ Ajuda</button>
+      </div>
+
+      <!-- Área de Mensagens -->
+      <div id="chatMessages" class="oracle-messages"></div>
+
+      <!-- Área de Digitação -->
+      <div class="oracle-input-area">
+        <div class="oracle-input-wrapper">
+          <button class="oracle-voice-btn" id="oracleVoiceBtn" title="Falar com o Oráculo">
+            <span class="voice-icon">🎤</span>
+            <span class="voice-listening hidden">🔴</span>
+          </button>
+          <input type="text" id="chatInput" class="oracle-input" placeholder="Digite sua mensagem ou use comandos como 'criar tarefa...'">
+          <button class="oracle-send-btn" id="sendMessageBtn" title="Enviar">
+            <span>➤</span>
+          </button>
+        </div>
+        <div class="oracle-input-hints">
+          <span>💡 <strong>Clique duplo</strong> no 🎤 para <strong>modo conversa por voz</strong> • Exemplo: "gastei 50 no almoço"</span>
+        </div>
+      </div>
+
+      <!-- Footer com info de memória -->
+      <div class="oracle-footer">
+        <div class="oracle-memory-indicator" id="oracleMemoryIndicator">
+          <span class="memory-icon">🧠</span>
+          <span class="memory-text">Memória: <span id="oracleMemoryCount">0</span> aprendizados</span>
+        </div>
+        <button class="oracle-settings-btn" id="oracleSettingsBtn" title="Configurações">⚙️</button>
       </div>
     </div>
   </div>
@@ -665,66 +712,5 @@
   </div>
 
   <script src="app.js"></script>
-  <script>
-    // Lógica do Cronômetro de Trabalho
-    (function() {
-      const startBtn = document.getElementById('startWorkBtn');
-      const stopBtn = document.getElementById('stopWorkBtn');
-      const display = document.getElementById('workTimerDisplay');
-      let intervalId = null;
-
-      function updateDisplay() {
-        const startTime = localStorage.getItem('work_start_time');
-        if (startTime) {
-          let diff = Date.now() - parseInt(startTime);
-          
-          // Limite visual de 48 horas (172800000 ms)
-          const maxDuration = 48 * 60 * 60 * 1000;
-          if (diff >= maxDuration) {
-            diff = maxDuration;
-            display.style.color = '#f87171'; // Vermelho para indicar limite
-          } else {
-            display.style.color = '';
-          }
-
-          const hrs = Math.floor(diff / 3600000);
-          const mins = Math.floor((diff % 3600000) / 60000);
-          const secs = Math.floor((diff % 60000) / 1000);
-          display.textContent = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-          
-          startBtn.disabled = true;
-          startBtn.style.opacity = '0.5';
-          stopBtn.disabled = false;
-          stopBtn.style.opacity = '1';
-        } else {
-          display.textContent = '00:00:00';
-          display.style.color = '';
-          startBtn.disabled = false;
-          startBtn.style.opacity = '1';
-          stopBtn.disabled = true;
-          stopBtn.style.opacity = '0.5';
-        }
-      }
-
-      startBtn.addEventListener('click', () => {
-        localStorage.setItem('work_start_time', Date.now());
-        intervalId = setInterval(updateDisplay, 1000);
-        updateDisplay();
-      });
-
-      stopBtn.addEventListener('click', () => {
-        const startTime = parseInt(localStorage.getItem('work_start_time'));
-        if (startTime) {
-          // Salva a sessão antes de limpar o timer
-          if (typeof window.finishWorkSession === 'function') {
-            window.finishWorkSession(startTime);
-          }
-          localStorage.removeItem('work_start_time');
-          clearInterval(intervalId);
-          updateDisplay();
-        }
-      });
-
-      updateDisplay();
-    })();
-  </script>
+  <!-- Sistema de Timer de Trabalho em Segundo Plano -->
+  <script src="workTimer.js"></script>
