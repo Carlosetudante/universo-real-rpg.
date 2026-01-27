@@ -3,7 +3,7 @@
 // ===========================================
 // 
 // COMO CONFIGURAR:
-// 1. Crie uma conta em https://supabase.com
+// 1. Crie uma conta em https://supabaseClient.com
 // 2. Crie um novo projeto
 // 3. Vá em Project Settings > API
 // 4. Copie a "Project URL" e a "anon public" key
@@ -12,22 +12,22 @@
 // ===========================================
 
 // ⚠️ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE ⚠️
-const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
+const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabaseClient.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
 
 // Importação do Supabase Client (via CDN)
 // Adicionado no index.html: <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-let supabase = null;
+let supabaseClient = null;
 let currentUser = null;
 
 // Inicializa o cliente Supabase
 function initSupabase() {
-  console.log('🔄 Tentando inicializar Supabase...');
+  console.log('🔄 Tentando inicializar supabaseClient...');
   
   // Verifica se o objeto supabase está disponível globalmente
   if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log('✅ Supabase inicializado com sucesso!');
     console.log('📡 URL:', SUPABASE_URL);
     
@@ -47,10 +47,10 @@ function initSupabase() {
 // Testa a conexão com o Supabase
 async function testConnection() {
   try {
-    const { data, error } = await supabase.from('profiles').select('count').limit(1);
+    const { data, error } = await supabaseClient.from('profiles').select('count').limit(1);
     if (error) {
       if (error.message.includes('relation') && error.message.includes('does not exist')) {
-        console.error('❌ TABELAS NÃO CRIADAS! Execute o database-schema.sql no Supabase.');
+        console.error('❌ TABELAS NÃO CRIADAS! Execute o database-schema.sql no supabaseClient.');
         console.error('📋 Vá em: Supabase Dashboard > SQL Editor > New Query > Cole o conteúdo de database-schema.sql');
       } else {
         console.warn('⚠️ Erro ao testar conexão:', error.message);
@@ -67,7 +67,7 @@ async function testConnection() {
 function isSupabaseConfigured() {
   return SUPABASE_URL !== 'https://SEU-PROJETO.supabase.co' && 
          SUPABASE_ANON_KEY !== 'SUA-ANON-KEY-AQUI' &&
-         supabase !== null;
+         supabaseClient !== null;
 }
 
 // ===========================================
@@ -77,10 +77,10 @@ function isSupabaseConfigured() {
 // Registrar novo usuário
 async function supabaseSignUp(email, password, characterData) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase não configurado. Configure as credenciais em supabase.js');
+    throw new Error('Supabase não configurado. Configure as credenciais em supabaseClient.js');
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email,
     password,
     options: {
@@ -104,10 +104,10 @@ async function supabaseSignUp(email, password, characterData) {
 // Login
 async function supabaseSignIn(email, password) {
   if (!isSupabaseConfigured()) {
-    throw new Error('Supabase não configurado. Configure as credenciais em supabase.js');
+    throw new Error('Supabase não configurado. Configure as credenciais em supabaseClient.js');
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
     email,
     password
   });
@@ -122,7 +122,7 @@ async function supabaseSignIn(email, password) {
 async function supabaseSignOut() {
   if (!isSupabaseConfigured()) return;
 
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabaseClient.auth.signOut();
   if (error) throw error;
 
   currentUser = null;
@@ -132,7 +132,7 @@ async function supabaseSignOut() {
 async function supabaseGetSession() {
   if (!isSupabaseConfigured()) return null;
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await supabaseClient.auth.getSession();
   if (session) {
     currentUser = session.user;
   }
@@ -143,7 +143,7 @@ async function supabaseGetSession() {
 function onAuthStateChange(callback) {
   if (!isSupabaseConfigured()) return;
 
-  supabase.auth.onAuthStateChange((event, session) => {
+  supabaseClient.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
     callback(event, session);
   });
@@ -154,7 +154,7 @@ function onAuthStateChange(callback) {
 // ===========================================
 
 async function createProfile(userId, characterData) {
-  const { error } = await supabase.from('profiles').insert({
+  const { error } = await supabaseClient.from('profiles').insert({
     id: userId,
     character_name: characterData.name,
     character_class: characterData.race,
