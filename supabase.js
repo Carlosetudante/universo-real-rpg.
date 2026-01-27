@@ -177,7 +177,7 @@ async function createProfile(userId, characterData) {
 async function getProfile() {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('profiles')
     .select('*')
     .eq('id', currentUser.id)
@@ -190,7 +190,7 @@ async function getProfile() {
 async function updateProfile(updates) {
   if (!currentUser) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('profiles')
     .update(updates)
     .eq('id', currentUser.id);
@@ -205,7 +205,7 @@ async function updateProfile(updates) {
 async function getTasks() {
   if (!currentUser) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tasks')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -218,7 +218,7 @@ async function getTasks() {
 async function addTask(task) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tasks')
     .insert({
       user_id: currentUser.id,
@@ -238,7 +238,7 @@ async function addTask(task) {
 async function updateTask(taskId, updates) {
   if (!currentUser) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('tasks')
     .update(updates)
     .eq('id', taskId)
@@ -250,7 +250,7 @@ async function updateTask(taskId, updates) {
 async function deleteTask(taskId) {
   if (!currentUser) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('tasks')
     .delete()
     .eq('id', taskId)
@@ -266,7 +266,7 @@ async function deleteTask(taskId) {
 async function getFinances(filters = {}) {
   if (!currentUser) return [];
 
-  let query = supabase
+  let query = supabaseClient
     .from('finance_transactions')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -297,7 +297,7 @@ async function getFinances(filters = {}) {
 async function addFinance(transaction) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('finance_transactions')
     .insert({
       user_id: currentUser.id,
@@ -316,7 +316,7 @@ async function addFinance(transaction) {
 async function deleteFinance(transactionId) {
   if (!currentUser) return;
 
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('finance_transactions')
     .delete()
     .eq('id', transactionId)
@@ -332,7 +332,7 @@ async function deleteFinance(transactionId) {
 async function getWorkSessions(filters = {}) {
   if (!currentUser) return [];
 
-  let query = supabase
+  let query = supabaseClient
     .from('work_sessions')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -354,7 +354,7 @@ async function getWorkSessions(filters = {}) {
 async function addWorkSession(session) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('work_sessions')
     .insert({
       user_id: currentUser.id,
@@ -377,7 +377,7 @@ async function addWorkSession(session) {
 async function addXpEvent(deltaXp, reason) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('xp_events')
     .insert({
       user_id: currentUser.id,
@@ -394,7 +394,7 @@ async function addXpEvent(deltaXp, reason) {
 async function getXpHistory(limit = 50) {
   if (!currentUser) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('xp_events')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -412,7 +412,7 @@ async function getXpHistory(limit = 50) {
 async function saveOracleMessage(role, content, meta = {}) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('oracle_messages')
     .insert({
       user_id: currentUser.id,
@@ -430,7 +430,7 @@ async function saveOracleMessage(role, content, meta = {}) {
 async function getOracleMessages(limit = 50) {
   if (!currentUser) return [];
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('oracle_messages')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -444,7 +444,7 @@ async function getOracleMessages(limit = 50) {
 async function saveOracleMemory(title, fact, tags = [], importance = 5) {
   if (!currentUser) return null;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('oracle_memory')
     .insert({
       user_id: currentUser.id,
@@ -463,7 +463,7 @@ async function saveOracleMemory(title, fact, tags = [], importance = 5) {
 async function getOracleMemories(searchTags = null) {
   if (!currentUser) return [];
 
-  let query = supabase
+  let query = supabaseClient
     .from('oracle_memory')
     .select('*')
     .eq('user_id', currentUser.id)
@@ -805,3 +805,5 @@ window.SupabaseService = {
 };
 
 console.log('📦 Supabase Service carregado');
+
+
