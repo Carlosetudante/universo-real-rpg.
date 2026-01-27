@@ -1,10 +1,11 @@
-const CACHE_NAME = 'universo-real-v1';
+const CACHE_NAME = 'universo-real-v3';
 
 const urlsToCache = [
   './index.html',
   './financeiro.html',
   './style.css',
   './app.js',
+  './workTimer.js',
   './logo.svg',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
