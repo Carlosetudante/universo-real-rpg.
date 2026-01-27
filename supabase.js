@@ -241,17 +241,27 @@ async function ensureProfileExists(characterData = {}) {
 }
 
 async function updateProfile(updates) {
-  if (!currentUser) return;
+  console.log('📝 updateProfile chamado, currentUser:', currentUser?.id);
+  if (!currentUser) {
+    console.error('❌ updateProfile: currentUser é null');
+    return;
+  }
 
   // Garante que o perfil existe antes de atualizar
   await ensureProfileExists(updates);
 
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from('profiles')
     .update(updates)
-    .eq('id', currentUser.id);
+    .eq('id', currentUser.id)
+    .select();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Erro ao atualizar perfil:', error);
+    throw error;
+  }
+  
+  console.log('✅ Perfil atualizado:', data);
 }
 
 // ===========================================
@@ -726,9 +736,27 @@ async function syncCloudToLocal() {
 
 // Sincroniza TUDO para a nuvem
 async function syncAllToCloud(localData) {
-  if (!isSupabaseConfigured() || !currentUser) return false;
+  console.log('🔄 Iniciando sincronização com nuvem...');
+  console.log('📊 currentUser:', currentUser ? currentUser.id : 'NULL');
+  console.log('📊 isConfigured:', isSupabaseConfigured());
+  
+  if (!isSupabaseConfigured()) {
+    console.error('❌ Supabase não configurado');
+    return false;
+  }
+  
+  if (!currentUser) {
+    // Tenta recuperar sessão
+    console.log('⚠️ currentUser é null, tentando recuperar sessão...');
+    const session = await supabaseGetSession();
+    if (!session || !currentUser) {
+      console.error('❌ Sem usuário logado para sincronizar');
+      return false;
+    }
+  }
 
   try {
+    console.log('📤 Salvando perfil...');
     // 1. Atualiza perfil
     await updateProfile({
       character_name: localData.name,
@@ -743,6 +771,7 @@ async function syncAllToCloud(localData) {
       achievements: localData.achievements,
       inventory: localData.inventory
     });
+    console.log('✅ Perfil salvo!');
 
     // 2. Sincroniza tarefas (apenas novas, não sobrescreve tudo)
     if (localData.dailyTasks && localData.dailyTasks.length > 0) {
