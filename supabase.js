@@ -183,12 +183,68 @@ async function getProfile() {
     .eq('id', currentUser.id)
     .single();
 
+  // Se não encontrou perfil, retorna null (será criado depois)
+  if (error && error.code === 'PGRST116') {
+    console.log('⚠️ Perfil não encontrado, será criado automaticamente');
+    return null;
+  }
   if (error) throw error;
+  return data;
+}
+
+// Garante que o perfil existe, criando se necessário
+async function ensureProfileExists(characterData = {}) {
+  if (!currentUser) return null;
+
+  // Tenta buscar perfil existente
+  const { data: existing } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('id', currentUser.id)
+    .single();
+
+  if (existing) {
+    console.log('✅ Perfil já existe');
+    return existing;
+  }
+
+  // Cria perfil se não existir
+  console.log('🔧 Criando perfil automaticamente...');
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .insert({
+      id: currentUser.id,
+      character_name: characterData.name || currentUser.email?.split('@')[0] || 'Herói',
+      character_class: characterData.race || 'Equilibrado',
+      title: characterData.title || 'Viajante',
+      aura_color: characterData.auraColor || '#ffdd57',
+      level: 1,
+      xp: 0,
+      streak: 0,
+      skill_points: 0,
+      attributes: {},
+      achievements: [],
+      inventory: [],
+      last_claim: null,
+      play_time: 0
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao criar perfil:', error);
+    throw error;
+  }
+  
+  console.log('✅ Perfil criado com sucesso!');
   return data;
 }
 
 async function updateProfile(updates) {
   if (!currentUser) return;
+
+  // Garante que o perfil existe antes de atualizar
+  await ensureProfileExists(updates);
 
   const { error } = await supabaseClient
     .from('profiles')
