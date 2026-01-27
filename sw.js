@@ -1,8 +1,9 @@
-const CACHE_NAME = 'universo-real-v16';
+const CACHE_NAME = 'universo-real-v17';
 
 const urlsToCache = [
   './index.html',
   './financeiro.html',
+  './carga-horaria.html',
   './style.css',
   './app.js',
   './supabase.js',
