@@ -498,26 +498,25 @@ async function login() {
       const { data, error } = await SupabaseService.signIn(email, password);
       if (error) throw error;
 
-      // Carrega perfil do banco
-      const profile = await SupabaseService.getProfile();
-      if (profile) {
-        gameState = normalizeGameState({
-          username: data.user.email,
-          name: profile.character_name,
-          race: profile.character_class,
-          title: profile.title,
-          auraColor: profile.aura_color,
-          level: profile.level,
-          xp: profile.xp,
-          streak: profile.streak,
-          skillPoints: profile.skill_points,
-          attributes: profile.attributes || {},
-          achievements: profile.achievements || [],
-          inventory: profile.inventory || [],
-          lastClaim: profile.last_claim,
-          playTime: profile.play_time
+      // Carrega TODOS os dados do banco (perfil + tarefas + finanças + memórias)
+      elements.loginBtn.textContent = 'Carregando dados...';
+      const cloudData = await SupabaseService.syncCloudToLocal();
+      
+      if (cloudData) {
+        gameState = normalizeGameState(cloudData);
+        
+        // Carrega memórias do oráculo se existirem
+        if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
+          OracleMemory.data = cloudData.oracleMemory;
+        }
+        
+        console.log('✅ Dados carregados da nuvem:', {
+          tarefas: cloudData.dailyTasks?.length || 0,
+          financas: cloudData.finances?.length || 0,
+          trabalho: cloudData.workLog?.length || 0
         });
       } else {
+        // Primeiro login - cria estado inicial
         gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
       }
 
@@ -526,12 +525,14 @@ async function login() {
         localStorage.setItem('ur_last_user', email);
       }
 
-      showToast('✅ Login realizado com sucesso!');
+      showToast('✅ Login realizado! Dados carregados da nuvem ☁️');
       isLoggedIn = true;
       loginTime = new Date();
       saveSession(email);
       hideAuthModal();
       updateUI();
+      if (typeof renderDailyTasks === 'function') renderDailyTasks();
+      if (typeof renderFinances === 'function') renderFinances();
       if (typeof checkAchievements === 'function') checkAchievements();
       checkBackupAvailability();
       checkBillsDueToday();
@@ -759,29 +760,29 @@ async function checkSession() {
     try {
       const session = await SupabaseService.getSession();
       if (session && session.user) {
-        const profile = await SupabaseService.getProfile();
-        if (profile) {
-          gameState = normalizeGameState({
-            username: session.user.email,
-            name: profile.character_name,
-            race: profile.character_class,
-            title: profile.title,
-            auraColor: profile.aura_color,
-            level: profile.level,
-            xp: profile.xp,
-            streak: profile.streak,
-            skillPoints: profile.skill_points,
-            attributes: profile.attributes || {},
-            achievements: profile.achievements || [],
-            inventory: profile.inventory || [],
-            lastClaim: profile.last_claim,
-            playTime: profile.play_time
+        // Carrega TODOS os dados da nuvem
+        const cloudData = await SupabaseService.syncCloudToLocal();
+        
+        if (cloudData) {
+          gameState = normalizeGameState(cloudData);
+          
+          // Carrega memórias do oráculo se existirem
+          if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
+            OracleMemory.data = cloudData.oracleMemory;
+          }
+          
+          console.log('✅ Sessão restaurada - dados carregados da nuvem:', {
+            tarefas: cloudData.dailyTasks?.length || 0,
+            financas: cloudData.finances?.length || 0
           });
+          
           isLoggedIn = true;
           loginTime = new Date();
           hideAuthModal();
           checkDailyTaskReset();
           updateUI();
+          if (typeof renderDailyTasks === 'function') renderDailyTasks();
+          if (typeof renderFinances === 'function') renderFinances();
           if (typeof checkAchievements === 'function') checkAchievements();
           checkBackupAvailability();
           checkBillsDueToday();
@@ -883,12 +884,17 @@ async function saveGame(arg) {
         loginTime = now;
       }
 
+      // Inclui memórias do oráculo no gameState para salvar
+      if (typeof OracleMemory !== 'undefined' && OracleMemory.data) {
+        gameState.oracleMemory = OracleMemory.data;
+      }
+
       users[username].character = gameState;
       setUsers(users);
       
-      // Sincroniza com Supabase (em background)
+      // Sincroniza TUDO com Supabase (em background)
       if (useSupabase()) {
-        SupabaseService.syncLocalToCloud(gameState).catch(e => {
+        SupabaseService.syncAllToCloud(gameState).catch(e => {
           console.warn('Erro ao sincronizar com nuvem:', e);
         });
       }
