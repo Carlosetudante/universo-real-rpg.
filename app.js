@@ -483,9 +483,9 @@ function useSupabase() {
 
 // Função de login (Supabase ou Local)
 async function login() {
-  const username = elements.loginUsername.value.trim();
+  const email = elements.loginUsername.value.trim();
   const password = elements.loginPassword.value;
-  if (!username || !password) {
+  if (!email || !password) {
     showToast('⚠️ Preencha todos os campos!');
     return;
   }
@@ -495,7 +495,7 @@ async function login() {
 
     // Tenta login com Supabase primeiro
     if (useSupabase()) {
-      const { data, error } = await SupabaseService.signIn(username, password);
+      const { data, error } = await SupabaseService.signIn(email, password);
       if (error) throw error;
 
       // Carrega perfil do banco
@@ -523,13 +523,13 @@ async function login() {
 
       // Salvar localmente também (para funcionar offline)
       if (elements.rememberUser && elements.rememberUser.checked) {
-        localStorage.setItem('ur_last_user', username);
+        localStorage.setItem('ur_last_user', email);
       }
 
       showToast('✅ Login realizado com sucesso!');
       isLoggedIn = true;
       loginTime = new Date();
-      saveSession(username);
+      saveSession(email);
       hideAuthModal();
       updateUI();
       if (typeof checkAchievements === 'function') checkAchievements();
@@ -542,29 +542,29 @@ async function login() {
 
     // Fallback: Login local (localStorage)
     const users = getUsers();
-    if (!users[username]) {
-      const foundKey = Object.keys(users).find(k => k.toLowerCase() === username.toLowerCase());
+    if (!users[email]) {
+      const foundKey = Object.keys(users).find(k => k.toLowerCase() === email.toLowerCase());
       if (foundKey) {
-        throw new Error(`Usuário não encontrado! Você quis dizer "${foundKey}"?`);
+        throw new Error(`Email não encontrado! Você quis dizer "${foundKey}"?`);
       }
-      throw new Error('Usuário não encontrado! Crie uma conta primeiro.');
+      throw new Error('Email não encontrado! Crie uma conta primeiro.');
     }
     
-    if (users[username].password !== password) {
+    if (users[email].password !== password) {
       throw new Error('Senha incorreta!');
     }
     
     if (elements.rememberUser && elements.rememberUser.checked) {
-      localStorage.setItem('ur_last_user', username);
+      localStorage.setItem('ur_last_user', email);
     } else {
       localStorage.removeItem('ur_last_user');
     }
 
     showToast('✅ Login realizado com sucesso!');
-    gameState = normalizeGameState(users[username].character);
+    gameState = normalizeGameState(users[email].character);
     isLoggedIn = true;
     loginTime = new Date();
-    saveSession(username);
+    saveSession(email);
     hideAuthModal();
     updateUI();
     if (typeof checkAchievements === 'function') checkAchievements();
@@ -581,41 +581,41 @@ async function login() {
 }
 
 function recoverPassword() {
-  let username = elements.loginUsername.value.trim();
-  if (!username) {
-    username = prompt("Digite seu usuário para recuperar a senha:");
+  let email = elements.loginUsername.value.trim();
+  if (!email) {
+    email = prompt("Digite seu email para recuperar a senha:");
   }
   
-  if (!username) return;
+  if (!email) return;
 
   const users = getUsers();
-  if (users[username]) {
+  if (users[email]) {
     // Verifica se o usuário tem pergunta de segurança (contas novas)
-    if (users[username].security && users[username].security.question) {
-      const answer = prompt(`Pergunta de Segurança: ${users[username].security.question}`);
-      if (answer && answer.toLowerCase().trim() === users[username].security.answer.toLowerCase().trim()) {
-        alert(`Sua senha é: ${users[username].password}`);
+    if (users[email].security && users[email].security.question) {
+      const answer = prompt(`Pergunta de Segurança: ${users[email].security.question}`);
+      if (answer && answer.toLowerCase().trim() === users[email].security.answer.toLowerCase().trim()) {
+        alert(`Sua senha é: ${users[email].password}`);
       } else {
         showToast('❌ Resposta de segurança incorreta.');
       }
     } else {
       // Fallback para contas antigas (Nome do Personagem)
-      const charName = users[username].character.name;
+      const charName = users[email].character.name;
       const check = prompt(`Segurança (Conta Antiga): Qual o nome do seu personagem?`);
       if (check && check.toLowerCase().trim() === charName.toLowerCase().trim()) {
-        alert(`Sua senha é: ${users[username].password}`);
+        alert(`Sua senha é: ${users[email].password}`);
       } else {
         showToast('❌ Nome do personagem incorreto.');
       }
     }
   } else {
-    showToast('❌ Usuário não encontrado neste navegador.');
+    showToast('❌ Email não encontrado neste navegador.');
   }
 }
 
 // Função de cadastro (Supabase ou Local)
 async function register() {
-  const username = elements.registerUsername.value.trim(); // Email para Supabase
+  const email = elements.registerUsername.value.trim(); // Email
   const password = elements.registerPassword.value;
   const confirmPassword = elements.registerConfirmPassword.value;
   const name = elements.registerName.value.trim();
@@ -624,10 +624,18 @@ async function register() {
   const question = elements.registerQuestion.value.trim();
   const answer = elements.registerAnswer.value.trim();
 
-  if (!username || !password || !name || !question || !answer) {
+  if (!email || !password || !name || !question || !answer) {
     showToast('⚠️ Preencha todos os campos obrigatórios!');
     return;
   }
+  
+  // Validação de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    showToast('⚠️ Digite um email válido!');
+    return;
+  }
+  
   if (password.length < 6) {
     showToast('⚠️ A senha deve ter pelo menos 6 caracteres!');
     return;
@@ -652,15 +660,7 @@ async function register() {
 
     // Tenta criar conta no Supabase primeiro
     if (useSupabase()) {
-      // Verifica se é email válido
-      if (!username.includes('@')) {
-        showToast('⚠️ Para usar com Supabase, o username deve ser um email válido!');
-        elements.registerBtn.disabled = false;
-        elements.registerBtn.textContent = 'Criar Personagem';
-        return;
-      }
-
-      const { data, error } = await SupabaseService.signUp(username, password, characterData);
+      const { data, error } = await SupabaseService.signUp(email, password, characterData);
       if (error) throw error;
 
       showToast('🎉 Conta criada! Verifique seu email para confirmar.', 5000);
@@ -680,12 +680,12 @@ async function register() {
 
     // Fallback: Cadastro local (localStorage)
     let users = getUsers();
-    if (users[username]) {
-      throw new Error('Usuário já existe!');
+    if (users[email]) {
+      throw new Error('Email já cadastrado!');
     }
     
     let character = {
-      username,
+      username: email,
       name,
       race,
       title: 'Viajante',
@@ -705,13 +705,13 @@ async function register() {
       lastTaskReset: new Date().toISOString()
     };
     character = normalizeGameState(character);
-    users[username] = { password, character, security: { question, answer } };
+    users[email] = { password, character, security: { question, answer } };
     setUsers(users);
     showToast('🎉 Personagem criado com sucesso!', 4000);
     gameState = character;
     isLoggedIn = true;
     loginTime = new Date();
-    saveSession(username);
+    saveSession(email);
     hideAuthModal();
     updateUI();
     if (typeof checkAchievements === 'function') checkAchievements();

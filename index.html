@@ -37,8 +37,8 @@
         <div id="loginForm">
           <div class="form-row">
             <div style="flex:1">
-              <label>Username</label>
-              <input type="text" id="loginUsername" placeholder="Digite seu username...">
+              <label>Email</label>
+              <input type="email" id="loginUsername" placeholder="Digite seu email..." autocomplete="email">
             </div>
           </div>
           <div class="form-row">
@@ -52,7 +52,7 @@
           </div>
           <div style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
             <input type="checkbox" id="rememberUser" style="width: auto; cursor: pointer;">
-            <label for="rememberUser" style="margin:0; font-size: 13px; cursor: pointer; opacity: 0.8;">Lembrar meu usuário</label>
+            <label for="rememberUser" style="margin:0; font-size: 13px; cursor: pointer; opacity: 0.8;">Lembrar meu email</label>
           </div>
           <div style="display:flex; gap:8px; margin-top: 20px;">
             <button class="btn" id="loginBtn">Entrar</button>
@@ -64,8 +64,8 @@
         <div id="registerForm" class="hidden">
           <div class="form-row">
             <div style="flex:1">
-              <label>Username</label>
-              <input type="text" id="registerUsername" placeholder="Escolha um username...">
+              <label>Email</label>
+              <input type="email" id="registerUsername" placeholder="Digite seu email..." autocomplete="email">
               <div id="usernameCheckMsg" class="validation-msg"></div>
             </div>
           </div>
