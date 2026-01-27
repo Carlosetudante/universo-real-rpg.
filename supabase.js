@@ -707,6 +707,12 @@ async function syncCloudToLocal() {
       }
     });
 
+    // Extrai dados extras do campo inventory (que guarda JSON extra)
+    const inventoryData = profile.inventory || {};
+    const extraData = typeof inventoryData === 'object' && !Array.isArray(inventoryData) 
+      ? inventoryData 
+      : { items: inventoryData };
+
     return {
       username: currentUser.email,
       name: profile.character_name,
@@ -719,10 +725,24 @@ async function syncCloudToLocal() {
       skillPoints: profile.skill_points,
       attributes: profile.attributes || {},
       achievements: profile.achievements || [],
-      inventory: profile.inventory || [],
+      inventory: extraData.items || [],
       lastClaim: profile.last_claim,
       playTime: profile.play_time,
-      // Dados adicionais
+      relationshipStart: profile.relationship_start,
+      relationshipPhoto: profile.relationship_photo,
+      financialGoal: profile.financial_goal || 0,
+      oraclePersonality: profile.oracle_personality || 'robot',
+      // Dados extras do campo inventory
+      job: extraData.job || null,
+      bills: extraData.bills || [],
+      xpHistory: extraData.xpHistory || {},
+      lastTaskReset: extraData.lastTaskReset || null,
+      zenBackgroundImage: extraData.zenBackgroundImage || null,
+      zenMusic: extraData.zenMusic || null,
+      gratitudeJournal: extraData.gratitudeJournal || [],
+      taskHistory: extraData.taskHistory || [],
+      expenseGroups: extraData.expenseGroups || [],
+      // Dados de outras tabelas
       dailyTasks: localTasks,
       finances: localFinances,
       workLog: localWorkLog,
@@ -757,7 +777,7 @@ async function syncAllToCloud(localData) {
 
   try {
     console.log('📤 Salvando perfil...');
-    // 1. Atualiza perfil
+    // 1. Atualiza perfil com TODOS os campos
     await updateProfile({
       character_name: localData.name,
       character_class: localData.race,
@@ -767,11 +787,27 @@ async function syncAllToCloud(localData) {
       xp: localData.xp,
       streak: localData.streak,
       skill_points: localData.skillPoints || 0,
-      attributes: localData.attributes,
-      achievements: localData.achievements,
-      inventory: localData.inventory,
+      attributes: localData.attributes || {},
+      achievements: localData.achievements || [],
+      inventory: {
+        items: localData.inventory || [],
+        // Campos extras guardados aqui como JSON
+        job: localData.job || null,
+        bills: localData.bills || [],
+        xpHistory: localData.xpHistory || {},
+        lastTaskReset: localData.lastTaskReset || null,
+        zenBackgroundImage: localData.zenBackgroundImage || null,
+        zenMusic: localData.zenMusic || null,
+        gratitudeJournal: localData.gratitudeJournal || [],
+        taskHistory: localData.taskHistory || [],
+        expenseGroups: localData.expenseGroups || []
+      },
       last_claim: localData.lastClaim || null,
-      play_time: localData.playTime || 0
+      play_time: localData.playTime || 0,
+      relationship_start: localData.relationshipStart || null,
+      relationship_photo: localData.relationshipPhoto || null,
+      financial_goal: localData.financialGoal || 0,
+      oracle_personality: localData.oraclePersonality || 'robot'
     });
     console.log('✅ Perfil salvo!');
 
