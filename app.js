@@ -3609,43 +3609,60 @@ if (cargaHorariaBtn) cargaHorariaBtn.addEventListener('click', () => window.loca
 // Função para verificar e aplicar atualizações
 async function checkForUpdates() {
   const btn = document.getElementById('updateAppBtn');
+  const mobileBtn = document.getElementById('mobileUpdateBtn');
   
   try {
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = '⏳';
-    }
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+    if (mobileBtn) { mobileBtn.disabled = true; }
     
-    showToast('🔍 Verificando atualizações...');
+    showToast('🔍 Forçando atualização completa...');
     
-    // Limpa todos os caches primeiro
+    // 1. Limpa TODOS os caches
     if ('caches' in window) {
       const cacheNames = await caches.keys();
+      console.log('🗑️ Removendo caches:', cacheNames);
       await Promise.all(cacheNames.map(name => caches.delete(name)));
     }
     
-    // Tenta atualizar o Service Worker
+    // 2. Desregistra o Service Worker atual
     if ('serviceWorker' in navigator) {
-      const registration = await navigator.serviceWorker.getRegistration();
-      
-      if (registration) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        console.log('🔄 Atualizando SW:', registration.scope);
+        
+        // Tenta atualizar
         await registration.update();
         
+        // Se há um worker esperando, força ativação
         if (registration.waiting) {
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        
+        // Se ainda não funcionou, desregistra completamente
+        if (registration.active) {
+          await registration.unregister();
+          console.log('🗑️ SW desregistrado');
         }
       }
     }
     
-    showToast('✅ Cache limpo! Recarregando...');
+    // 3. Limpa localStorage de versão (se houver)
+    localStorage.removeItem('app_version');
+    
+    showToast('✅ Cache limpo! Recarregando em 2s...');
+    
+    // 4. Recarrega com cache-bust
     setTimeout(() => {
-      window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
-    }, 1000);
+      const url = window.location.origin + window.location.pathname;
+      window.location.replace(url + '?nocache=' + Date.now());
+    }, 2000);
     
   } catch (error) {
     console.error('Erro ao atualizar:', error);
-    showToast('🔄 Recarregando...');
-    setTimeout(() => window.location.reload(true), 1000);
+    showToast('⚠️ Erro! Tentando reload forçado...');
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 1500);
   }
 }
 
