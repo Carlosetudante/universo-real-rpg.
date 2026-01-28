@@ -256,7 +256,7 @@
           <div class="control-bar">
             <!-- Salvar e Atualizar -->
             <button class="save-btn" id="saveBtn">💾 Salvar</button>
-            <button class="icon-btn" id="updateAppBtn" title="Verificar Atualizações">🔄</button>
+            <button class="icon-btn" id="updateAppBtn" title="Verificar Atualizações" onclick="if(typeof checkForUpdates==='function')checkForUpdates();else{alert('Recarregando...');location.reload(true);}">🔄</button>
             
             <div class="divider-v"></div>
             
