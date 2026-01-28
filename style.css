@@ -2663,6 +2663,172 @@ input.success {
 }
 
 /* ==========================================
+   MOBILE DRAWER - Menu Lateral
+   ========================================== */
+
+/* Botão Hamburger Flutuante */
+.mobile-fab-menu {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  border: none;
+  cursor: pointer;
+  z-index: 150;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  box-shadow: 0 4px 20px rgba(255, 221, 87, 0.4);
+  transition: all 0.3s;
+}
+
+.mobile-fab-menu:hover {
+  transform: scale(1.1);
+}
+
+.mobile-fab-menu span {
+  display: block;
+  width: 22px;
+  height: 3px;
+  background: #1a1a1a;
+  border-radius: 2px;
+  transition: all 0.3s;
+}
+
+.mobile-fab-menu.active span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.mobile-fab-menu.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.mobile-fab-menu.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(6px, -6px);
+}
+
+/* Overlay do Drawer */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+.mobile-drawer-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Drawer (Menu Lateral) */
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 280px;
+  max-width: 85vw;
+  height: 100%;
+  background: linear-gradient(180deg, #1a2d4a, #0e2340);
+  box-shadow: -5px 0 30px rgba(0, 0, 0, 0.5);
+  transform: translateX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  z-index: 201;
+}
+
+.mobile-drawer-overlay.hidden .mobile-drawer {
+  transform: translateX(100%);
+}
+
+.mobile-drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.mobile-drawer-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-drawer-section {
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mobile-drawer-title {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+  padding-left: 5px;
+}
+
+.mobile-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 15px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 4px;
+}
+
+.mobile-drawer-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.mobile-drawer-item.active {
+  background: rgba(255, 221, 87, 0.15);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.mobile-drawer-item.danger {
+  color: var(--danger);
+}
+
+.mobile-drawer-item.danger:hover {
+  background: rgba(248, 113, 113, 0.15);
+}
+
+/* Mostrar FAB apenas no mobile */
+@media screen and (max-width: 900px) {
+  .mobile-fab-menu:not(.hidden) {
+    display: flex;
+  }
+}
+
+/* ==========================================
    MOBILE OVERRIDE - Regras finais garantidas
    ========================================== */
 @media screen and (max-width: 900px) {
