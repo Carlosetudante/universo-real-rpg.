@@ -95,10 +95,19 @@ function parseMoney(input) {
   
   // Lógica Brasileira: Ponto é milhar, Vírgula é decimal
   if (str.includes(',')) {
+    // Tem vírgula - formato BR (ex: 1.234,56)
     str = str.replace(/\./g, '').replace(',', '.');
-  } else {
-    // Se só tem ponto (ex: 2.000), assume que é milhar
-    str = str.replace(/\./g, '');
+  } else if (str.includes('.')) {
+    // Só tem ponto - verificar se é decimal ou milhar
+    const parts = str.split('.');
+    // Se a parte após o ponto tem 1 ou 2 dígitos, é decimal (ex: 1.5 ou 3.50)
+    // Se tem 3 dígitos, é milhar (ex: 1.000)
+    if (parts.length === 2 && parts[1].length <= 2) {
+      // Mantém como decimal (1.5 = 1.5)
+    } else {
+      // Remove pontos de milhar (1.000 = 1000)
+      str = str.replace(/\./g, '');
+    }
   }
   
   return (parseFloat(str) || 0) * multiplier;
@@ -3434,6 +3443,10 @@ function updateUI() {
   // Atualizar barra de progresso
   const xpPercent = (gameState.xp / xpToNextLevel) * 100;
   if (elements.xpProgress) elements.xpProgress.style.width = `${xpPercent}%`;
+  
+  // Atualizar segunda barra de XP (na seção de missões)
+  const xpProgressMissions = document.getElementById('xpProgressMissions');
+  if (xpProgressMissions) xpProgressMissions.style.width = `${xpPercent}%`;
 
   // Atualizar última reivindicação e streak
   if (gameState.lastClaim) {
