@@ -228,6 +228,20 @@
 
     <!-- Tela Principal do Jogo -->
     <div class="card hidden" id="gameScreen">
+      <!-- Mobile Header -->
+      <div class="mobile-header">
+        <div class="logo" style="font-size: 18px;">
+          <svg class="logo-icon" style="width: 24px; height: 24px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="#ffdd57" stroke-width="6" stroke-linejoin="round"/>
+          </svg>
+          <span>Universo Real</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="icon-btn" onclick="toggleZenMode()" title="Modo Zen">🧘</button>
+          <button class="icon-btn" onclick="toggleChat()" title="Oráculo">🤖</button>
+        </div>
+      </div>
+
       <div class="cinema">
         <div class="logo">
           <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -252,50 +266,41 @@
             </div>
           </div>
         </div>
+        
+        <!-- Navegação Principal (Desktop) -->
+        <nav class="app-nav">
+          <button class="nav-item active tab-btn" data-tab="hero"><span class="nav-icon">🦸</span> Herói</button>
+          <button class="nav-item tab-btn" data-tab="quests"><span class="nav-icon">📜</span> Missões</button>
+          <button class="nav-item tab-btn" data-tab="finance"><span class="nav-icon">💰</span> Finanças</button>
+          <button class="nav-item tab-btn" data-tab="social"><span class="nav-icon">❤️</span> Social</button>
+          <button class="nav-item tab-btn" data-tab="dom"><span class="nav-icon">💼</span> Trabalho</button>
+        </nav>
+
+        <!-- Ferramentas e Sistema -->
         <div class="press-start">
-          <div class="control-bar">
-            <!-- Salvar e Atualizar -->
-            <button class="save-btn" id="saveBtn">💾 Salvar</button>
-            <button class="icon-btn" id="updateAppBtn" title="Verificar Atualizações" onclick="if(typeof checkForUpdates==='function')checkForUpdates();else{alert('Recarregando...');location.reload(true);}">🔄</button>
-            <button class="icon-btn" id="installAppBtn2" title="Instalar App" style="display: none;">📲</button>
-            
-            <div class="divider-v"></div>
-            
-            <!-- Backup -->
-            <button class="icon-btn" id="exportBtn" title="Exportar Backup">📤</button>
-            <button class="icon-btn" id="importBtn" title="Importar Backup">📥</button>
-            <button class="icon-btn" id="restoreBackupBtn" style="display: none;" title="Restaurar Backup">↺</button>
-            
-            <div class="divider-v"></div>
-            
-            <!-- Ferramentas -->
-            <button class="icon-btn" id="zenModeBtn" title="Modo Zen">🧘</button>
-            <button class="icon-btn" id="chatBtn" title="Oráculo IA">🤖</button>
-            
-            <div class="divider-v"></div>
-            
-            <!-- Páginas Extras -->
-            <button class="icon-btn" id="simpleFinanceBtn" title="Finanças Detalhadas">📊</button>
-            <button class="icon-btn" id="cargaHorariaBtn" title="Carga Horária">⏱️</button>
-            
-            <div class="divider-v"></div>
-            
-            <!-- Sair -->
-            <button class="icon-btn danger" id="logoutBtn" title="Sair">🚪</button>
-            <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
+          <div class="tools-grid">
+            <button class="tool-btn" id="zenModeBtn"><span class="tool-icon">🧘</span> Zen</button>
+            <button class="tool-btn" id="chatBtn"><span class="tool-icon">🤖</span> Oráculo</button>
+            <button class="tool-btn" id="simpleFinanceBtn"><span class="tool-icon">📊</span> Detalhes</button>
+            <button class="tool-btn" id="cargaHorariaBtn"><span class="tool-icon">⏱️</span> Ponto</button>
+            <button class="tool-btn" id="exportBtn"><span class="tool-icon">📤</span> Backup</button>
+            <button class="tool-btn" id="importBtn"><span class="tool-icon">📥</span> Restaurar</button>
           </div>
+          
+          <button class="save-btn" id="saveBtn" style="width: 100%; justify-content: center;">💾 Salvar Progresso</button>
+          
+          <div style="display: flex; gap: 5px;">
+            <button class="tool-btn" id="updateAppBtn" title="Atualizar" style="flex: 1;">🔄</button>
+            <button class="tool-btn" id="installAppBtn2" title="Instalar" style="display: none; flex: 1;">📲</button>
+            <button class="tool-btn" id="restoreBackupBtn" title="Restaurar Auto" style="display: none; flex: 1;">↺</button>
+            <button class="tool-btn" id="logoutBtn" title="Sair" style="flex: 1; border-color: var(--danger); color: var(--danger);">🚪</button>
+          </div>
+          <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
         </div>
       </div>
       
       <div class="panel">
-        <!-- Menu de Abas -->
-        <div class="tabs">
-          <button class="tab-btn active" data-tab="hero">🦸 Herói</button>
-          <button class="tab-btn" data-tab="quests">📜 Missões</button>
-          <button class="tab-btn" data-tab="finance">💰 Finanças</button>
-          <button class="tab-btn" data-tab="social">❤️ Social</button>
-          <button class="tab-btn" data-tab="dom">💼 Trabalho</button>
-        </div>
+        <!-- Conteúdo das Abas (Mantido igual) -->
 
         <!-- Conteúdo da Aba: Herói -->
         <div id="tab-hero" class="tab-content active">
@@ -628,6 +633,15 @@
       </div>
     </div>
   </div>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="mobile-bottom-nav">
+    <button class="mobile-nav-item active tab-btn" data-tab="hero"><span class="mobile-nav-icon">🦸</span>Herói</button>
+    <button class="mobile-nav-item tab-btn" data-tab="quests"><span class="mobile-nav-icon">📜</span>Missões</button>
+    <button class="mobile-nav-item tab-btn" data-tab="finance"><span class="mobile-nav-icon">💰</span>Finanças</button>
+    <button class="mobile-nav-item tab-btn" data-tab="social"><span class="mobile-nav-icon">❤️</span>Social</button>
+    <button class="mobile-nav-item tab-btn" data-tab="dom"><span class="mobile-nav-icon">💼</span>Trabalho</button>
+  </nav>
   
   <!-- FAB (Botão Flutuante de Ações Rápidas) -->
   <div class="fab-container hidden" id="fabContainer">
@@ -640,17 +654,16 @@
   </div>
 
   <!-- Modal do Chat (Oráculo) - Sistema Inteligente -->
-  <div id="chatModal" class="modal">
-    <div class="oracle-container">
-      <!-- Header do Oráculo -->
-      <div class="oracle-header">
-        <div class="oracle-header-left">
-          <div class="oracle-avatar">
-            <div class="oracle-avatar-ring"></div>
-            <span id="oracleAvatarEmoji">🤖</span>
+  <div id="chatModal" class="modal" style="--accent: #818cf8;">
+    <div class="oracle-container" style="max-width: 550px;">
+      <div class="oracle-header" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%);">
+        <div class="oracle-header-left" style="gap: 15px;">
+          <div class="oracle-avatar" style="width: 52px; height: 52px;">
+            <div class="oracle-avatar-ring" style="border-color: var(--accent);"></div>
+            <span id="oracleAvatarEmoji" style="font-size: 28px;">🤖</span>
           </div>
           <div class="oracle-info">
-            <h2 id="oracleTitle">Oráculo</h2>
+            <h2 id="oracleTitle" style="font-size: 1.2rem;">Oráculo</h2>
             <div class="oracle-status">
               <span class="oracle-status-dot"></span>
               <span id="oracleStatusText">Online • Pronto para ajudar</span>
@@ -658,52 +671,50 @@
           </div>
         </div>
         <div class="oracle-header-right">
-          <select id="oraclePersonalitySelect" class="oracle-personality-select">
+          <select id="oraclePersonalitySelect" class="oracle-personality-select" title="Mudar Personalidade">
             <option value="assistant">🧠 Assistente</option>
             <option value="wise">🧙‍♂️ Sábio</option>
             <option value="coach">🏋️ Coach</option>
             <option value="friend">😊 Amigo</option>
           </select>
-          <button class="oracle-close-btn" id="closeChatBtn" title="Fechar">✕</button>
+          <button class="oracle-close-btn" id="closeChatBtn" title="Fechar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
         </div>
       </div>
 
-      <!-- Sugestões Rápidas -->
-      <div class="oracle-quick-actions" id="oracleQuickActions">
-        <button class="oracle-quick-btn" data-action="status">📊 Meu Status</button>
+      <div class="oracle-quick-actions">
+        <button class="oracle-quick-btn" data-action="status">📊 Status</button>
         <button class="oracle-quick-btn" data-action="tasks">📝 Tarefas</button>
         <button class="oracle-quick-btn" data-action="finance">💰 Finanças</button>
         <button class="oracle-quick-btn" data-action="work">💼 Trabalho</button>
         <button class="oracle-quick-btn" data-action="help">❓ Ajuda</button>
       </div>
 
-      <!-- Área de Mensagens -->
-      <div id="chatMessages" class="oracle-messages"></div>
-
-      <!-- Área de Digitação -->
       <div class="oracle-input-area">
         <div class="oracle-input-wrapper">
-          <button class="oracle-voice-btn" id="oracleVoiceBtn" title="Falar com o Oráculo">
-            <span class="voice-icon">🎤</span>
-            <span class="voice-listening hidden">🔴</span>
+          <button class="oracle-voice-btn" id="oracleVoiceBtn">
+            <svg class="voice-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+            <svg class="voice-listening hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle></svg>
           </button>
           <input type="text" id="chatInput" class="oracle-input" placeholder="Digite sua mensagem ou use comandos como 'criar tarefa...'">
           <button class="oracle-send-btn" id="sendMessageBtn" title="Enviar">
-            <span>➤</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
         </div>
         <div class="oracle-input-hints">
-          <span>💡 <strong>Clique duplo</strong> no 🎤 para <strong>modo conversa por voz</strong> • Exemplo: "gastei 50 no almoço"</span>
+          <span>💡 <strong>Clique duplo</strong> no 🎤 para <strong>modo conversa</strong> • Ex: "gastei 50 no almoço"</span>
         </div>
       </div>
 
-      <!-- Footer com info de memória -->
       <div class="oracle-footer">
-        <div class="oracle-memory-indicator" id="oracleMemoryIndicator">
-          <span class="memory-icon">🧠</span>
+        <div class="oracle-memory-indicator">
+          <span class="memory-icon" style="font-size: 16px;">🧠</span>
           <span class="memory-text">Memória: <span id="oracleMemoryCount">0</span> aprendizados</span>
         </div>
-        <button class="oracle-settings-btn" id="oracleSettingsBtn" title="Configurações">⚙️</button>
+        <button class="oracle-settings-btn" id="oracleSettingsBtn" title="Ver Perfil">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
       </div>
     </div>
   </div>

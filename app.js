@@ -3675,8 +3675,8 @@ if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener(
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
 // ========================================
-// SISTEMA DE LINGUAGEM NATURAL (NLU)
-// Detecta intenções e extrai dados automaticamente
+// SISTEMA DE LINGUAGEM NATURAL (NLU) 2.0
+// Detecta intenções e extrai dados de forma mais robusta
 // ========================================
 
 const OracleNLU = {
@@ -7454,11 +7454,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      
+      // Remove active de todos os botões e conteúdos
       tabBtns.forEach(b => b.classList.remove('active'));
       tabContents.forEach(c => c.classList.remove('active'));
 
-      btn.classList.add('active');
-      const tabId = btn.getAttribute('data-tab');
+      // Adiciona active para TODOS os botões com o mesmo data-tab (Desktop e Mobile)
+      document.querySelectorAll(`.tab-btn[data-tab="${tabId}"]`).forEach(b => b.classList.add('active'));
+      
       const target = document.getElementById(`tab-${tabId}`);
       if (target) target.classList.add('active');
       
