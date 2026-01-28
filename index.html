@@ -642,37 +642,49 @@
     </div>
   </div>
 
-  <!-- Mobile Bottom Navigation (Escondido até fazer login) -->
-  <nav class="mobile-bottom-nav hidden" id="mobileBottomNav">
-    <button class="mobile-nav-item active tab-btn" data-tab="hero"><span class="mobile-nav-icon">🦸</span></button>
-    <button class="mobile-nav-item tab-btn" data-tab="quests"><span class="mobile-nav-icon">📜</span></button>
-    <button class="mobile-nav-item tab-btn" data-tab="finance"><span class="mobile-nav-icon">💰</span></button>
-    <button class="mobile-nav-item tab-btn" data-tab="social"><span class="mobile-nav-icon">❤️</span></button>
-    <button class="mobile-nav-item tab-btn" data-tab="dom"><span class="mobile-nav-icon">💼</span></button>
-    <button class="mobile-nav-item" id="mobileMenuBtn"><span class="mobile-nav-icon">☰</span></button>
-  </nav>
+  <!-- Botão Hamburger Flutuante (Mobile) -->
+  <button class="mobile-fab-menu hidden" id="mobileFabMenu">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
 
-  <!-- Mobile Tools Menu (Slide-up - Escondido até fazer login) -->
-  <div class="mobile-tools-overlay hidden" id="mobileToolsOverlay">
-    <div class="mobile-tools-menu" id="mobileToolsMenu">
-      <div class="mobile-tools-header">
-        <h3>🛠️ Ferramentas</h3>
-        <button class="mobile-tools-close" id="mobileToolsClose">✕</button>
+  <!-- Menu Lateral Mobile (Drawer) -->
+  <div class="mobile-drawer-overlay hidden" id="mobileDrawerOverlay">
+    <nav class="mobile-drawer" id="mobileDrawer">
+      <div class="mobile-drawer-header">
+        <span>📍 Navegação</span>
+        <button class="mobile-drawer-close" id="mobileDrawerClose">✕</button>
       </div>
-      <div class="mobile-tools-grid">
-        <button class="mobile-tool-item" id="mobileZenBtn"><span>🧘</span> Modo Zen</button>
-        <button class="mobile-tool-item" id="mobileChatBtn"><span>🤖</span> Oráculo IA</button>
-        <button class="mobile-tool-item" id="mobileFinanceBtn"><span>📊</span> Relatórios</button>
-        <button class="mobile-tool-item" id="mobilePontoBtn"><span>⏱️</span> Ponto</button>
-        <button class="mobile-tool-item" id="mobileSaveBtn"><span>💾</span> Salvar</button>
-        <button class="mobile-tool-item" id="mobileUpdateBtn"><span>🔄</span> Atualizar</button>
-        <button class="mobile-tool-item" id="mobileExportBtn"><span>📤</span> Backup</button>
-        <button class="mobile-tool-item" id="mobileImportBtn"><span>📥</span> Restaurar</button>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">📑 Abas</div>
+        <button class="mobile-drawer-item tab-btn active" data-tab="hero">🦸 Herói</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="quests">📜 Missões</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="finance">💰 Finanças</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="social">❤️ Social</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="dom">💼 Trabalho</button>
       </div>
-      <button class="mobile-logout-btn" id="mobileLogoutBtn">🚪 Sair da Conta</button>
-    </div>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">🛠️ Ferramentas</div>
+        <button class="mobile-drawer-item" id="drawerZenBtn">🧘 Modo Zen</button>
+        <button class="mobile-drawer-item" id="drawerChatBtn">🤖 Oráculo IA</button>
+        <button class="mobile-drawer-item" id="drawerFinanceBtn">📊 Relatórios</button>
+        <button class="mobile-drawer-item" id="drawerPontoBtn">⏱️ Ponto</button>
+      </div>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">⚙️ Sistema</div>
+        <button class="mobile-drawer-item" id="drawerSaveBtn">💾 Salvar</button>
+        <button class="mobile-drawer-item" id="drawerUpdateBtn">🔄 Atualizar</button>
+        <button class="mobile-drawer-item" id="drawerExportBtn">📤 Backup</button>
+        <button class="mobile-drawer-item" id="drawerImportBtn">📥 Restaurar</button>
+        <button class="mobile-drawer-item danger" id="drawerLogoutBtn">🚪 Sair</button>
+      </div>
+    </nav>
   </div>
-  
+
   <!-- FAB (Botão Flutuante de Ações Rápidas) -->
   <div class="fab-container hidden" id="fabContainer">
     <div class="fab-actions hidden" id="fabActions">

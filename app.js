@@ -456,10 +456,10 @@ function showAuthModal() {
   elements.gameScreen.classList.add('hidden');
   if (elements.fabContainer) elements.fabContainer.classList.add('hidden');
   
-  // Esconde navegação mobile na tela de login
-  const mobileBottomNav = document.getElementById('mobileBottomNav');
+  // Esconde menu mobile na tela de login
+  const mobileFab = document.getElementById('mobileFabMenu');
   const mobileHeader = document.getElementById('mobileHeader');
-  if (mobileBottomNav) mobileBottomNav.classList.add('hidden');
+  if (mobileFab) mobileFab.classList.add('hidden');
   if (mobileHeader) mobileHeader.style.display = 'none';
 }
 
@@ -468,10 +468,10 @@ function hideAuthModal() {
   elements.gameScreen.classList.remove('hidden');
   if (elements.fabContainer) elements.fabContainer.classList.remove('hidden');
   
-  // Mostra navegação mobile após login (o CSS controla se aparece baseado na largura da tela)
-  const mobileBottomNav = document.getElementById('mobileBottomNav');
+  // Mostra menu mobile após login
+  const mobileFab = document.getElementById('mobileFabMenu');
   const mobileHeader = document.getElementById('mobileHeader');
-  if (mobileBottomNav) mobileBottomNav.classList.remove('hidden');
+  if (mobileFab) mobileFab.classList.remove('hidden');
   if (mobileHeader) mobileHeader.style.display = '';
 }
 
@@ -7218,37 +7218,65 @@ const OracleChat = {
 window.toggleChat = () => OracleChat.toggle();
 window.toggleZenMode = toggleZenMode;
 
-// --- Lógica do Menu Mobile ---
-const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-const mobileToolsOverlay = document.getElementById('mobileToolsOverlay');
-const mobileToolsClose = document.getElementById('mobileToolsClose');
+// --- Lógica do Menu Drawer Mobile ---
+const mobileFabMenu = document.getElementById('mobileFabMenu');
+const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
+const mobileDrawerClose = document.getElementById('mobileDrawerClose');
 
-function openMobileMenu() {
-  if (mobileToolsOverlay) mobileToolsOverlay.classList.remove('hidden');
+function openDrawer() {
+  if (mobileDrawerOverlay) mobileDrawerOverlay.classList.remove('hidden');
+  if (mobileFabMenu) mobileFabMenu.classList.add('active');
 }
 
-function closeMobileMenu() {
-  if (mobileToolsOverlay) mobileToolsOverlay.classList.add('hidden');
+function closeDrawer() {
+  if (mobileDrawerOverlay) mobileDrawerOverlay.classList.add('hidden');
+  if (mobileFabMenu) mobileFabMenu.classList.remove('active');
 }
 
-if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileMenu);
-if (mobileToolsClose) mobileToolsClose.addEventListener('click', closeMobileMenu);
-if (mobileToolsOverlay) {
-  mobileToolsOverlay.addEventListener('click', (e) => {
-    if (e.target === mobileToolsOverlay) closeMobileMenu();
+if (mobileFabMenu) mobileFabMenu.addEventListener('click', () => {
+  if (mobileDrawerOverlay?.classList.contains('hidden')) {
+    openDrawer();
+  } else {
+    closeDrawer();
+  }
+});
+
+if (mobileDrawerClose) mobileDrawerClose.addEventListener('click', closeDrawer);
+if (mobileDrawerOverlay) {
+  mobileDrawerOverlay.addEventListener('click', (e) => {
+    if (e.target === mobileDrawerOverlay) closeDrawer();
   });
 }
 
-// Ações do menu mobile
-document.getElementById('mobileZenBtn')?.addEventListener('click', () => { closeMobileMenu(); toggleZenMode(); });
-document.getElementById('mobileChatBtn')?.addEventListener('click', () => { closeMobileMenu(); OracleChat.toggle(); });
-document.getElementById('mobileFinanceBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './financeiro.html'; });
-document.getElementById('mobilePontoBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './carga-horaria.html'; });
-document.getElementById('mobileSaveBtn')?.addEventListener('click', () => { closeMobileMenu(); saveGame(); });
-document.getElementById('mobileUpdateBtn')?.addEventListener('click', () => { closeMobileMenu(); checkForUpdates(); });
-document.getElementById('mobileExportBtn')?.addEventListener('click', () => { closeMobileMenu(); elements.exportBtn?.click(); });
-document.getElementById('mobileImportBtn')?.addEventListener('click', () => { closeMobileMenu(); elements.importBtn?.click(); });
-document.getElementById('mobileLogoutBtn')?.addEventListener('click', () => { closeMobileMenu(); logout(); });
+// Ações do drawer - Abas (fecha drawer e troca aba)
+document.querySelectorAll('.mobile-drawer-item.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tabId = btn.getAttribute('data-tab');
+    // Remove active de todos
+    document.querySelectorAll('.mobile-drawer-item.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    // Ativa o clicado
+    btn.classList.add('active');
+    const target = document.getElementById(`tab-${tabId}`);
+    if (target) target.classList.add('active');
+    // Sincroniza com tabs desktop
+    document.querySelectorAll(`.tab-btn[data-tab="${tabId}"]`).forEach(b => b.classList.add('active'));
+    closeDrawer();
+  });
+});
+
+// Ações do drawer - Ferramentas
+document.getElementById('drawerZenBtn')?.addEventListener('click', () => { closeDrawer(); toggleZenMode(); });
+document.getElementById('drawerChatBtn')?.addEventListener('click', () => { closeDrawer(); OracleChat.toggle(); });
+document.getElementById('drawerFinanceBtn')?.addEventListener('click', () => { closeDrawer(); window.location.href = './financeiro.html'; });
+document.getElementById('drawerPontoBtn')?.addEventListener('click', () => { closeDrawer(); window.location.href = './carga-horaria.html'; });
+
+// Ações do drawer - Sistema
+document.getElementById('drawerSaveBtn')?.addEventListener('click', () => { closeDrawer(); saveGame(); });
+document.getElementById('drawerUpdateBtn')?.addEventListener('click', () => { closeDrawer(); checkForUpdates(); });
+document.getElementById('drawerExportBtn')?.addEventListener('click', () => { closeDrawer(); elements.exportBtn?.click(); });
+document.getElementById('drawerImportBtn')?.addEventListener('click', () => { closeDrawer(); elements.importBtn?.click(); });
+document.getElementById('drawerLogoutBtn')?.addEventListener('click', () => { closeDrawer(); logout(); });
 
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {
