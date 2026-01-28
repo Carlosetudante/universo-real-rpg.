@@ -7463,20 +7463,7 @@ setInterval(updateRelationshipTimer, 1000);
 let swRegistration = null;
 let updateAvailable = false;
 
-// Verifica se há atualização disponível
-async function checkForUpdates() {
-  if (!swRegistration) return false;
-  
-  try {
-    await swRegistration.update();
-    return updateAvailable;
-  } catch (e) {
-    console.warn('Erro ao verificar atualizações:', e);
-    return false;
-  }
-}
-
-// Força atualização do app
+// Força atualização do app (chamado pela notificação automática)
 function forceAppUpdate() {
   if (swRegistration && swRegistration.waiting) {
     // Envia mensagem para o SW waiting para ativar
