@@ -198,34 +198,36 @@
     .control-bar {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 16px;
-      background: rgba(0, 0, 0, 0.3);
+      gap: 6px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
+      border-radius: 16px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      flex-wrap: wrap;
+      justify-content: center;
     }
 
     .divider-v {
       width: 1px;
-      height: 24px;
-      background: rgba(255, 255, 255, 0.1);
-      margin: 0 4px;
+      height: 20px;
+      background: rgba(255, 255, 255, 0.15);
+      margin: 0 2px;
     }
 
     /* Botões de Ícone */
     .icon-btn {
-      width: 40px;
-      height: 40px;
-      border-radius: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
       border: 1px solid rgba(255, 255, 255, 0.05);
-      background: rgba(255, 255, 255, 0.03);
+      background: rgba(255, 255, 255, 0.05);
       color: #ccc;
       display: grid;
       place-items: center;
-      font-size: 18px;
+      font-size: 16px;
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
@@ -889,12 +891,32 @@
         width: 100%;
         overflow-x: auto;
         justify-content: flex-start;
-        padding: 10px;
+        padding: 8px 10px;
+        gap: 4px;
         -webkit-overflow-scrolling: touch; /* Rolagem suave no iOS */
       }
       
       .control-bar::-webkit-scrollbar {
         display: none; /* Esconde barra de rolagem */
+      }
+      
+      .control-bar .icon-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+      
+      .control-bar .save-btn {
+        font-size: 12px;
+        padding: 6px 10px;
+        flex-shrink: 0;
+      }
+      
+      .control-bar .divider-v {
+        height: 18px;
+        margin: 0 1px;
+        flex-shrink: 0;
       }
       
       .btn, .ghost {
