@@ -2660,3 +2660,28 @@ input.success {
     font-size: 14px;
   }
 }
+
+/* ==========================================
+   MOBILE OVERRIDE - Regras finais garantidas
+   ========================================== */
+@media screen and (max-width: 900px) {
+  .cinema {
+    display: none !important;
+  }
+  
+  .mobile-header {
+    display: flex !important;
+  }
+  
+  .mobile-bottom-nav {
+    display: flex !important;
+  }
+  
+  .panel {
+    padding-bottom: 100px !important;
+  }
+  
+  .card {
+    flex-direction: column !important;
+  }
+}
