@@ -2673,8 +2673,13 @@ input.success {
     display: flex !important;
   }
   
-  .mobile-bottom-nav {
+  /* Só mostra bottom nav se não tiver classe hidden */
+  .mobile-bottom-nav:not(.hidden) {
     display: flex !important;
+  }
+  
+  .mobile-bottom-nav.hidden {
+    display: none !important;
   }
   
   .panel {

@@ -455,12 +455,24 @@ function showAuthModal() {
   elements.authModal.classList.add('active');
   elements.gameScreen.classList.add('hidden');
   if (elements.fabContainer) elements.fabContainer.classList.add('hidden');
+  
+  // Esconde navegação mobile na tela de login
+  const mobileBottomNav = document.getElementById('mobileBottomNav');
+  const mobileHeader = document.getElementById('mobileHeader');
+  if (mobileBottomNav) mobileBottomNav.classList.add('hidden');
+  if (mobileHeader) mobileHeader.style.display = 'none';
 }
 
 function hideAuthModal() {
   elements.authModal.classList.remove('active');
   elements.gameScreen.classList.remove('hidden');
   if (elements.fabContainer) elements.fabContainer.classList.remove('hidden');
+  
+  // Mostra navegação mobile após login (o CSS controla se aparece baseado na largura da tela)
+  const mobileBottomNav = document.getElementById('mobileBottomNav');
+  const mobileHeader = document.getElementById('mobileHeader');
+  if (mobileBottomNav) mobileBottomNav.classList.remove('hidden');
+  if (mobileHeader) mobileHeader.style.display = '';
 }
 
 function showLoginForm() {
