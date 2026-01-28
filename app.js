@@ -7323,21 +7323,35 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     deferredPrompt = e;
     
-    // Mostra o botão de instalar
-    if (elements.installAppBtn) {
-      elements.installAppBtn.style.display = 'block';
-      
-      elements.installAppBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          console.log(`Resultado da instalação: ${outcome}`);
-          deferredPrompt = null;
-          elements.installAppBtn.style.display = 'none';
-        }
-      });
+    // Mostra os botões de instalar (na tela de login e na barra de controle)
+    const installBtn1 = elements.installAppBtn;
+    const installBtn2 = document.getElementById('installAppBtn2');
+    
+    if (installBtn1) {
+      installBtn1.style.display = 'block';
+      installBtn1.addEventListener('click', handleInstallClick);
+    }
+    
+    if (installBtn2) {
+      installBtn2.style.display = 'flex';
+      installBtn2.addEventListener('click', handleInstallClick);
     }
   });
+  
+  // Função compartilhada para instalar o app
+  async function handleInstallClick() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`Resultado da instalação: ${outcome}`);
+      deferredPrompt = null;
+      
+      // Esconde ambos os botões
+      if (elements.installAppBtn) elements.installAppBtn.style.display = 'none';
+      const installBtn2 = document.getElementById('installAppBtn2');
+      if (installBtn2) installBtn2.style.display = 'none';
+    }
+  }
 
   // Tratamento de erro para o áudio Zen (evita erro no console se falhar)
   if (elements.zenAudio) {
@@ -7413,6 +7427,8 @@ window.addEventListener('DOMContentLoaded', () => {
 // Evento disparado quando o app é instalado com sucesso
 window.addEventListener('appinstalled', () => {
   if (elements.installAppBtn) elements.installAppBtn.style.display = 'none';
+  const installBtn2 = document.getElementById('installAppBtn2');
+  if (installBtn2) installBtn2.style.display = 'none';
   showToast('🎉 App instalado com sucesso!');
 });
 
