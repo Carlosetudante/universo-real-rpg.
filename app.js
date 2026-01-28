@@ -3558,72 +3558,53 @@ if (elements.simpleFinanceBtn) elements.simpleFinanceBtn.addEventListener('click
 const cargaHorariaBtn = document.getElementById('cargaHorariaBtn');
 if (cargaHorariaBtn) cargaHorariaBtn.addEventListener('click', () => window.location.href = './carga-horaria.html');
 
-// Botão de Atualização do App
-const updateAppBtn = document.getElementById('updateAppBtn');
-if (updateAppBtn) updateAppBtn.addEventListener('click', checkForUpdates);
-
 // Função para verificar e aplicar atualizações
 async function checkForUpdates() {
   const btn = document.getElementById('updateAppBtn');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = '⏳';
-  }
-  
-  showToast('🔍 Verificando atualizações...');
   
   try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '⏳';
+    }
+    
+    showToast('🔍 Verificando atualizações...');
+    
+    // Limpa todos os caches primeiro
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+    }
+    
+    // Tenta atualizar o Service Worker
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (registration) {
-        // Força verificação de atualização
         await registration.update();
         
-        // Se há um novo SW esperando, ativa ele
         if (registration.waiting) {
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-          showToast('🚀 Atualização encontrada! Recarregando...');
-          setTimeout(() => window.location.reload(true), 1500);
-          return;
         }
-        
-        // Se há um SW instalando
-        if (registration.installing) {
-          showToast('📥 Baixando atualização...');
-          registration.installing.addEventListener('statechange', (e) => {
-            if (e.target.state === 'installed') {
-              showToast('🚀 Atualização pronta! Recarregando...');
-              setTimeout(() => window.location.reload(true), 1500);
-            }
-          });
-          return;
-        }
-        
-        // Limpa cache e recarrega para garantir
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-        
-        showToast('✅ App atualizado! Recarregando...');
-        setTimeout(() => window.location.reload(true), 1500);
-      } else {
-        // Sem SW registrado, apenas recarrega
-        showToast('🔄 Recarregando página...');
-        setTimeout(() => window.location.reload(true), 1000);
       }
-    } else {
-      // Navegador sem suporte a SW
-      showToast('🔄 Recarregando página...');
-      setTimeout(() => window.location.reload(true), 1000);
     }
+    
+    showToast('✅ Cache limpo! Recarregando...');
+    setTimeout(() => {
+      window.location.href = window.location.href.split('?')[0] + '?v=' + Date.now();
+    }, 1000);
+    
   } catch (error) {
     console.error('Erro ao atualizar:', error);
-    showToast('❌ Erro ao verificar. Tente recarregar manualmente.');
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '🔄';
-    }
+    showToast('🔄 Recarregando...');
+    setTimeout(() => window.location.reload(true), 1000);
   }
+}
+
+// Botão de Atualização do App
+const updateAppBtn = document.getElementById('updateAppBtn');
+if (updateAppBtn) {
+  updateAppBtn.addEventListener('click', checkForUpdates);
 }
 
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
