@@ -7185,8 +7185,9 @@ const OracleChat = {
   }
 };
 
-// Expõe globalmente para compatibilidade
+// Expõe globalmente para compatibilidade com onclick no HTML
 window.toggleChat = () => OracleChat.toggle();
+window.toggleZenMode = toggleZenMode;
 
 // --- Lógica do Menu Mobile ---
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -7210,7 +7211,7 @@ if (mobileToolsOverlay) {
 }
 
 // Ações do menu mobile
-document.getElementById('mobileZenBtn')?.addEventListener('click', () => { closeMobileMenu(); enterZenMode(); });
+document.getElementById('mobileZenBtn')?.addEventListener('click', () => { closeMobileMenu(); toggleZenMode(); });
 document.getElementById('mobileChatBtn')?.addEventListener('click', () => { closeMobileMenu(); OracleChat.toggle(); });
 document.getElementById('mobileFinanceBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './financeiro.html'; });
 document.getElementById('mobilePontoBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './carga-horaria.html'; });
