@@ -3558,6 +3558,74 @@ if (elements.simpleFinanceBtn) elements.simpleFinanceBtn.addEventListener('click
 const cargaHorariaBtn = document.getElementById('cargaHorariaBtn');
 if (cargaHorariaBtn) cargaHorariaBtn.addEventListener('click', () => window.location.href = './carga-horaria.html');
 
+// Botão de Atualização do App
+const updateAppBtn = document.getElementById('updateAppBtn');
+if (updateAppBtn) updateAppBtn.addEventListener('click', checkForUpdates);
+
+// Função para verificar e aplicar atualizações
+async function checkForUpdates() {
+  const btn = document.getElementById('updateAppBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳';
+  }
+  
+  showToast('🔍 Verificando atualizações...');
+  
+  try {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      
+      if (registration) {
+        // Força verificação de atualização
+        await registration.update();
+        
+        // Se há um novo SW esperando, ativa ele
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          showToast('🚀 Atualização encontrada! Recarregando...');
+          setTimeout(() => window.location.reload(true), 1500);
+          return;
+        }
+        
+        // Se há um SW instalando
+        if (registration.installing) {
+          showToast('📥 Baixando atualização...');
+          registration.installing.addEventListener('statechange', (e) => {
+            if (e.target.state === 'installed') {
+              showToast('🚀 Atualização pronta! Recarregando...');
+              setTimeout(() => window.location.reload(true), 1500);
+            }
+          });
+          return;
+        }
+        
+        // Limpa cache e recarrega para garantir
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        
+        showToast('✅ App atualizado! Recarregando...');
+        setTimeout(() => window.location.reload(true), 1500);
+      } else {
+        // Sem SW registrado, apenas recarrega
+        showToast('🔄 Recarregando página...');
+        setTimeout(() => window.location.reload(true), 1000);
+      }
+    } else {
+      // Navegador sem suporte a SW
+      showToast('🔄 Recarregando página...');
+      setTimeout(() => window.location.reload(true), 1000);
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar:', error);
+    showToast('❌ Erro ao verificar. Tente recarregar manualmente.');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🔄';
+    }
+  }
+}
+
 if (elements.zenMusicInput) elements.zenMusicInput.addEventListener('change', handleZenMusicSelect);
 if (elements.zenImageInput) elements.zenImageInput.addEventListener('change', handleZenImageSelect);
 if (elements.zenBackgroundDisplay) elements.zenBackgroundDisplay.addEventListener('click', toggleZenImageSize);
@@ -7388,11 +7456,156 @@ setInterval(() => {
 // Timer do Relacionamento (1 segundo)
 setInterval(updateRelationshipTimer, 1000);
 
-// Registrar Service Worker (PWA)
+// ===========================================
+// SISTEMA DE ATUALIZAÇÃO DO PWA
+// ===========================================
+
+let swRegistration = null;
+let updateAvailable = false;
+
+// Verifica se há atualização disponível
+async function checkForUpdates() {
+  if (!swRegistration) return false;
+  
+  try {
+    await swRegistration.update();
+    return updateAvailable;
+  } catch (e) {
+    console.warn('Erro ao verificar atualizações:', e);
+    return false;
+  }
+}
+
+// Força atualização do app
+function forceAppUpdate() {
+  if (swRegistration && swRegistration.waiting) {
+    // Envia mensagem para o SW waiting para ativar
+    swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    // Se não tem SW waiting, apenas recarrega
+    window.location.reload(true);
+  }
+}
+
+// Mostra notificação de atualização
+function showUpdateNotification() {
+  // Remove notificação antiga se existir
+  const oldNotif = document.getElementById('updateNotification');
+  if (oldNotif) oldNotif.remove();
+  
+  const notification = document.createElement('div');
+  notification.id = 'updateNotification';
+  notification.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #4ade80, #22c55e);
+      color: #000;
+      padding: 12px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 600;
+      animation: slideUp 0.3s ease;
+    ">
+      <span>🔄 Nova versão disponível!</span>
+      <button onclick="forceAppUpdate()" style="
+        background: #000;
+        color: #fff;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: bold;
+      ">Atualizar</button>
+      <button onclick="this.parentElement.parentElement.remove()" style="
+        background: transparent;
+        border: none;
+        color: #000;
+        cursor: pointer;
+        font-size: 18px;
+      ">✕</button>
+    </div>
+  `;
+  document.body.appendChild(notification);
+}
+
+// Adiciona estilos de animação
+const updateStyles = document.createElement('style');
+updateStyles.textContent = `
+  @keyframes slideUp {
+    from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+  }
+`;
+document.head.appendChild(updateStyles);
+
+// Registrar Service Worker (PWA) com detecção de atualizações
 if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.protocol === 'http:')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('Service Worker registrado!', reg))
-      .catch(err => console.log('Falha no Service Worker:', err));
+      .then(reg => {
+        console.log('✅ Service Worker registrado!');
+        swRegistration = reg;
+        
+        // Verifica se já tem um SW waiting (atualização pendente)
+        if (reg.waiting) {
+          updateAvailable = true;
+          showUpdateNotification();
+        }
+        
+        // Detecta quando uma nova versão está disponível
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          console.log('🔄 Nova versão sendo instalada...');
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nova versão instalada, mas antiga ainda ativa
+              updateAvailable = true;
+              console.log('✅ Nova versão pronta! Mostrando notificação.');
+              showUpdateNotification();
+            }
+          });
+        });
+        
+        // Verifica atualizações a cada 5 minutos
+        setInterval(() => {
+          reg.update();
+        }, 5 * 60 * 1000);
+      })
+      .catch(err => console.log('❌ Falha no Service Worker:', err));
+    
+    // Quando o SW toma controle, recarrega a página
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('⚡ Novo Service Worker ativo! Recarregando...');
+      window.location.reload();
+    });
   });
 }
+
+// Função global para verificar versão (pode ser chamada do console)
+window.checkAppVersion = async function() {
+  if (swRegistration) {
+    const messageChannel = new MessageChannel();
+    return new Promise(resolve => {
+      messageChannel.port1.onmessage = (event) => {
+        console.log('📱 Versão do app:', event.data.version);
+        resolve(event.data.version);
+      };
+      navigator.serviceWorker.controller?.postMessage(
+        { type: 'GET_VERSION' },
+        [messageChannel.port2]
+      );
+    });
+  }
+  return 'Service Worker não disponível';
+};
+
+// Função global para forçar atualização (pode ser chamada do console)
+window.forceUpdate = forceAppUpdate;
