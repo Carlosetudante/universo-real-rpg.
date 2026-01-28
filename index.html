@@ -237,10 +237,6 @@
           </svg>
           <span>Universo Real</span>
         </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="icon-btn" onclick="toggleZenMode()" title="Modo Zen">🧘</button>
-          <button class="icon-btn" onclick="toggleChat()" title="Oráculo">🤖</button>
-        </div>
       </div>
 
       <div class="cinema">
@@ -400,6 +396,7 @@
               <input type="text" id="taskInput" placeholder="Ex: Beber 2L de água..." style="flex: 2;">
               <button class="ghost" id="viewTaskHistoryBtn" title="Ver Histórico" style="padding: 10px;">📜</button>
               <button class="btn" id="addTaskBtn" style="padding: 10px; width: auto;">+</button>
+              <button class="ghost danger" id="clearAllTasksBtn" title="Remover Todas" style="padding: 10px;">🗑️</button>
             </div>
             <div class="task-list" id="taskList">
               <!-- Tarefas serão geradas dinamicamente -->
@@ -683,16 +680,6 @@
         <button class="mobile-drawer-item danger" id="drawerLogoutBtn">🚪 Sair</button>
       </div>
     </nav>
-  </div>
-
-  <!-- FAB (Botão Flutuante de Ações Rápidas) -->
-  <div class="fab-container hidden" id="fabContainer">
-    <div class="fab-actions hidden" id="fabActions">
-      <button class="fab-action" id="fabWorkBtn" title="Registrar Ponto">💼</button>
-      <button class="fab-action" id="fabTaskBtn" title="Adicionar Tarefa">📝</button>
-      <button class="fab-action" id="fabFinanceBtn" title="Nova Transação">💰</button>
-    </div>
-    <button class="fab-main" id="fabMainBtn">➕</button>
   </div>
 
   <!-- Modal do Chat (Oráculo) - Sistema Inteligente -->

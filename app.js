@@ -3592,6 +3592,25 @@ if (elements.addTaskBtn) elements.addTaskBtn.addEventListener('click', addDailyT
 if (elements.taskInput) elements.taskInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addDailyTask();
 });
+
+// Botão de remover todas as tarefas
+const clearAllTasksBtn = document.getElementById('clearAllTasksBtn');
+if (clearAllTasksBtn) {
+  clearAllTasksBtn.addEventListener('click', () => {
+    if (!gameState.dailyTasks || gameState.dailyTasks.length === 0) {
+      showToast('📭 Não há tarefas para remover!');
+      return;
+    }
+    
+    if (confirm(`🗑️ Deseja remover todas as ${gameState.dailyTasks.length} tarefas?`)) {
+      gameState.dailyTasks = [];
+      renderTasks();
+      saveGame();
+      showToast('✅ Todas as tarefas foram removidas!');
+    }
+  });
+}
+
 if (elements.viewTaskHistoryBtn) elements.viewTaskHistoryBtn.addEventListener('click', () => {
   renderTaskHistory();
   elements.taskHistoryModal.classList.add('active');
