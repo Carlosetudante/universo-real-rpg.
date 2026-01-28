@@ -7188,6 +7188,38 @@ const OracleChat = {
 // Expõe globalmente para compatibilidade
 window.toggleChat = () => OracleChat.toggle();
 
+// --- Lógica do Menu Mobile ---
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const mobileToolsOverlay = document.getElementById('mobileToolsOverlay');
+const mobileToolsClose = document.getElementById('mobileToolsClose');
+
+function openMobileMenu() {
+  if (mobileToolsOverlay) mobileToolsOverlay.classList.remove('hidden');
+}
+
+function closeMobileMenu() {
+  if (mobileToolsOverlay) mobileToolsOverlay.classList.add('hidden');
+}
+
+if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileMenu);
+if (mobileToolsClose) mobileToolsClose.addEventListener('click', closeMobileMenu);
+if (mobileToolsOverlay) {
+  mobileToolsOverlay.addEventListener('click', (e) => {
+    if (e.target === mobileToolsOverlay) closeMobileMenu();
+  });
+}
+
+// Ações do menu mobile
+document.getElementById('mobileZenBtn')?.addEventListener('click', () => { closeMobileMenu(); enterZenMode(); });
+document.getElementById('mobileChatBtn')?.addEventListener('click', () => { closeMobileMenu(); OracleChat.toggle(); });
+document.getElementById('mobileFinanceBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './financeiro.html'; });
+document.getElementById('mobilePontoBtn')?.addEventListener('click', () => { closeMobileMenu(); window.location.href = './carga-horaria.html'; });
+document.getElementById('mobileSaveBtn')?.addEventListener('click', () => { closeMobileMenu(); saveGame(); });
+document.getElementById('mobileUpdateBtn')?.addEventListener('click', () => { closeMobileMenu(); checkForUpdates(); });
+document.getElementById('mobileExportBtn')?.addEventListener('click', () => { closeMobileMenu(); elements.exportBtn?.click(); });
+document.getElementById('mobileImportBtn')?.addEventListener('click', () => { closeMobileMenu(); elements.importBtn?.click(); });
+document.getElementById('mobileLogoutBtn')?.addEventListener('click', () => { closeMobileMenu(); logout(); });
+
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {
   elements.fabMainBtn.addEventListener('click', (e) => {

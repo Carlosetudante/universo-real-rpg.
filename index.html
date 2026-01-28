@@ -278,22 +278,29 @@
 
         <!-- Ferramentas e Sistema -->
         <div class="press-start">
-          <div class="tools-grid">
-            <button class="tool-btn" id="zenModeBtn"><span class="tool-icon">🧘</span> Zen</button>
-            <button class="tool-btn" id="chatBtn"><span class="tool-icon">🤖</span> Oráculo</button>
-            <button class="tool-btn" id="simpleFinanceBtn"><span class="tool-icon">📊</span> Detalhes</button>
-            <button class="tool-btn" id="cargaHorariaBtn"><span class="tool-icon">⏱️</span> Ponto</button>
-            <button class="tool-btn" id="exportBtn"><span class="tool-icon">📤</span> Backup</button>
-            <button class="tool-btn" id="importBtn"><span class="tool-icon">📥</span> Restaurar</button>
+          <div class="tools-section">
+            <div class="tools-header">🛠️ Ferramentas</div>
+            <div class="tools-grid">
+              <button class="tool-btn" id="zenModeBtn"><span class="tool-icon">🧘</span> Zen</button>
+              <button class="tool-btn" id="chatBtn"><span class="tool-icon">🤖</span> Oráculo</button>
+              <button class="tool-btn" id="simpleFinanceBtn"><span class="tool-icon">📊</span> Relatórios</button>
+              <button class="tool-btn" id="cargaHorariaBtn"><span class="tool-icon">⏱️</span> Ponto</button>
+            </div>
           </div>
           
-          <button class="save-btn" id="saveBtn" style="width: 100%; justify-content: center;">💾 Salvar Progresso</button>
-          
-          <div style="display: flex; gap: 5px;">
-            <button class="tool-btn" id="updateAppBtn" title="Atualizar" style="flex: 1;">🔄</button>
-            <button class="tool-btn" id="installAppBtn2" title="Instalar" style="display: none; flex: 1;">📲</button>
-            <button class="tool-btn" id="restoreBackupBtn" title="Restaurar Auto" style="display: none; flex: 1;">↺</button>
-            <button class="tool-btn" id="logoutBtn" title="Sair" style="flex: 1; border-color: var(--danger); color: var(--danger);">🚪</button>
+          <div class="system-section">
+            <div class="tools-header">⚙️ Sistema</div>
+            <div class="system-actions">
+              <button class="save-btn" id="saveBtn">💾 Salvar</button>
+              <button class="system-btn" id="updateAppBtn" title="Verificar Atualizações">🔄</button>
+            </div>
+            <div class="system-actions">
+              <button class="system-btn secondary" id="exportBtn" title="Exportar Backup">📤</button>
+              <button class="system-btn secondary" id="importBtn" title="Importar Backup">📥</button>
+              <button class="system-btn secondary" id="restoreBackupBtn" style="display: none;" title="Restaurar">↺</button>
+              <button class="system-btn secondary" id="installAppBtn2" style="display: none;" title="Instalar">📲</button>
+            </div>
+            <button class="logout-btn" id="logoutBtn">🚪 Sair da Conta</button>
           </div>
           <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
         </div>
@@ -641,7 +648,29 @@
     <button class="mobile-nav-item tab-btn" data-tab="finance"><span class="mobile-nav-icon">💰</span>Finanças</button>
     <button class="mobile-nav-item tab-btn" data-tab="social"><span class="mobile-nav-icon">❤️</span>Social</button>
     <button class="mobile-nav-item tab-btn" data-tab="dom"><span class="mobile-nav-icon">💼</span>Trabalho</button>
+    <button class="mobile-nav-item" id="mobileMenuBtn"><span class="mobile-nav-icon">☰</span>Menu</button>
   </nav>
+
+  <!-- Mobile Tools Menu (Slide-up) -->
+  <div class="mobile-tools-overlay hidden" id="mobileToolsOverlay">
+    <div class="mobile-tools-menu" id="mobileToolsMenu">
+      <div class="mobile-tools-header">
+        <h3>🛠️ Ferramentas</h3>
+        <button class="mobile-tools-close" id="mobileToolsClose">✕</button>
+      </div>
+      <div class="mobile-tools-grid">
+        <button class="mobile-tool-item" id="mobileZenBtn"><span>🧘</span> Modo Zen</button>
+        <button class="mobile-tool-item" id="mobileChatBtn"><span>🤖</span> Oráculo IA</button>
+        <button class="mobile-tool-item" id="mobileFinanceBtn"><span>📊</span> Relatórios</button>
+        <button class="mobile-tool-item" id="mobilePontoBtn"><span>⏱️</span> Ponto</button>
+        <button class="mobile-tool-item" id="mobileSaveBtn"><span>💾</span> Salvar</button>
+        <button class="mobile-tool-item" id="mobileUpdateBtn"><span>🔄</span> Atualizar</button>
+        <button class="mobile-tool-item" id="mobileExportBtn"><span>📤</span> Backup</button>
+        <button class="mobile-tool-item" id="mobileImportBtn"><span>📥</span> Restaurar</button>
+      </div>
+      <button class="mobile-logout-btn" id="mobileLogoutBtn">🚪 Sair da Conta</button>
+    </div>
+  </div>
   
   <!-- FAB (Botão Flutuante de Ações Rápidas) -->
   <div class="fab-container hidden" id="fabContainer">
