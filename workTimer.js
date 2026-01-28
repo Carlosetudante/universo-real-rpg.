@@ -20,9 +20,9 @@ const WorkTimer = {
       this.stopBtn.addEventListener('click', () => this.stop());
     }
 
-    // Cria o widget flutuante se não estamos na página principal do trabalho
-    // ou se o display não existe
-    if (!this.displayElement) {
+    // Cria o widget flutuante APENAS se há um timer ativo E não estamos na página com o timer principal
+    const hasActiveTimer = localStorage.getItem('work_start_time');
+    if (!this.displayElement && hasActiveTimer) {
       this.createFloatingWidget();
     }
 
@@ -30,7 +30,7 @@ const WorkTimer = {
     this.updateDisplay();
 
     // Se há um timer ativo, inicia o intervalo
-    if (localStorage.getItem('work_start_time')) {
+    if (hasActiveTimer) {
       this.intervalId = setInterval(() => this.updateDisplay(), 1000);
     }
 
@@ -40,10 +40,19 @@ const WorkTimer = {
         this.updateDisplay();
         if (e.newValue && !this.intervalId) {
           this.intervalId = setInterval(() => this.updateDisplay(), 1000);
+          // Cria widget se não existe e não estamos na página principal
+          if (!this.displayElement && !this.floatingWidget) {
+            this.createFloatingWidget();
+          }
         } else if (!e.newValue && this.intervalId) {
           clearInterval(this.intervalId);
           this.intervalId = null;
           this.updateDisplay();
+          // Remove widget quando timer para
+          if (this.floatingWidget) {
+            this.floatingWidget.remove();
+            this.floatingWidget = null;
+          }
         }
       }
     });

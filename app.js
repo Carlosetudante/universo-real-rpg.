@@ -889,6 +889,13 @@ function normalizeGameState(data) {
 
   // Mescla os dados importados com o padrão para preencher campos faltantes
   const merged = { ...defaultState, ...data };
+  
+  // Remove valores undefined/null que vieram do data e usa o default
+  Object.keys(defaultState).forEach(key => {
+    if (merged[key] === undefined || merged[key] === null) {
+      merged[key] = defaultState[key];
+    }
+  });
 
   // Garante a integridade dos atributos
   if (data.attributes) {
@@ -2445,9 +2452,19 @@ async function claimDailyReward() {
     if (lastClaim && lastClaim.toDateString() === now.toDateString()) {
       throw new Error('Você já reivindicou a recompensa diária hoje!');
     }
-    // Se ontem, aumenta streak, senão zera
-    if (lastClaim && (now - lastClaim) < 1000 * 60 * 60 * 48 && now.getDate() !== lastClaim.getDate()) {
-      streak++;
+    // Verifica se é o dia seguinte para manter streak
+    if (lastClaim) {
+      const lastClaimDate = new Date(lastClaim.getFullYear(), lastClaim.getMonth(), lastClaim.getDate());
+      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const diffDays = Math.floor((todayDate - lastClaimDate) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 1) {
+        // É exatamente o dia seguinte - mantém streak
+        streak++;
+      } else {
+        // Passou mais de 1 dia - reseta streak
+        streak = 1;
+      }
     } else {
       streak = 1;
     }
@@ -7150,11 +7167,6 @@ const OracleChat = {
   }
 };
 
-// Inicializa o Oráculo quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => OracleChat.init(), 500);
-});
-
 // Expõe globalmente para compatibilidade
 window.toggleChat = () => OracleChat.toggle();
 
@@ -7278,9 +7290,12 @@ function validatePasswords() {
 if (elements.registerPassword) elements.registerPassword.addEventListener('input', validatePasswords);
 if (elements.registerConfirmPassword) elements.registerConfirmPassword.addEventListener('input', validatePasswords);
 
-// Inicialização
+// Inicialização Principal
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🎮 Universo Real carregado com sucesso!');
+  
+  // Inicializa o Oráculo
+  setTimeout(() => OracleChat.init(), 500);
   
   // Splash Screen Logic
   const splash = document.getElementById('splashScreen');
