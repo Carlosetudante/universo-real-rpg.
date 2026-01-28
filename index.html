@@ -229,7 +229,7 @@
     <!-- Tela Principal do Jogo -->
     <div class="card hidden" id="gameScreen">
       <!-- Mobile Header -->
-      <div class="mobile-header">
+      <div class="mobile-header" id="mobileHeader">
         <div class="logo" style="font-size: 18px;">
           <svg class="logo-icon" style="width: 24px; height: 24px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="#ffdd57" stroke-width="6" stroke-linejoin="round"/>
@@ -641,8 +641,8 @@
     </div>
   </div>
 
-  <!-- Mobile Bottom Navigation -->
-  <nav class="mobile-bottom-nav">
+  <!-- Mobile Bottom Navigation (Escondido até fazer login) -->
+  <nav class="mobile-bottom-nav hidden" id="mobileBottomNav">
     <button class="mobile-nav-item active tab-btn" data-tab="hero"><span class="mobile-nav-icon">🦸</span>Herói</button>
     <button class="mobile-nav-item tab-btn" data-tab="quests"><span class="mobile-nav-icon">📜</span>Missões</button>
     <button class="mobile-nav-item tab-btn" data-tab="finance"><span class="mobile-nav-icon">💰</span>Finanças</button>
@@ -651,7 +651,7 @@
     <button class="mobile-nav-item" id="mobileMenuBtn"><span class="mobile-nav-icon">☰</span>Menu</button>
   </nav>
 
-  <!-- Mobile Tools Menu (Slide-up) -->
+  <!-- Mobile Tools Menu (Slide-up - Escondido até fazer login) -->
   <div class="mobile-tools-overlay hidden" id="mobileToolsOverlay">
     <div class="mobile-tools-menu" id="mobileToolsMenu">
       <div class="mobile-tools-header">
