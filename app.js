@@ -7236,6 +7236,16 @@ const OracleChat = {
 // Expõe globalmente para compatibilidade com onclick no HTML
 window.toggleChat = () => OracleChat.toggle();
 window.toggleZenMode = toggleZenMode;
+window.removeTask = removeTask;
+window.toggleTask = toggleTask;
+window.removeTransaction = removeTransaction;
+window.changeFinancePage = changeFinancePage;
+window.removeExpenseGroup = removeExpenseGroup;
+window.toggleBillPaid = toggleBillPaid;
+window.removeBill = removeBill;
+window.removeSkillPoint = removeSkillPoint;
+window.addSkillPoint = addSkillPoint;
+window.removeItem = removeItem;
 
 // --- Lógica do Menu Drawer Mobile ---
 const mobileFabMenu = document.getElementById('mobileFabMenu');
