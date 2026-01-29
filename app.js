@@ -155,19 +155,185 @@ const ATTRIBUTES = [
   { id: 'resilience', name: 'Resiliência', icon: '🛡️', description: 'Superação de desafios' }
 ];
 
-// Sistema de Conquistas
+// Sistema de Conquistas com informações interativas
 const ACHIEVEMENTS = [
-  { id: 'first_step', name: 'Primeiro Passo', icon: '👣', condition: (char) => char.level >= 1, unlocked: true, titleReward: 'O Iniciante' },
-  { id: 'level_5', name: 'Novato', icon: '🌱', condition: (char) => char.level >= 5, titleReward: 'Aprendiz' },
-  { id: 'level_10', name: 'Experiente', icon: '⭐', condition: (char) => char.level >= 10, titleReward: 'Aventureiro' },
-  { id: 'level_25', name: 'Veterano', icon: '🏅', condition: (char) => char.level >= 25, titleReward: 'Veterano' },
-  { id: 'level_50', name: 'Mestre', icon: '👑', condition: (char) => char.level >= 50, titleReward: 'Lenda' },
-  { id: 'all_attrs_10', name: 'Equilibrado', icon: '⚖️', condition: (char) => Object.values(char.attributes).every(v => v >= 10), titleReward: 'Harmônico' },
-  { id: 'one_attr_50', name: 'Especialista', icon: '🎯', condition: (char) => Object.values(char.attributes).some(v => v >= 50), titleReward: 'Grão-Mestre' },
-  { id: 'week_streak', name: 'Consistente', icon: '🔥', condition: (char) => char.streak >= 7, titleReward: 'Persistente' },
-  { id: 'month_streak', name: 'Dedicado', icon: '💎', condition: (char) => char.streak >= 30, titleReward: 'Imparável' },
-  { id: 'streak_10', name: 'Chave Mestra', icon: '🗝️', condition: (char) => char.streak >= 10, titleReward: 'Guardião', secret: true }
+  { 
+    id: 'first_step', 
+    name: 'Primeiro Passo', 
+    icon: '👣', 
+    condition: (char) => char.level >= 1, 
+    unlocked: true, 
+    titleReward: 'O Iniciante',
+    description: 'Você deu o primeiro passo na sua jornada de evolução pessoal!',
+    getStats: () => {
+      const now = new Date();
+      const sessionTime = loginTime ? (now - loginTime) : 0;
+      const totalTime = (gameState.playTime || 0) + sessionTime;
+      const hours = Math.floor(totalTime / 3600000);
+      const minutes = Math.floor((totalTime % 3600000) / 60000);
+      const startDate = gameState.createdAt ? new Date(gameState.createdAt).toLocaleDateString('pt-BR') : 'Início da jornada';
+      return `⏱️ Tempo total: ${hours}h ${minutes}m\n📅 Início: ${startDate}`;
+    }
+  },
+  { 
+    id: 'level_5', 
+    name: 'Novato', 
+    icon: '🌱', 
+    condition: (char) => char.level >= 5, 
+    titleReward: 'Aprendiz',
+    description: 'Uma semente plantada começa a brotar. Você está crescendo!',
+    getStats: () => {
+      const totalXpEarned = (gameState.level - 1) * 100 + gameState.xp;
+      const tasksCompleted = gameState.taskHistory?.reduce((sum, day) => sum + day.tasks.length, 0) || 0;
+      return `⭐ XP Total Ganho: ${totalXpEarned}\n✅ Tarefas concluídas: ${tasksCompleted}`;
+    }
+  },
+  { 
+    id: 'level_10', 
+    name: 'Experiente', 
+    icon: '⭐', 
+    condition: (char) => char.level >= 10, 
+    titleReward: 'Aventureiro',
+    description: 'Você já percorreu um longo caminho. Continue brilhando!',
+    getStats: () => {
+      const avgXpPerDay = gameState.xpHistory ? Math.round(Object.values(gameState.xpHistory).reduce((a,b) => a+b, 0) / Math.max(Object.keys(gameState.xpHistory).length, 1)) : 0;
+      return `📊 Média XP/dia: ${avgXpPerDay}\n🏆 Nível atual: ${gameState.level}`;
+    }
+  },
+  { 
+    id: 'level_25', 
+    name: 'Veterano', 
+    icon: '🏅', 
+    condition: (char) => char.level >= 25, 
+    titleReward: 'Veterano',
+    description: 'Um verdadeiro guerreiro forjado pela disciplina!',
+    getStats: () => {
+      const topAttr = Object.entries(gameState.attributes).sort((a,b) => b[1] - a[1])[0];
+      const attrName = ATTRIBUTES.find(a => a.id === topAttr[0])?.name || topAttr[0];
+      return `💪 Maior atributo: ${attrName} (${topAttr[1]})\n🎖️ Pontos distribuídos: ${Object.values(gameState.attributes).reduce((a,b) => a+b, 0) - 10}`;
+    }
+  },
+  { 
+    id: 'level_50', 
+    name: 'Mestre', 
+    icon: '👑', 
+    condition: (char) => char.level >= 50, 
+    titleReward: 'Lenda',
+    description: 'Você alcançou a maestria! Poucos chegam tão longe.',
+    getStats: () => {
+      const totalAchievements = gameState.achievements?.length || 0;
+      return `🏆 Conquistas: ${totalAchievements}/${ACHIEVEMENTS.length}\n👑 Status: LENDÁRIO`;
+    }
+  },
+  { 
+    id: 'all_attrs_10', 
+    name: 'Equilibrado', 
+    icon: '⚖️', 
+    condition: (char) => Object.values(char.attributes).every(v => v >= 10), 
+    titleReward: 'Harmônico',
+    description: 'Equilíbrio perfeito em todas as áreas da vida!',
+    getStats: () => {
+      const attrs = gameState.attributes;
+      const total = Object.values(attrs).reduce((a,b) => a+b, 0);
+      const avg = Math.round(total / Object.keys(attrs).length);
+      return `⚖️ Média dos atributos: ${avg}\n🎯 Total de pontos: ${total}`;
+    }
+  },
+  { 
+    id: 'one_attr_50', 
+    name: 'Especialista', 
+    icon: '🎯', 
+    condition: (char) => Object.values(char.attributes).some(v => v >= 50), 
+    titleReward: 'Grão-Mestre',
+    description: 'Você se tornou um especialista em sua área!',
+    getStats: () => {
+      const maxAttr = Object.entries(gameState.attributes).sort((a,b) => b[1] - a[1])[0];
+      const attrData = ATTRIBUTES.find(a => a.id === maxAttr[0]);
+      return `🎯 Especialidade: ${attrData?.name || maxAttr[0]}\n📈 Nível: ${maxAttr[1]} pontos`;
+    }
+  },
+  { 
+    id: 'week_streak', 
+    name: 'Consistente', 
+    icon: '🔥', 
+    condition: (char) => char.streak >= 7, 
+    titleReward: 'Persistente',
+    description: 'Uma semana inteira de dedicação! O hábito está se formando.',
+    getStats: () => {
+      const currentStreak = gameState.streak || 0;
+      const maxStreak = gameState.maxStreak || currentStreak;
+      return `🔥 Sequência atual: ${currentStreak} dias\n🏆 Recorde: ${maxStreak} dias`;
+    }
+  },
+  { 
+    id: 'month_streak', 
+    name: 'Dedicado', 
+    icon: '💎', 
+    condition: (char) => char.streak >= 30, 
+    titleReward: 'Imparável',
+    description: 'Um mês inteiro! Você é verdadeiramente imparável!',
+    getStats: () => {
+      const daysActive = gameState.xpHistory ? Object.keys(gameState.xpHistory).length : 0;
+      return `💎 Dias ativos: ${daysActive}\n🔥 Sequência: ${gameState.streak} dias`;
+    }
+  },
+  { 
+    id: 'streak_10', 
+    name: 'Chave Mestra', 
+    icon: '🗝️', 
+    condition: (char) => char.streak >= 10, 
+    titleReward: 'Guardião', 
+    secret: true,
+    description: 'Você encontrou a chave para a consistência!',
+    getStats: () => {
+      const respecUnlocked = (gameState.streak || 0) >= 10;
+      return `🗝️ Respec desbloqueado: ${respecUnlocked ? 'SIM' : 'NÃO'}\n⚡ Poder especial: Redistribuir atributos`;
+    }
+  }
 ];
+
+// Função para mostrar detalhes da conquista ao clicar
+function showAchievementDetails(achievementId) {
+  const achievement = ACHIEVEMENTS.find(a => a.id === achievementId);
+  if (!achievement) return;
+  
+  const unlocked = gameState.achievements.includes(achievementId);
+  if (!unlocked) {
+    showToast('🔒 Conquista ainda não desbloqueada!');
+    return;
+  }
+  
+  // Calcula estatísticas dinâmicas
+  const stats = achievement.getStats ? achievement.getStats() : '';
+  
+  // Cria modal de detalhes
+  const modal = document.createElement('div');
+  modal.className = 'achievement-detail-modal';
+  modal.innerHTML = `
+    <div class="achievement-detail-content">
+      <div class="achievement-detail-header">
+        <span class="achievement-detail-icon">${achievement.icon}</span>
+        <div>
+          <h3>${achievement.name}</h3>
+          <span class="achievement-detail-title">Título: ${achievement.titleReward}</span>
+        </div>
+      </div>
+      <p class="achievement-detail-desc">${achievement.description}</p>
+      <div class="achievement-detail-stats">
+        ${stats.split('\n').map(s => `<div>${s}</div>`).join('')}
+      </div>
+      <button class="btn" onclick="this.closest('.achievement-detail-modal').remove()">Fechar</button>
+    </div>
+  `;
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+  
+  document.body.appendChild(modal);
+  playSound('click');
+  triggerHaptic(20);
+}
 
 // Frases Inspiradoras para o Modo Zen
 const ZEN_QUOTES = [
@@ -2628,13 +2794,17 @@ function renderAchievements() {
     
     const div = document.createElement('div');
     div.className = `achievement-item ${unlocked ? '' : 'locked'}`;
+    div.style.cursor = unlocked ? 'pointer' : 'default';
     div.innerHTML = `
       <span class="achievement-icon">${displayIcon}</span>
       <div style="flex: 1;">
         <div style="font-weight: 600;">${displayName}</div>
-        <div class="small" style="opacity: 0.7;">${unlocked ? 'Desbloqueada!' : '???'}</div>
+        <div class="small" style="opacity: 0.7;">${unlocked ? '✨ Clique para detalhes' : '???'}</div>
       </div>
     `;
+    if (unlocked) {
+      div.onclick = () => showAchievementDetails(achievement.id);
+    }
     if (elements.achievementsList) elements.achievementsList.appendChild(div);
   });
 }
@@ -2650,21 +2820,9 @@ function renderVisualBadges() {
       const badge = document.createElement('div');
       badge.className = 'visual-badge';
       badge.textContent = achievement.icon;
-      
-      if (achievement.icon === '👣') {
-        badge.style.cursor = 'pointer';
-        badge.title = "Ver tempo online";
-        badge.onclick = () => {
-          const now = new Date();
-          const sessionTime = loginTime ? (now - loginTime) : 0;
-          const totalTime = (gameState.playTime || 0) + sessionTime;
-          const hours = Math.floor(totalTime / 3600000);
-          const minutes = Math.floor((totalTime % 3600000) / 60000);
-          showToast(`⏱️ Tempo total online: ${hours}h e ${minutes}m`);
-        };
-      } else {
-        badge.title = `${achievement.name}\n${achievement.titleReward ? 'Título: ' + achievement.titleReward : 'Conquista Desbloqueada'}`;
-      }
+      badge.style.cursor = 'pointer';
+      badge.title = `${achievement.name} - Clique para ver detalhes`;
+      badge.onclick = () => showAchievementDetails(achId);
       
       elements.heroVisualBadges.appendChild(badge);
     }
@@ -6634,9 +6792,201 @@ const OracleChat = {
       return `Lembro que você me disse: "<em>${memories[0].text}</em>". Isso ajuda, ${treatment}? 🤔`;
     }
     
+    // Sistema de sabedoria contextual
+    const wisdomResponse = this.getContextualWisdom(input);
+    if (wisdomResponse) return wisdomResponse;
+    
     return CHARISMATIC_RESPONSES.notUnderstood[
       Math.floor(Math.random() * CHARISMATIC_RESPONSES.notUnderstood.length)
     ] + `<br><br>Dica: Diz <strong>"ajuda"</strong> pra ver o que sei fazer! 💡`;
+  },
+  
+  // Sistema de Sabedoria Contextual - Respostas inteligentes baseadas em contexto
+  getContextualWisdom(input) {
+    const lower = input.toLowerCase();
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    const hour = new Date().getHours();
+    
+    // Base de conhecimento do Oráculo
+    const wisdom = {
+      // Estados emocionais
+      emotions: {
+        sad: {
+          triggers: ['triste', 'mal', 'chateado', 'chateada', 'desanimado', 'desanimada', 'deprimido', 'deprimida', 'pra baixo', 'chorando', 'chorei'],
+          responses: [
+            `${name}, sinto muito que você esteja assim. 💙 Lembre-se: tempestades não duram para sempre. Cada dia difícil é um passo para um você mais forte.`,
+            `Ei, ${name}... Está tudo bem não estar bem às vezes. 🌧️ Mas você é mais forte do que imagina. O que está te incomodando?`,
+            `${name}, a tristeza faz parte da jornada. 💫 "Depois da tempestade vem a bonança." Estou aqui se quiser desabafar.`,
+            `Força, ${name}! 💪 Dias ruins constroem dias melhores. Que tal fazer uma coisa que te deixe feliz? Mesmo que pequena.`
+          ]
+        },
+        anxious: {
+          triggers: ['ansioso', 'ansiosa', 'ansiedade', 'nervoso', 'nervosa', 'preocupado', 'preocupada', 'estressado', 'estressada'],
+          responses: [
+            `Respira fundo, ${name}. 🧘 Tenta o 4-7-8: inspira 4s, segura 7s, expira 8s. A ansiedade é mentirosa - você vai superar isso!`,
+            `Ei, ${name}! 💨 Uma coisa de cada vez. Não tente resolver tudo agora. Qual é a MENOR coisa que você pode fazer agora?`,
+            `${name}, a ansiedade vê monstros onde não existem. 🌟 Foque no agora, neste momento. O que você consegue controlar AGORA?`,
+            `Calma, ${name}! 🌊 "Não antecipe problemas. Quando eles chegarem, você estará mais forte do que imagina." - Anônimo`
+          ]
+        },
+        happy: {
+          triggers: ['feliz', 'alegre', 'animado', 'animada', 'empolgado', 'empolgada', 'contente', 'realizado', 'realizada'],
+          responses: [
+            `Que maravilha, ${name}! 🎉 Sua energia positiva é contagiante! Aproveite esse momento e lembre dele nos dias difíceis.`,
+            `Show de bola, ${name}! ✨ A felicidade atrai mais felicidade. Continue irradiando essa luz!`,
+            `Fico muito feliz por você, ${name}! 🌟 Guarde essa sensação no coração - ela é combustível pra jornada.`
+          ]
+        },
+        tired: {
+          triggers: ['cansado', 'cansada', 'exausto', 'exausta', 'esgotado', 'esgotada', 'sem energia', 'morto', 'morta'],
+          responses: [
+            `${name}, seu corpo está pedindo descanso. 😴 Não é fraqueza, é sabedoria. Já considerou uma pausa?`,
+            `Ei, ${name}! O descanso faz parte do treino. 🛌 Atletas de elite dormem 10h+. Cuide de você!`,
+            `${name}, "descanse quando precisar, não quando quebrar." 💜 Que tal uma soneca ou atividade relaxante?`
+          ]
+        },
+        angry: {
+          triggers: ['raiva', 'bravo', 'brava', 'irritado', 'irritada', 'puto', 'puta', 'nervoso', 'ódio'],
+          responses: [
+            `Entendo sua frustração, ${name}. 😤 Respira... A raiva é válida, mas não deixe ela te controlar. Quer desabafar?`,
+            `${name}, às vezes a raiva é um sinal de que algo precisa mudar. 🔥 Use essa energia para agir, não para destruir.`,
+            `Calma, ${name}. "Antes de falar com raiva, conte até 10. Se ainda estiver com raiva, conte até 100." 🧘`
+          ]
+        },
+        lonely: {
+          triggers: ['sozinho', 'sozinha', 'solidão', 'solitário', 'solitária', 'ninguém', 'abandonado', 'abandonada'],
+          responses: [
+            `${name}, você não está sozinho! 💙 Eu estou aqui, e muitas pessoas se importam com você. Que tal mandar mensagem pra alguém?`,
+            `Ei, ${name}... A solidão dói, mas também pode ser um momento de autoconhecimento. 🌙 O que você descobriu sobre si mesmo?`,
+            `${name}, "a solidão é o preço da liberdade, mas também o berço da criatividade." 🎨 Use esse tempo para criar algo!`
+          ]
+        }
+      },
+      
+      // Tópicos específicos
+      topics: {
+        motivation: {
+          triggers: ['motivação', 'motivar', 'desistir', 'não consigo', 'vou desistir', 'quero desistir', 'sem vontade'],
+          responses: [
+            `${name}, disciplina supera motivação! 💪 A motivação vai e vem, mas o compromisso consigo mesmo permanece. Dê só o primeiro passo.`,
+            `Ei, ${name}! "O sucesso é a soma de pequenos esforços repetidos dia após dia." 🏆 Não desista no capítulo 1!`,
+            `${name}, você já chegou tão longe! 🌟 Olhe para trás e veja sua evolução. Cada dia é uma nova chance.`,
+            `Desistir é fácil, ${name}. Por isso poucas pessoas chegam lá. 🎯 Você é diferente. Prove isso!`
+          ]
+        },
+        success: {
+          triggers: ['sucesso', 'vencer', 'conseguir', 'realizar', 'conquistar', 'objetivo', 'meta', 'sonho'],
+          responses: [
+            `${name}, sucesso = preparação + oportunidade. 🎯 Continue se preparando, e quando a chance vier, você estará pronto!`,
+            `"O sucesso não é final, o fracasso não é fatal: é a coragem de continuar que conta." - Churchill 💫`,
+            `${name}, defina seu sucesso. Não deixe outros definirem por você. 🏆 O que VOCÊ considera sucesso?`
+          ]
+        },
+        money: {
+          triggers: ['dinheiro', 'rico', 'grana', 'financeiro', 'investir', 'economizar', 'poupar'],
+          responses: [
+            `${name}, dica de ouro: pague-se primeiro! 💰 Antes de gastar, separe pelo menos 10% para você futuro.`,
+            `"Não é sobre quanto você ganha, mas quanto você guarda." 📊 Posso te ajudar a rastrear seus gastos!`,
+            `${name}, três pilares: 1) Gaste menos do que ganha. 2) Invista a diferença. 3) Tenha paciência. 📈`,
+            `Riqueza é liberdade, ${name}. 🗝️ Cada real economizado é um passo para sua independência!`
+          ]
+        },
+        study: {
+          triggers: ['estudar', 'estudo', 'aprender', 'prova', 'faculdade', 'escola', 'curso'],
+          responses: [
+            `${name}, técnica Pomodoro: 25min foco total + 5min pausa. 🍅 Repita 4x e descanse 30min. Funciona demais!`,
+            `Dica: ensine o que aprendeu! 📚 Se consegue explicar para alguém, você realmente entendeu.`,
+            `${name}, "o conhecimento é o único tesouro que aumenta quando compartilhado." 🧠 Continue aprendendo!`,
+            `Estudar cansa, ${name}. Mas a ignorância custa mais caro. 💪 Cada hora de estudo é investimento em você!`
+          ]
+        },
+        health: {
+          triggers: ['saúde', 'exercício', 'academia', 'treino', 'emagrecer', 'dieta', 'dormir', 'sono'],
+          responses: [
+            `${name}, seu corpo é seu templo! 🏛️ Cuide dele como cuidaria do seu bem mais precioso - porque é!`,
+            `Dica de ouro: beba água! 💧 A maioria das pessoas está desidratada sem saber. 2L por dia mínimo!`,
+            `${name}, o sono é quando seu cérebro processa tudo. 😴 7-9h por noite = superpower desbloqueado!`,
+            `"Cuide do seu corpo. É o único lugar que você tem para viver." 🌟 Como está sua saúde, ${name}?`
+          ]
+        },
+        relationship: {
+          triggers: ['relacionamento', 'namoro', 'namorada', 'namorado', 'casamento', 'amor', 'paquera', 'crush'],
+          responses: [
+            `${name}, relacionamentos saudáveis precisam de comunicação! 💑 Fale sobre sentimentos, não só sobre fatos.`,
+            `"Antes de amar alguém, aprenda a se amar." 💖 Você está em paz consigo mesmo, ${name}?`,
+            `${name}, dica: ouça mais do que fala. 👂 Pessoas amam quem realmente as escuta.`,
+            `O amor cresce com gentileza diária, ${name}. 🌹 Pequenos gestos > grandes presentes.`
+          ]
+        },
+        work: {
+          triggers: ['trabalho', 'emprego', 'carreira', 'chefe', 'colega', 'salário', 'promoção'],
+          responses: [
+            `${name}, seja indispensável! 💼 Não faça só o mínimo. Quem faz mais do que é pago, logo é pago mais.`,
+            `"Escolha um trabalho que ame e não terá que trabalhar um dia sequer." ⭐ Mas até lá, faça o seu melhor!`,
+            `${name}, networking é tudo. 🤝 Cultive relacionamentos profissionais. Oportunidades vêm de pessoas!`,
+            `Dica: documente suas conquistas! 📝 Na hora de pedir aumento, você terá provas do seu valor.`
+          ]
+        }
+      },
+      
+      // Perguntas filosóficas
+      philosophical: {
+        triggers: ['sentido da vida', 'por que vivo', 'pra que', 'propósito', 'existência', 'filosofia', 'por que existimos'],
+        responses: [
+          `${name}, o sentido da vida não é encontrado, é criado! 🌟 O que você escolhe que seja importante?`,
+          `"Aquele que tem um porquê pode suportar qualquer como." - Nietzsche 🧠 Qual é o seu porquê, ${name}?`,
+          `${name}, talvez a vida seja sobre a jornada, não o destino. 🚀 O que você está aprendendo no caminho?`,
+          `Grandes perguntas, ${name}! 🤔 Viktor Frankl disse: "A vida nunca é insuportável pela situação, mas pela falta de sentido." O que te dá sentido?`
+        ]
+      }
+    };
+    
+    // Verifica estados emocionais
+    for (const [emotion, data] of Object.entries(wisdom.emotions)) {
+      if (data.triggers.some(t => lower.includes(t))) {
+        return data.responses[Math.floor(Math.random() * data.responses.length)];
+      }
+    }
+    
+    // Verifica tópicos
+    for (const [topic, data] of Object.entries(wisdom.topics)) {
+      if (data.triggers.some(t => lower.includes(t))) {
+        return data.responses[Math.floor(Math.random() * data.responses.length)];
+      }
+    }
+    
+    // Verifica perguntas filosóficas
+    if (wisdom.philosophical.triggers.some(t => lower.includes(t))) {
+      return wisdom.philosophical.responses[Math.floor(Math.random() * wisdom.philosophical.responses.length)];
+    }
+    
+    // Saudações inteligentes baseadas na hora
+    if (lower.match(/^(oi|olá|ola|hey|eai|e ai|fala|salve|bom dia|boa tarde|boa noite)/)) {
+      const greetings = hour < 12 
+        ? [`Bom dia, ${name}! ☀️ Pronto pra conquistar o mundo hoje?`, `Dia lindo, ${name}! 🌅 Que seus objetivos se realizem!`]
+        : hour < 18 
+        ? [`Boa tarde, ${name}! ☕ Como está sendo seu dia?`, `Ei, ${name}! 🌤️ Espero que o dia esteja sendo produtivo!`]
+        : [`Boa noite, ${name}! 🌙 Hora de relaxar ou ainda tem missões?`, `Noite, ${name}! ✨ Que bom te ver por aqui!`];
+      return greetings[Math.floor(Math.random() * greetings.length)];
+    }
+    
+    // Perguntas sobre o próprio Oráculo
+    if (lower.match(/quem [eé] voc[eê]|o que voc[eê] [eé]|voc[eê] [eé] real|voc[eê] [eé] uma? ia/)) {
+      return `Sou o Oráculo, ${name}! 🔮 Seu companheiro de jornada no Universo Real. Estou aqui para ajudar, motivar e lembrar que você é capaz de coisas incríveis! ✨`;
+    }
+    
+    // Piadas
+    if (lower.match(/piada|me faz rir|conta uma|gracinha/)) {
+      const jokes = [
+        `Por que o programador usa óculos? 👓 Porque ele não consegue C#! (ver sharp) 😂`,
+        `O que o zero disse pro oito? 🎱 "Que cinto maneiro!" 😄`,
+        `Por que a matemática está triste? ➗ Porque ela tem muitos problemas! 🤣`,
+        `O que é um pontinho verde no canto da sala? 🟢 Uma ervilha de castigo! 😆`
+      ];
+      return jokes[Math.floor(Math.random() * jokes.length)];
+    }
+    
+    return null; // Não encontrou contexto - usa resposta padrão
   },
   
   // Métodos auxiliares para NLU
@@ -7264,6 +7614,7 @@ window.removeBill = removeBill;
 window.removeSkillPoint = removeSkillPoint;
 window.addSkillPoint = addSkillPoint;
 window.removeItem = removeItem;
+window.showAchievementDetails = showAchievementDetails;
 
 // --- Lógica do Menu Drawer Mobile ---
 const mobileFabMenu = document.getElementById('mobileFabMenu');

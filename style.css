@@ -2867,3 +2867,98 @@ input.success {
     overflow: visible !important;
   }
 }
+
+/* === MODAL DE DETALHES DA CONQUISTA === */
+.achievement-detail-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease;
+  padding: 20px;
+}
+
+.achievement-detail-content {
+  background: linear-gradient(145deg, rgba(30, 50, 80, 0.95), rgba(15, 30, 50, 0.98));
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 380px;
+  width: 100%;
+  border: 2px solid rgba(255, 221, 87, 0.4);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(255, 221, 87, 0.1);
+  text-align: center;
+  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.achievement-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.achievement-detail-icon {
+  font-size: 60px;
+  animation: pulse 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 20px rgba(255, 221, 87, 0.5));
+}
+
+.achievement-detail-header h3 {
+  font-size: 24px;
+  margin: 0;
+  background: linear-gradient(135deg, var(--accent), #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.achievement-detail-title {
+  font-size: 13px;
+  opacity: 0.8;
+  color: var(--accent);
+}
+
+.achievement-detail-desc {
+  font-size: 15px;
+  line-height: 1.6;
+  opacity: 0.9;
+  margin: 15px 0 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border-left: 3px solid var(--accent);
+}
+
+.achievement-detail-stats {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 20px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  text-align: left;
+}
+
+.achievement-detail-stats div {
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.achievement-detail-stats div:last-child {
+  border-bottom: none;
+}
+
+.achievement-detail-content .btn {
+  width: 100%;
+  margin-top: 10px;
+}
