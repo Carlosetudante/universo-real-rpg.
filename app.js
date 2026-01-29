@@ -150,32 +150,36 @@ function createStars(color = '#ffffff') {
   const starsContainer = document.querySelector('.stars');
   if (!starsContainer) return;
   
-  // Limpa estrelas existentes (exceto o ::after do CSS)
+  // Limpa estrelas existentes (exceto o ::before e ::after do CSS)
   starsContainer.querySelectorAll('.star').forEach(s => s.remove());
   
   // Define a cor das estrelas
   currentStarColor = color;
   starsContainer.style.setProperty('--star-color', color);
   
-  // Cria estrelas dinâmicas
-  const starCount = Math.min(80, Math.floor(window.innerWidth * window.innerHeight / 15000));
+  // Cria mais estrelas para um céu mais rico
+  const baseCount = Math.floor(window.innerWidth * window.innerHeight / 8000);
+  const starCount = Math.min(150, Math.max(60, baseCount));
   
   for (let i = 0; i < starCount; i++) {
     const star = document.createElement('div');
     star.className = 'star';
     
-    // Tamanhos variados
+    // Distribuição de tamanhos: mais estrelas pequenas, poucas grandes
     const sizeRand = Math.random();
-    if (sizeRand < 0.5) star.classList.add('small');
-    else if (sizeRand > 0.85) star.classList.add('large');
+    if (sizeRand < 0.35) star.classList.add('tiny');
+    else if (sizeRand < 0.65) star.classList.add('small');
+    else if (sizeRand < 0.85) star.classList.add('medium');
+    else if (sizeRand < 0.95) star.classList.add('large');
+    else star.classList.add('bright'); // 5% são estrelas muito brilhantes
     
     // Posição aleatória
     star.style.left = `${Math.random() * 100}%`;
     star.style.top = `${Math.random() * 100}%`;
     
-    // Duração e delay de piscagem aleatórios
-    const duration = 2 + Math.random() * 4; // 2-6 segundos
-    const delay = Math.random() * 5; // delay 0-5s
+    // Duração e delay de piscagem aleatórios para efeito natural
+    const duration = 1.5 + Math.random() * 4; // 1.5-5.5 segundos
+    const delay = Math.random() * 6; // delay 0-6s
     star.style.setProperty('--twinkle-duration', `${duration}s`);
     star.style.setProperty('--twinkle-delay', `${delay}s`);
     
@@ -190,10 +194,22 @@ function updateStarColor(color) {
   currentStarColor = color;
   starsContainer.style.setProperty('--star-color', color);
   
-  // Atualiza todas as estrelas existentes com transição suave
+  // Atualiza todas as estrelas existentes
   starsContainer.querySelectorAll('.star').forEach(star => {
     star.style.background = color;
-    star.style.boxShadow = `0 0 6px 2px ${color}`;
+    
+    // Ajusta o brilho baseado no tamanho
+    if (star.classList.contains('tiny')) {
+      star.style.boxShadow = `0 0 3px 1px ${color}`;
+    } else if (star.classList.contains('small')) {
+      star.style.boxShadow = `0 0 6px 2px ${color}`;
+    } else if (star.classList.contains('medium')) {
+      star.style.boxShadow = `0 0 10px 3px ${color}`;
+    } else if (star.classList.contains('large')) {
+      star.style.boxShadow = `0 0 15px 5px ${color}, 0 0 30px 10px ${color}40`;
+    } else if (star.classList.contains('bright')) {
+      star.style.boxShadow = `0 0 20px 8px ${color}, 0 0 40px 15px ${color}60, 0 0 60px 20px ${color}30`;
+    }
   });
 }
 
