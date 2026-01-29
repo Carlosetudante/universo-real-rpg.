@@ -141,6 +141,74 @@ function triggerHaptic(pattern = 15) {
   }
 }
 
+// ===================================
+// Sistema de Estrelas do Universo
+// ===================================
+let currentStarColor = '#ffffff';
+
+function createStars(color = '#ffffff') {
+  const starsContainer = document.querySelector('.stars');
+  if (!starsContainer) return;
+  
+  // Limpa estrelas existentes (exceto o ::after do CSS)
+  starsContainer.querySelectorAll('.star').forEach(s => s.remove());
+  
+  // Define a cor das estrelas
+  currentStarColor = color;
+  starsContainer.style.setProperty('--star-color', color);
+  
+  // Cria estrelas dinâmicas
+  const starCount = Math.min(80, Math.floor(window.innerWidth * window.innerHeight / 15000));
+  
+  for (let i = 0; i < starCount; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    
+    // Tamanhos variados
+    const sizeRand = Math.random();
+    if (sizeRand < 0.5) star.classList.add('small');
+    else if (sizeRand > 0.85) star.classList.add('large');
+    
+    // Posição aleatória
+    star.style.left = `${Math.random() * 100}%`;
+    star.style.top = `${Math.random() * 100}%`;
+    
+    // Duração e delay de piscagem aleatórios
+    const duration = 2 + Math.random() * 4; // 2-6 segundos
+    const delay = Math.random() * 5; // delay 0-5s
+    star.style.setProperty('--twinkle-duration', `${duration}s`);
+    star.style.setProperty('--twinkle-delay', `${delay}s`);
+    
+    starsContainer.appendChild(star);
+  }
+}
+
+function updateStarColor(color) {
+  const starsContainer = document.querySelector('.stars');
+  if (!starsContainer) return;
+  
+  currentStarColor = color;
+  starsContainer.style.setProperty('--star-color', color);
+  
+  // Atualiza todas as estrelas existentes com transição suave
+  starsContainer.querySelectorAll('.star').forEach(star => {
+    star.style.background = color;
+    star.style.boxShadow = `0 0 6px 2px ${color}`;
+  });
+}
+
+// Inicializa estrelas quando a página carrega
+window.addEventListener('load', () => {
+  createStars(currentStarColor);
+  
+  // Recria estrelas se a janela for redimensionada (debounced)
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => createStars(currentStarColor), 500);
+  });
+});
+
 // Sistema de Atributos
 const ATTRIBUTES = [
   { id: 'strength', name: 'Força', icon: '💪', description: 'Resistência física e energia' },
@@ -3690,6 +3758,11 @@ function updateUI() {
   if (elements.orb) elements.orb.style.background = `radial-gradient(circle at 30% 20%, ${auraColor}40, transparent 45%)`;
   if (elements.ring) elements.ring.style.background = `conic-gradient(from 0deg, ${auraColor}, transparent, ${auraColor})`;
   if (elements.avatar) elements.avatar.style.borderColor = auraColor;
+  
+  // Atualizar cor das estrelas do universo
+  if (typeof updateStarColor === 'function') {
+    updateStarColor(auraColor);
+  }
 
   // Atualizar Tema da Classe (Emoji e Imagem de Fundo)
   const theme = CLASS_THEMES[gameState.race] || CLASS_THEMES['default'];
@@ -8245,6 +8318,20 @@ function validatePasswords() {
 
 if (elements.registerPassword) elements.registerPassword.addEventListener('input', validatePasswords);
 if (elements.registerConfirmPassword) elements.registerConfirmPassword.addEventListener('input', validatePasswords);
+
+// Listener para mudar cor das estrelas quando selecionar cor da aura
+if (elements.registerAura) {
+  elements.registerAura.addEventListener('input', (e) => {
+    updateStarColor(e.target.value);
+  });
+}
+
+// Também para a edição de personagem
+if (elements.editAura) {
+  elements.editAura.addEventListener('input', (e) => {
+    updateStarColor(e.target.value);
+  });
+}
 
 // Inicialização Principal
 window.addEventListener('DOMContentLoaded', () => {
