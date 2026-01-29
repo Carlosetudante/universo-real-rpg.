@@ -7571,7 +7571,7 @@ window.addEventListener('DOMContentLoaded', () => {
     elements.gratitudeBtn.addEventListener('click', addGratitudeEntry);
   }
 
-  // Função para verificar elementos ausentes no DOM
+  // Função para verificar elementos ausentes no DOM (apenas em desenvolvimento)
   function checkMissingElements() {
     const missing = [];
     Object.keys(elements).forEach(key => {
@@ -7581,7 +7581,8 @@ window.addEventListener('DOMContentLoaded', () => {
       console.group('Os seguintes elementos definidos em "elements" não foram encontrados no HTML:');
       missing.forEach(key => console.warn(`- Chave: ${key} (Verifique o ID no HTML)`));
       console.groupEnd();
-      showToast(`⚠️ Debug: ${missing.length} elementos não encontrados (F12)`, 5000);
+      // Removido toast de debug para não incomodar usuários em produção
+      // showToast(`⚠️ Debug: ${missing.length} elementos não encontrados (F12)`, 5000);
     }
   }
   
