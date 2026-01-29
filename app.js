@@ -1582,12 +1582,25 @@ function toggleTask(id) {
   }
 }
 
-function removeTask(id, event) {
+async function removeTask(id, event) {
   event.stopPropagation(); // Impede que o clique no botão ative o toggleTask
   if (confirm('Excluir esta tarefa permanentemente?')) {
+    // Remove localmente
     gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== id);
     saveGame();
     updateUI();
+    
+    // Remove do Supabase (nuvem)
+    try {
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.deleteTask) {
+        await SupabaseService.deleteTask(id);
+        console.log('✅ Tarefa deletada do Supabase:', id);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao deletar tarefa do Supabase:', error);
+    }
+    
+    showToast('🗑️ Tarefa excluída permanentemente!');
   }
 }
 
