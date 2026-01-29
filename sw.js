@@ -1,4 +1,4 @@
-const CACHE_NAME = 'universo-real-v39';
+const CACHE_NAME = 'universo-real-v40';
 
 const urlsToCache = [
   './index.html',
