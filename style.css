@@ -29,32 +29,66 @@
       padding-bottom: env(safe-area-inset-bottom);
     }
     
-    /* Estrelas animadas */
+    /* Estrelas animadas do Universo */
     .stars {
       position: fixed;
       inset: 0;
       z-index: 0;
-      animation: moveBG 30s linear infinite;
       pointer-events: none;
+      overflow: hidden;
     }
     
-    .stars:after, .stars:before {
+    .stars .star {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      background: var(--star-color, #ffffff);
+      border-radius: 50%;
+      box-shadow: 0 0 6px 2px var(--star-color, #ffffff);
+      animation: twinkle var(--twinkle-duration, 3s) ease-in-out infinite;
+      animation-delay: var(--twinkle-delay, 0s);
+      opacity: 0.7;
+    }
+    
+    .stars .star.small {
+      width: 2px;
+      height: 2px;
+      box-shadow: 0 0 4px 1px var(--star-color, #ffffff);
+      opacity: 0.5;
+    }
+    
+    .stars .star.large {
+      width: 4px;
+      height: 4px;
+      box-shadow: 0 0 10px 3px var(--star-color, #ffffff);
+      opacity: 0.9;
+    }
+    
+    @keyframes twinkle {
+      0%, 100% { 
+        opacity: 0.3;
+        transform: scale(0.8);
+      }
+      50% { 
+        opacity: 1;
+        transform: scale(1.2);
+      }
+    }
+    
+    /* Efeito de movimento lento das estrelas */
+    .stars::after {
       content: '';
       position: absolute;
       inset: 0;
-      background-image: radial-gradient(#fff 0.6px, transparent 0.6px);
-      background-size: 50px 50px;
-      opacity: .06;
+      background-image: radial-gradient(var(--star-color, #fff) 0.5px, transparent 0.5px);
+      background-size: 80px 80px;
+      opacity: 0.03;
+      animation: driftStars 60s linear infinite;
     }
     
-    .stars:before {
-      transform: scale(.6);
-      opacity: .04;
-    }
-    
-    @keyframes moveBG {
-      from { transform: translateY(0); }
-      to { transform: translateY(-1200px); }
+    @keyframes driftStars {
+      from { transform: translateY(0) translateX(0); }
+      to { transform: translateY(-500px) translateX(-200px); }
     }
     
     .container {
