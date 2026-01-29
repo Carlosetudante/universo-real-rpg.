@@ -3580,14 +3580,7 @@ function renderDailyTasks() {
     deleteBtn.style.cssText = 'padding:4px 8px; font-size:10px; flex-shrink:0; width: auto;';
     deleteBtn.title = 'Excluir';
     deleteBtn.textContent = '❌';
-    deleteBtn.onclick = (e) => {
-      e.stopPropagation();
-      if (confirm('Excluir esta tarefa permanentemente?')) {
-        gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== task.id);
-        saveGame();
-        renderDailyTasks(); // Atualiza a lista imediatamente
-      }
-    };
+    deleteBtn.onclick = (e) => removeTask(task.id, e);
     
     div.appendChild(span);
     div.appendChild(deleteBtn);

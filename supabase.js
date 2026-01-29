@@ -836,10 +836,25 @@ async function syncAllToCloud(localData) {
     });
     console.log('✅ Perfil salvo!');
 
-    // 2. Sincroniza tarefas (apenas novas, não sobrescreve tudo)
+    // 2. Sincroniza tarefas (adiciona novas, atualiza existentes, DELETA removidas)
+    const existingTasks = await getTasks();
+    const existingIds = new Set(existingTasks.map(t => t.id));
+    const localTaskIds = new Set((localData.dailyTasks || []).map(t => t.id));
+    
+    // 2a. Deleta tarefas que existem na nuvem mas não existem mais localmente
+    for (const cloudTask of existingTasks) {
+      if (!localTaskIds.has(cloudTask.id)) {
+        console.log('🗑️ Deletando tarefa da nuvem:', cloudTask.id, cloudTask.title);
+        try {
+          await deleteTask(cloudTask.id);
+        } catch (e) {
+          console.warn('Erro ao deletar tarefa:', e);
+        }
+      }
+    }
+    
+    // 2b. Adiciona novas e atualiza existentes
     if (localData.dailyTasks && localData.dailyTasks.length > 0) {
-      const existingTasks = await getTasks();
-      const existingIds = new Set(existingTasks.map(t => t.id));
       // Também rastreia por título+data para evitar duplicatas
       const existingTexts = new Set(existingTasks.map(t => `${t.title}_${t.created_at?.split('T')[0]}`));
       
