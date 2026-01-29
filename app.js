@@ -3398,11 +3398,28 @@ function renderDailyTasks() {
     const div = document.createElement('div');
     div.className = `task-item ${task.completed ? 'completed' : ''}`;
     div.dataset.id = task.id; // Identificador para animação
-    div.onclick = () => toggleTask(task.id);
-    div.innerHTML = `
-      <span style="flex:1; word-break: break-word; line-height: 1.4; padding-right: 10px;">${task.completed ? '✅' : '⬜'} ${task.text}</span>
-      <button class="ghost" style="padding:4px 8px; font-size:10px; flex-shrink:0; width: auto;" onclick="removeTask(${task.id}, event)" title="Excluir">❌</button>
-    `;
+    
+    const span = document.createElement('span');
+    span.style.cssText = 'flex:1; word-break: break-word; line-height: 1.4; padding-right: 10px;';
+    span.textContent = `${task.completed ? '✅' : '⬜'} ${task.text}`;
+    span.onclick = () => toggleTask(task.id);
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'ghost';
+    deleteBtn.style.cssText = 'padding:4px 8px; font-size:10px; flex-shrink:0; width: auto;';
+    deleteBtn.title = 'Excluir';
+    deleteBtn.textContent = '❌';
+    deleteBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (confirm('Excluir esta tarefa permanentemente?')) {
+        gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== task.id);
+        saveGame();
+        renderTasks(); // Atualiza a lista imediatamente
+      }
+    };
+    
+    div.appendChild(span);
+    div.appendChild(deleteBtn);
     if (elements.taskList) elements.taskList.appendChild(div);
   });
 }
@@ -3604,8 +3621,9 @@ if (clearAllTasksBtn) {
     
     if (confirm(`🗑️ Deseja remover todas as ${gameState.dailyTasks.length} tarefas?`)) {
       gameState.dailyTasks = [];
-      renderTasks();
       saveGame();
+      renderTasks(); // Atualiza a lista imediatamente
+      updateUI(); // Atualiza toda a interface
       showToast('✅ Todas as tarefas foram removidas!');
     }
   });
