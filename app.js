@@ -5211,6 +5211,14 @@ const OracleChat = {
     const autoLearnResult = this.autoLearnFromInput(cleanedInput, lowerInput);
     if (autoLearnResult) return autoLearnResult;
     
+    // 1.5 GERAÇÃO DE IMAGEM
+    const imageResult = this.handleImageGeneration(lowerInput, cleanedInput);
+    if (imageResult) return imageResult;
+    
+    // 1.6 EDUCAÇÃO FINANCEIRA
+    const financeEducationResult = this.handleFinanceEducation(lowerInput);
+    if (financeEducationResult) return financeEducationResult;
+    
     // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE
     const nluResult = OracleNLU.detectIntent(input);
     if (nluResult.intent !== 'unknown' && nluResult.confidence > 0.5) {
@@ -5241,6 +5249,442 @@ const OracleChat = {
     
     // 8. Resposta padrão inteligente
     return this.getSmartDefault(lowerInput);
+  },
+  
+  // === SISTEMA DE GERAÇÃO DE IMAGENS ===
+  handleImageGeneration(lowerInput, originalInput) {
+    // Detecta pedidos de imagem
+    const imagePatterns = [
+      /(?:gera|gerar|cria|criar|faz|fazer|mostra|mostrar|desenha|desenhar)\s+(?:uma?\s+)?(?:imagem|foto|figura|desenho|ilustração)\s+(?:de|do|da|sobre|com)?\s*(.+)/i,
+      /(?:quero|preciso de)\s+(?:uma?\s+)?(?:imagem|foto|figura)\s+(?:de|do|da|sobre|com)?\s*(.+)/i,
+      /(?:me\s+)?(?:mostra|desenha)\s+(?:um|uma)?\s*(.+)/i
+    ];
+    
+    for (const pattern of imagePatterns) {
+      const match = originalInput.match(pattern);
+      if (match && match[1]) {
+        const prompt = match[1].trim();
+        return this.generateImage(prompt);
+      }
+    }
+    
+    return null;
+  },
+  
+  generateImage(prompt) {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    // Usa Pollinations AI (API gratuita de geração de imagens)
+    const encodedPrompt = encodeURIComponent(prompt + ', high quality, detailed, beautiful');
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true`;
+    
+    // Imagens alternativas para conceitos abstratos
+    const conceptImages = {
+      motivação: 'https://images.unsplash.com/photo-1504805572947-34fad45aed93?w=512',
+      sucesso: 'https://images.unsplash.com/photo-1533227268428-f9ed0900fb3b?w=512',
+      paz: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=512',
+      natureza: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=512',
+      amor: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=512',
+      trabalho: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=512',
+      dinheiro: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=512',
+      estudo: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=512'
+    };
+    
+    // Verifica se é um conceito conhecido
+    let finalUrl = imageUrl;
+    const lowerPrompt = prompt.toLowerCase();
+    for (const [concept, url] of Object.entries(conceptImages)) {
+      if (lowerPrompt.includes(concept)) {
+        finalUrl = url;
+        break;
+      }
+    }
+    
+    return {
+      message: `🎨 Aqui está, ${name}! Gerando uma imagem de "<strong>${prompt}</strong>":<br><br>
+        <div class="oracle-image-container">
+          <img src="${finalUrl}" alt="${prompt}" class="oracle-generated-image" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=512'" />
+        </div>
+        <br><small style="opacity:0.7">💡 Dica: Posso gerar outras imagens! Só pedir.</small>`,
+      actions: [
+        { text: '🔄 Gerar outra versão', action: () => { 
+          const newUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}&seed=${Date.now()}`;
+          const img = document.querySelector('.oracle-generated-image');
+          if (img) img.src = newUrl;
+          this.addBotMessage('🎨 Nova versão gerada! Atualizando imagem...');
+        }},
+        { text: '💾 Salvar', action: () => {
+          window.open(finalUrl, '_blank');
+          this.addBotMessage('✅ Abrindo imagem em nova aba para você salvar!');
+        }}
+      ]
+    };
+  },
+  
+  // === SISTEMA DE EDUCAÇÃO FINANCEIRA ===
+  handleFinanceEducation(lowerInput) {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    // Dicas financeiras
+    if (lowerInput.match(/dica|conselho|sugestão|como\s+(economizar|poupar|investir|ganhar|guardar|juntar)/i)) {
+      return this.getFinancialTip();
+    }
+    
+    // Metas financeiras
+    if (lowerInput.match(/meta\s+financeira|objetivo\s+financeiro|criar\s+meta|definir\s+meta/i)) {
+      return this.createFinancialGoal();
+    }
+    
+    // Análise de gastos
+    if (lowerInput.match(/analis[ae]|analise\s+(?:meus?\s+)?(?:gastos?|despesas?|finanças)|onde\s+(?:eu\s+)?(?:gasto|gastei)/i)) {
+      return this.analyzeSpending();
+    }
+    
+    // Ensinar sobre finanças
+    if (lowerInput.match(/(?:me\s+)?(?:ensina|explica|ensine|explique)\s+(?:sobre\s+)?(?:finanças|investir|investimento|poupança|juros|renda\s+fixa|ações|tesouro|cdb|lci|lca)/i)) {
+      return this.teachFinance(lowerInput);
+    }
+    
+    // Calculadora de objetivos
+    if (lowerInput.match(/(?:quanto|como)\s+(?:preciso|devo)\s+(?:guardar|economizar|juntar|poupar)/i)) {
+      return this.calculateSavings(lowerInput);
+    }
+    
+    // Diagnóstico financeiro
+    if (lowerInput.match(/(?:como\s+)?(?:estou|está|tá)\s+(?:minha\s+)?(?:saúde|situação)\s+financeira|diagnóstico/i)) {
+      return this.getFinancialDiagnosis();
+    }
+    
+    return null;
+  },
+  
+  getFinancialTip() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    const tips = [
+      {
+        title: '💰 Regra 50/30/20',
+        content: `${name}, uma das melhores formas de organizar seu dinheiro é a regra 50/30/20:<br><br>
+          • <strong>50%</strong> para necessidades (moradia, comida, contas)<br>
+          • <strong>30%</strong> para desejos (lazer, compras, hobbies)<br>
+          • <strong>20%</strong> para poupança e investimentos<br><br>
+          📊 Quer que eu analise seus gastos para ver como você está?`,
+        actions: [
+          { text: '📊 Analisar meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      },
+      {
+        title: '🎯 Pague-se Primeiro',
+        content: `${name}, essa é uma das dicas de ouro dos milionários:<br><br>
+          Assim que receber seu salário, <strong>IMEDIATAMENTE</strong> separe pelo menos 10% para você mesmo (poupança/investimento).<br><br>
+          💡 Não espere sobrar dinheiro. Separe antes de gastar!<br><br>
+          "Não é sobre quanto você ganha, mas quanto você guarda." - Warren Buffett`,
+        actions: [
+          { text: '📈 Como investir?', action: () => this.addBotMessage(this.teachFinance('investimento')) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      },
+      {
+        title: '📱 Automatize suas Finanças',
+        content: `${name}, a automação é o segredo para economizar sem esforço:<br><br>
+          1. <strong>Débito automático</strong> nas contas fixas<br>
+          2. <strong>Transferência automática</strong> para poupança no dia do pagamento<br>
+          3. <strong>Investimento automático</strong> mensal em fundos ou Tesouro<br><br>
+          🧠 Assim você não precisa de força de vontade - acontece sozinho!`,
+        actions: [
+          { text: '🎯 Criar meta', action: () => this.addBotMessage(this.createFinancialGoal()) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      },
+      {
+        title: '🛒 Regra das 24 Horas',
+        content: `${name}, antes de qualquer compra não essencial acima de R$ 100:<br><br>
+          ⏰ <strong>Espere 24 horas!</strong><br><br>
+          Se depois de 24h você ainda quiser, ok, compre. Mas na maioria das vezes, o impulso passa.<br><br>
+          💡 Isso evita gastos por emoção e economiza centenas por mês!`,
+        actions: [
+          { text: '📊 Ver meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      },
+      {
+        title: '🏦 Fundo de Emergência',
+        content: `${name}, antes de investir, tenha uma <strong>reserva de emergência</strong>!<br><br>
+          📋 Ideal: <strong>6 meses</strong> de gastos mensais<br>
+          📋 Mínimo: <strong>3 meses</strong> de gastos mensais<br><br>
+          Onde deixar? <strong>Tesouro Selic</strong> ou <strong>CDB com liquidez diária</strong>.<br><br>
+          ⚠️ Nunca invista em renda variável sem ter esse colchão!`,
+        actions: [
+          { text: '🎯 Calcular minha reserva', action: () => this.addBotMessage(this.calculateEmergencyFund()) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      },
+      {
+        title: '💳 Fuja das Dívidas',
+        content: `${name}, dívidas são o maior inimigo da riqueza!<br><br>
+          🔴 <strong>Evite a todo custo:</strong><br>
+          • Cartão de crédito rotativo (400%+ ao ano!)<br>
+          • Cheque especial (300%+ ao ano!)<br>
+          • Empréstimo pessoal (100%+ ao ano!)<br><br>
+          Se já está endividado: <strong>NEGOCIE!</strong> Bancos preferem receber com desconto do que não receber.`,
+        actions: [
+          { text: '📊 Diagnóstico financeiro', action: () => this.addBotMessage(this.getFinancialDiagnosis()) },
+          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        ]
+      }
+    ];
+    
+    const tip = tips[Math.floor(Math.random() * tips.length)];
+    return {
+      message: `<strong>${tip.title}</strong><br><br>${tip.content}`,
+      actions: tip.actions
+    };
+  },
+  
+  teachFinance(topic) {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    const lower = topic.toLowerCase();
+    
+    const lessons = {
+      investimento: {
+        title: '📈 Introdução a Investimentos',
+        content: `${name}, vou te ensinar o básico de investimentos!<br><br>
+          <strong>1. Renda Fixa</strong> (menor risco):<br>
+          • Tesouro Direto (governo)<br>
+          • CDB (bancos)<br>
+          • LCI/LCA (isentos de IR)<br><br>
+          <strong>2. Renda Variável</strong> (maior risco/retorno):<br>
+          • Ações (partes de empresas)<br>
+          • Fundos Imobiliários (FIIs)<br>
+          • ETFs (cestas de ações)<br><br>
+          💡 <strong>Dica:</strong> Comece pela renda fixa e vá diversificando!`
+      },
+      tesouro: {
+        title: '🏛️ Tesouro Direto',
+        content: `${name}, o Tesouro Direto é um dos investimentos mais seguros do Brasil!<br><br>
+          <strong>Tipos:</strong><br>
+          • <strong>Tesouro Selic:</strong> Melhor para reserva de emergência<br>
+          • <strong>Tesouro IPCA+:</strong> Protege contra inflação (longo prazo)<br>
+          • <strong>Tesouro Prefixado:</strong> Taxa fixa combinada<br><br>
+          💰 <strong>Mínimo:</strong> ~R$ 30<br>
+          📊 <strong>Rentabilidade:</strong> ~13% ao ano (2024)<br>
+          ✅ <strong>Garantia:</strong> Governo Federal`
+      },
+      acoes: {
+        title: '📊 Mercado de Ações',
+        content: `${name}, ações são partes de empresas!<br><br>
+          <strong>Como ganhar:</strong><br>
+          • <strong>Valorização:</strong> Comprar barato, vender caro<br>
+          • <strong>Dividendos:</strong> Parte do lucro das empresas<br><br>
+          <strong>Dicas para iniciantes:</strong><br>
+          1. Comece com pouco (R$ 100-500)<br>
+          2. Estude as empresas antes<br>
+          3. Pense no longo prazo (5+ anos)<br>
+          4. Diversifique (várias empresas)<br><br>
+          ⚠️ <strong>Atenção:</strong> Pode perder dinheiro! Só invista o que pode perder.`
+      },
+      poupanca: {
+        title: '💰 Por que NÃO deixar na Poupança',
+        content: `${name}, a poupança é o pior investimento!<br><br>
+          <strong>Rendimento atual:</strong> ~6% ao ano<br>
+          <strong>Inflação média:</strong> ~5% ao ano<br>
+          <strong>Resultado:</strong> Você ganha só 1% real! 😢<br><br>
+          <strong>Alternativas MELHORES e seguras:</strong><br>
+          • Tesouro Selic: ~13% ao ano<br>
+          • CDB 100% CDI: ~13% ao ano<br>
+          • LCI/LCA: ~10% ao ano (isento de IR)<br><br>
+          💡 Todos tão seguros quanto a poupança, mas rendem MUITO mais!`
+      },
+      juros: {
+        title: '🔢 Juros Compostos - A 8ª Maravilha',
+        content: `${name}, Einstein disse: "Os juros compostos são a oitava maravilha do mundo!"<br><br>
+          <strong>Exemplo prático:</strong><br>
+          R$ 1.000/mês por 30 anos a 10% ao ano:<br>
+          • Total investido: R$ 360.000<br>
+          • Valor final: <strong>R$ 2.280.000</strong>!<br><br>
+          O segredo é: <strong>TEMPO + CONSISTÊNCIA</strong><br><br>
+          💡 Quanto mais cedo começar, melhor!`
+      }
+    };
+    
+    // Encontra a lição apropriada
+    let lesson = lessons.investimento; // padrão
+    if (lower.includes('tesouro')) lesson = lessons.tesouro;
+    else if (lower.includes('ação') || lower.includes('ações') || lower.includes('acoes')) lesson = lessons.acoes;
+    else if (lower.includes('poupança') || lower.includes('poupanca')) lesson = lessons.poupanca;
+    else if (lower.includes('juros')) lesson = lessons.juros;
+    
+    return {
+      message: `<strong>${lesson.title}</strong><br><br>${lesson.content}`,
+      actions: [
+        { text: '📚 Outro tema', action: () => {
+          this.addBotMessage({
+            message: `O que você quer aprender, ${name}?`,
+            actions: [
+              { text: '📈 Investimentos', action: () => this.addBotMessage(this.teachFinance('investimento')) },
+              { text: '🏛️ Tesouro Direto', action: () => this.addBotMessage(this.teachFinance('tesouro')) },
+              { text: '📊 Ações', action: () => this.addBotMessage(this.teachFinance('acoes')) },
+              { text: '🔢 Juros Compostos', action: () => this.addBotMessage(this.teachFinance('juros')) }
+            ]
+          });
+        }},
+        { text: '💡 Dicas práticas', action: () => this.addBotMessage(this.getFinancialTip()) }
+      ]
+    };
+  },
+  
+  createFinancialGoal() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    this.pendingAction = { type: 'financial_goal_name' };
+    
+    return {
+      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Qual é o seu objetivo? (Ex: "Comprar um carro", "Reserva de emergência", "Viajar")`,
+      actions: [
+        { text: '🚗 Carro', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Comprar um carro' }; this.addBotMessage('Quanto você precisa para o carro? (Ex: 50000)'); }},
+        { text: '🏠 Casa', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Entrada da casa' }; this.addBotMessage('Quanto você precisa para a entrada? (Ex: 100000)'); }},
+        { text: '✈️ Viagem', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Viagem dos sonhos' }; this.addBotMessage('Quanto você precisa para a viagem? (Ex: 15000)'); }},
+        { text: '🛡️ Reserva', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Reserva de emergência' }; this.addBotMessage('Quanto você quer ter de reserva? (Ex: 30000)'); }}
+      ]
+    };
+  },
+  
+  analyzeSpending() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    if (!gameState || !gameState.finances || gameState.finances.length < 3) {
+      return `${name}, você ainda não tem gastos suficientes registrados para eu analisar. 📊<br><br>
+        Continue registrando seus gastos dizendo coisas como:<br>
+        • "gastei 50 no almoço"<br>
+        • "paguei 100 de luz"<br><br>
+        Quando tiver pelo menos 10 registros, volte aqui!`;
+    }
+    
+    const expenses = gameState.finances.filter(f => f.type === 'expense');
+    const totalExpenses = expenses.reduce((sum, e) => sum + e.value, 0);
+    
+    // Agrupa por categoria
+    const byCategory = {};
+    expenses.forEach(e => {
+      const cat = e.category || 'Outros';
+      byCategory[cat] = (byCategory[cat] || 0) + e.value;
+    });
+    
+    // Ordena por valor
+    const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+    
+    // Calcula porcentagens
+    let response = `<strong>📊 Análise dos seus gastos, ${name}:</strong><br><br>`;
+    response += `💸 <strong>Total gasto:</strong> R$ ${totalExpenses.toFixed(2)}<br><br>`;
+    response += `<strong>Por categoria:</strong><br>`;
+    
+    sorted.forEach(([cat, value]) => {
+      const percent = ((value / totalExpenses) * 100).toFixed(1);
+      const bar = '█'.repeat(Math.round(percent / 5)) + '░'.repeat(20 - Math.round(percent / 5));
+      response += `• ${cat}: <strong>R$ ${value.toFixed(2)}</strong> (${percent}%)<br>`;
+      response += `<span style="font-family: monospace; font-size: 10px; opacity: 0.7;">${bar}</span><br>`;
+    });
+    
+    // Dica personalizada
+    const topCategory = sorted[0][0];
+    response += `<br>💡 <strong>Insight:</strong> Você gasta mais com <strong>${topCategory}</strong>. `;
+    
+    if (topCategory === 'Alimentação') {
+      response += 'Considere cozinhar mais em casa ou levar marmita!';
+    } else if (topCategory === 'Lazer') {
+      response += 'Lazer é importante, mas verifique se não está exagerando.';
+    } else if (topCategory === 'Transporte') {
+      response += 'Avalie alternativas como carona, bike ou transporte público.';
+    } else {
+      response += 'Veja se pode reduzir ou negociar melhores preços.';
+    }
+    
+    return response;
+  },
+  
+  calculateEmergencyFund() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    if (!gameState || !gameState.finances) {
+      return `${name}, preciso conhecer seus gastos mensais primeiro. Registre alguns gastos e eu calculo sua reserva ideal!`;
+    }
+    
+    // Estima gastos mensais baseado nos últimos 30 dias
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentExpenses = gameState.finances
+      .filter(f => f.type === 'expense' && new Date(f.date) >= thirtyDaysAgo)
+      .reduce((sum, e) => sum + e.value, 0);
+    
+    const monthlyExpenses = recentExpenses || 3000; // Estimativa padrão
+    const emergencyFund = monthlyExpenses * 6;
+    
+    return `<strong>🛡️ Calculadora de Reserva de Emergência</strong><br><br>
+      📊 Baseado nos seus gastos:<br>
+      • Gastos mensais estimados: <strong>R$ ${monthlyExpenses.toFixed(2)}</strong><br><br>
+      
+      🎯 <strong>Sua reserva ideal:</strong><br>
+      • Mínimo (3 meses): <strong>R$ ${(monthlyExpenses * 3).toFixed(2)}</strong><br>
+      • Ideal (6 meses): <strong>R$ ${emergencyFund.toFixed(2)}</strong><br><br>
+      
+      💡 <strong>Onde guardar:</strong> Tesouro Selic ou CDB com liquidez diária.<br>
+      ⏰ <strong>Meta mensal sugerida:</strong> R$ ${(emergencyFund / 12).toFixed(2)}/mês para ter em 1 ano!`;
+  },
+  
+  getFinancialDiagnosis() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    if (!gameState || !gameState.finances || gameState.finances.length < 5) {
+      return `${name}, preciso de mais dados para fazer um diagnóstico. Continue registrando suas finanças! 📊`;
+    }
+    
+    const finances = gameState.finances;
+    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+    const balance = income - expenses;
+    const savingsRate = income > 0 ? ((balance / income) * 100) : 0;
+    
+    let diagnosis, emoji, color;
+    
+    if (savingsRate >= 20) {
+      diagnosis = 'EXCELENTE';
+      emoji = '🏆';
+      color = '#4CAF50';
+    } else if (savingsRate >= 10) {
+      diagnosis = 'BOA';
+      emoji = '✅';
+      color = '#8BC34A';
+    } else if (savingsRate >= 0) {
+      diagnosis = 'ATENÇÃO';
+      emoji = '⚠️';
+      color = '#FF9800';
+    } else {
+      diagnosis = 'CRÍTICA';
+      emoji = '🚨';
+      color = '#f44336';
+    }
+    
+    return `<strong>🏥 Diagnóstico Financeiro</strong><br><br>
+      
+      <div style="text-align: center; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; margin: 10px 0;">
+        <span style="font-size: 40px;">${emoji}</span><br>
+        <strong style="color: ${color}; font-size: 20px;">Saúde ${diagnosis}</strong>
+      </div><br>
+      
+      📊 <strong>Seus números:</strong><br>
+      • Receitas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>
+      • Despesas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>
+      • Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>
+      • Taxa de poupança: <strong>${savingsRate.toFixed(1)}%</strong><br><br>
+      
+      💡 <strong>Recomendação:</strong> ${
+        savingsRate >= 20 ? 'Continue assim! Considere investir o excedente.' :
+        savingsRate >= 10 ? 'Bom trabalho! Tente aumentar para 20%.' :
+        savingsRate >= 0 ? 'Tente cortar gastos supérfluos para poupar mais.' :
+        'Urgente! Reduza despesas ou aumente renda. Evite dívidas!'
+      }`;
   },
   
   // Executa a intenção detectada pelo NLU
