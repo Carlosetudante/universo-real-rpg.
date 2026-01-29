@@ -3414,7 +3414,7 @@ function renderDailyTasks() {
       if (confirm('Excluir esta tarefa permanentemente?')) {
         gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== task.id);
         saveGame();
-        renderTasks(); // Atualiza a lista imediatamente
+        renderDailyTasks(); // Atualiza a lista imediatamente
       }
     };
     
@@ -3622,7 +3622,7 @@ if (clearAllTasksBtn) {
     if (confirm(`🗑️ Deseja remover todas as ${gameState.dailyTasks.length} tarefas?`)) {
       gameState.dailyTasks = [];
       saveGame();
-      renderTasks(); // Atualiza a lista imediatamente
+      renderDailyTasks(); // Atualiza a lista imediatamente
       updateUI(); // Atualiza toda a interface
       showToast('✅ Todas as tarefas foram removidas!');
     }
