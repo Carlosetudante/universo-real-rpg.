@@ -4396,6 +4396,16 @@ const OracleNLU = {
   
   // Detecta a intenção do usuário
   detectIntent(text) {
+    const mem = OracleMemory.get();
+    const lowerText = text.toLowerCase().trim();
+
+    // Check for aliases first
+    if (mem.aliases && mem.aliases[lowerText]) {
+        const canonicalCommand = mem.aliases[lowerText];
+        console.log(`Oracle: Alias detected! "${text}" -> "${canonicalCommand}"`);
+        text = canonicalCommand; // Replace the text with the canonical command
+    }
+
     const cleanText = text.toLowerCase().trim();
     
     for (const [intentName, intent] of Object.entries(this.intents)) {
@@ -4545,13 +4555,20 @@ const OracleMemory = {
       interests: [],
       dislikes: []
     },
-    customResponses: {}
+    customResponses: {},
+    aliases: {}
   },
   
   get() {
     try {
       const stored = JSON.parse(localStorage.getItem(this.key));
-      return { ...this.defaultMemory, ...stored, profile: { ...this.defaultMemory.profile, ...(stored?.profile || {}) } };
+      const merged = { 
+        ...this.defaultMemory, 
+        ...stored, 
+        profile: { ...this.defaultMemory.profile, ...(stored?.profile || {}) },
+        aliases: { ...this.defaultMemory.aliases, ...(stored?.aliases || {}) }
+      };
+      return merged;
     } catch {
       return { ...this.defaultMemory };
     }
@@ -6785,6 +6802,66 @@ const OracleChat = {
     }
     
     switch(action.type) {
+      case 'learn_unknown':
+        let definition = lowerInput;
+        // Remove prefixos comuns de definição para limpar o comando
+        definition = definition.replace(/^(isso )?(significa|quer dizer|é|e|querer dizer)\s+/i, '').trim();
+        
+        const unknownPhrase = action.originalInput;
+        
+        // Salva o alias na memória
+        const mem = OracleMemory.get();
+        if (!mem.aliases) mem.aliases = {};
+        mem.aliases[unknownPhrase] = definition;
+        OracleMemory.save(mem);
+        
+        this.pendingAction = null;
+        
+        // Executa o comando aprendido para confirmar e mostrar que funcionou
+        setTimeout(() => {
+             const response = this.generateResponse(definition);
+             if (typeof response === 'string') {
+                this.addBotMessage(response);
+             } else if (response && response.message) {
+                this.addBotMessage(response.message, response.actions);
+             }
+        }, 1000);
+
+        return `Entendi! 🧠 Aprendi que "<strong>${unknownPhrase}</strong>" significa "<strong>${definition}</strong>".<br>Vou tentar fazer isso agora...`;
+
+      case 'learn_alias':
+        const newCommand = input.trim();
+        const originalCommand = action.originalInput;
+
+        // Check if the new command is something the Oracle understands
+        const nluResult = OracleNLU.detectIntent(newCommand);
+
+        if (nluResult.intent === 'unknown') {
+            this.pendingAction = { type: 'learn_alias', originalInput: originalCommand }; // Keep pending
+            return `Acho que também não entendi o comando "<strong>${newCommand}</strong>". 😕 Tente um comando que você sabe que eu entendo, como "criar tarefa" ou "meu status".`;
+        }
+
+        // If the new command is valid, save the alias
+        const mem2 = OracleMemory.get();
+        if (!mem2.aliases) mem2.aliases = {};
+        mem2.aliases[originalCommand.toLowerCase()] = newCommand;
+        OracleMemory.save(mem2);
+
+        this.pendingAction = null;
+
+        // Confirm and execute the new command
+        this.addBotMessage(`✅ Entendido! Da próxima vez que você disser "<strong>${originalCommand}</strong>", vou entender como "<strong>${newCommand}</strong>".<br><br>Agora, executando o comando...`);
+        
+        setTimeout(() => {
+            const response = this.generateResponse(newCommand);
+            if (typeof response === 'string') {
+                this.addBotMessage(response);
+            } else if (response.message) {
+                this.addBotMessage(response.message, response.actions);
+            }
+        }, 500);
+
+        return null; // Don't return anything, the response is handled asynchronously
       case 'clarify_meta': // NEW CASE for ambiguity
         if (lowerInput.includes('financeira')) {
             this.pendingAction = null;
@@ -8239,9 +8316,18 @@ const OracleChat = {
     const wisdomResponse = this.getContextualWisdom(input);
     if (wisdomResponse) return wisdomResponse;
     
-    return CHARISMATIC_RESPONSES.notUnderstood[
-      Math.floor(Math.random() * CHARISMATIC_RESPONSES.notUnderstood.length)
-    ] + `<br><br>Dica: Diz <strong>"ajuda"</strong> pra ver o que sei fazer! 💡`;
+    // Se não entendeu, pergunta e aprende
+    this.pendingAction = { type: 'learn_unknown', originalInput: input };
+    
+    return {
+      message: `Não entendi "<strong>${input}</strong>", ${treatment}. 😕<br><br>O que isso significa? Você pode me ensinar! (Ex: "significa criar tarefa estudar")`,
+      actions: [
+        { text: '❌ Deixa pra lá', action: () => { 
+          this.pendingAction = null; 
+          this.addBotMessage('Tudo bem! Se precisar de algo, estou aqui. 😊'); 
+        }}
+      ]
+    };
   },
   
   // Sistema de Sabedoria Contextual - Respostas inteligentes baseadas em contexto
