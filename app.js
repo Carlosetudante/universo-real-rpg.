@@ -561,6 +561,7 @@ const elements = {
   // Finance Goal
   financeGoalInput: document.getElementById('financeGoalInput'),
   setFinanceGoalBtn: document.getElementById('setFinanceGoalBtn'),
+  cancelFinanceGoalBtn: document.getElementById('cancelFinanceGoalBtn'),
   financeGoalDisplay: document.getElementById('financeGoalDisplay'),
   financeGoalText: document.getElementById('financeGoalText'),
   financeGoalProgress: document.getElementById('financeGoalProgress'),
@@ -2048,14 +2049,24 @@ function renderFinanceMonthlyChart() {
 
 function setFinancialGoal() {
   const goal = parseMoney(elements.financeGoalInput.value);
-  if (isNaN(goal) || goal < 0) {
+  if (isNaN(goal) || goal <= 0) {
     showToast('⚠️ Defina um valor válido para a meta!');
     return;
   }
   gameState.financialGoal = goal;
+  elements.financeGoalInput.value = '';
   saveGame();
   updateUI();
-  showToast('🎯 Meta financeira definida!');
+  showToast('🎯 Meta financeira definida: R$ ' + goal.toLocaleString('pt-BR'));
+}
+
+function cancelFinancialGoal() {
+  if (confirm('Deseja realmente cancelar a meta financeira atual?')) {
+    gameState.financialGoal = 0;
+    saveGame();
+    updateUI();
+    showToast('❌ Meta financeira cancelada!');
+  }
 }
 
 function renderFinancialGoal() {
@@ -2063,11 +2074,12 @@ function renderFinancialGoal() {
   
   if (goal <= 0) {
     if (elements.financeGoalDisplay) elements.financeGoalDisplay.classList.add('hidden');
+    if (elements.financeGoalInput) elements.financeGoalInput.placeholder = 'Definir Meta (R$)';
     return;
   }
   
   if (elements.financeGoalDisplay) elements.financeGoalDisplay.classList.remove('hidden');
-  if (elements.financeGoalInput) elements.financeGoalInput.placeholder = `Meta atual: R$ ${goal.toLocaleString('pt-BR')}`;
+  if (elements.financeGoalInput) elements.financeGoalInput.placeholder = `Alterar meta (atual: R$ ${goal.toLocaleString('pt-BR')})`;
   
   // Calcular Saldo
   const transactions = gameState.finances || [];
@@ -2083,22 +2095,32 @@ function renderFinancialGoal() {
   if (goal > 0) {
     percent = (balance / goal) * 100;
   }
-  if (percent < 0) percent = 0;
-  if (percent > 100) percent = 100;
+  const cappedPercent = Math.max(0, Math.min(100, percent));
   
-  if (elements.financeGoalProgress) elements.financeGoalProgress.style.width = `${percent}%`;
-  if (elements.financeGoalText) elements.financeGoalText.textContent = `${percent.toFixed(1)}% (R$ ${balance.toLocaleString('pt-BR')} / R$ ${goal.toLocaleString('pt-BR')})`;
+  // Cor da barra baseada no progresso
+  let barColor = 'var(--danger)';
+  if (percent >= 100) barColor = 'var(--success)';
+  else if (percent >= 75) barColor = '#4ade80';
+  else if (percent >= 50) barColor = 'var(--accent)';
+  else if (percent >= 25) barColor = '#fbbf24';
+  
+  if (elements.financeGoalProgress) {
+    elements.financeGoalProgress.style.width = `${cappedPercent}%`;
+    elements.financeGoalProgress.style.background = barColor;
+  }
+  
+  if (elements.financeGoalText) {
+    elements.financeGoalText.innerHTML = `<strong>${percent.toFixed(1)}%</strong> &nbsp;•&nbsp; R$ ${balance.toLocaleString('pt-BR')} / R$ ${goal.toLocaleString('pt-BR')}`;
+  }
   
   const remaining = goal - balance;
   if (elements.financeGoalStatus) {
     if (remaining <= 0) {
-      elements.financeGoalStatus.textContent = "🎉 Meta alcançada! Parabéns!";
-      elements.financeGoalStatus.style.color = "var(--accent)";
-      elements.financeGoalStatus.style.fontWeight = "bold";
+      elements.financeGoalStatus.innerHTML = "🎉 <strong>Meta alcançada!</strong> Parabéns!";
+      elements.financeGoalStatus.style.color = "var(--success)";
     } else {
-      elements.financeGoalStatus.textContent = `Faltam R$ ${remaining.toLocaleString('pt-BR')}`;
+      elements.financeGoalStatus.innerHTML = `Faltam <strong>R$ ${remaining.toLocaleString('pt-BR')}</strong>`;
       elements.financeGoalStatus.style.color = "inherit";
-      elements.financeGoalStatus.style.fontWeight = "normal";
     }
   }
 }
@@ -3892,6 +3914,7 @@ if (elements.financeValue) elements.financeValue.addEventListener('keypress', (e
 });
 if (elements.addBillBtn) elements.addBillBtn.addEventListener('click', addBill);
 if (elements.setFinanceGoalBtn) elements.setFinanceGoalBtn.addEventListener('click', setFinancialGoal);
+if (elements.cancelFinanceGoalBtn) elements.cancelFinanceGoalBtn.addEventListener('click', cancelFinancialGoal);
 if (elements.setRelationshipBtn) elements.setRelationshipBtn.addEventListener('click', setRelationshipDate);
 if (elements.resetRelationshipBtn) elements.resetRelationshipBtn.addEventListener('click', resetRelationshipDate);
 if (elements.relationshipPhotoDisplay) elements.relationshipPhotoDisplay.addEventListener('click', changeRelationshipPhoto);
