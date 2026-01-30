@@ -8563,641 +8563,860 @@ const OracleChat = {
     return null; // Não encontrou contexto - usa resposta padrão
   },
   
-  // Métodos auxiliares para NLU
-  getTasksList() {
-    if (!gameState) return "Não consegui acessar seus dados.";
-    
-    const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
-    const completed = (gameState.dailyTasks || []).filter(t => t.completed);
-    
-    if (pending.length === 0 && completed.length === 0) {
-      return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+  // ... (restante do código existente)
+};
+
+// ===========================================
+// MÓDULO BÍBLIA - ASSISTENTE BÍBLICO
+// ===========================================
+
+const BibleAssistant = {
+  // Base de conhecimento expandida com referências
+  topicMap: {
+    'ansiedade': ['Filipenses 4:6-7', '1 Pedro 5:7', 'Mateus 6:25-34', 'Salmos 94:19'],
+    'medo': ['Isaías 41:10', 'Salmos 23:4', '2 Timóteo 1:7', 'Salmos 27:1', 'Josué 1:9'],
+    'amor': ['1 Coríntios 13:4-7', 'João 3:16', '1 João 4:8', 'Romanos 8:38-39', 'Provérbios 10:12'],
+    'dinheiro': ['Hebreus 13:5', '1 Timóteo 6:10', 'Provérbios 22:7', 'Mateus 6:24', 'Eclesiastes 5:10'],
+    'tristeza': ['Salmos 34:18', 'Mateus 5:4', 'Apocalipse 21:4', 'Salmos 147:3', 'João 16:22'],
+    'proposito': ['Jeremias 29:11', 'Efésios 2:10', 'Romanos 8:28', 'Provérbios 19:21', 'Eclesiastes 3:1'],
+    'perdao': ['1 João 1:9', 'Mateus 6:14-15', 'Efésios 4:32', 'Colossenses 3:13', 'Miqueias 7:18'],
+    'fe': ['Hebreus 11:1', 'Marcos 11:22-24', 'Romanos 10:17', 'Tiago 2:14-26', '2 Coríntios 5:7'],
+    'esperanca': ['Romanos 15:13', 'Isaías 40:31', 'Lamentações 3:21-23', 'Salmos 39:7'],
+    'paz': ['João 14:27', 'Filipenses 4:7', 'Isaías 26:3', 'Mateus 5:9', 'Salmos 29:11'],
+    'sabedoria': ['Tiago 1:5', 'Provérbios 1:7', 'Provérbios 3:13-18', 'Colossenses 2:2-3'],
+    'gratidao': ['1 Tessalonicenses 5:18', 'Salmos 107:1', 'Colossenses 3:17', 'Salmos 118:24'],
+    'familia': ['Êxodo 20:12', 'Provérbios 22:6', 'Efésios 6:1-4', 'Salmos 127:3-5', 'Gênesis 2:24'],
+    'trabalho': ['Colossenses 3:23', 'Provérbios 14:23', '2 Tessalonicenses 3:10', 'Salmos 90:17'],
+    'amizade': ['Provérbios 17:17', 'Provérbios 27:17', 'Eclesiastes 4:9-10', 'João 15:13'],
+    'cura': ['Jeremias 17:14', 'Tiago 5:14-15', 'Salmos 103:2-3', 'Isaías 53:5']
+  },
+
+  // Cache para evitar requisições repetidas
+  verseCache: {},
+
+  // Busca o texto do versículo na API
+  async getVerseText(reference) {
+    if (this.verseCache[reference]) return this.verseCache[reference];
+
+    try {
+      // Usa bible-api.com com tradução Almeida (português)
+      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=almeida`);
+      if (!response.ok) throw new Error('Erro na API');
+      const data = await response.json();
+      
+      const text = data.text.trim();
+      this.verseCache[reference] = text;
+      return text;
+    } catch (e) {
+      console.warn('Erro ao buscar versículo:', e);
+      return null;
     }
+  },
+
+  // Tenta responder usando a base local ou API
+  async ask(question) {
+    const lowerQ = question.toLowerCase();
     
-    let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
-    
-    if (pending.length > 0) {
-      response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
-      pending.forEach(t => {
-        response += `• ${t.text}`;
-        if (t.dueDate) {
-          const date = new Date(t.dueDate + 'T00:00');
-          response += ` <small>(${date.toLocaleDateString('pt-BR')})</small>`;
+    // 1. Verifica tópicos mapeados
+    let foundTopic = null;
+    for (const topic of Object.keys(this.topicMap)) {
+      if (lowerQ.includes(topic)) {
+        foundTopic = topic;
+        break;
+      }
+    }
+
+    if (foundTopic) {
+      const refs = this.topicMap[foundTopic];
+      // Tenta até 3 vezes encontrar um versículo que a API retorne
+      for (let i = 0; i < 3; i++) {
+        const randomRef = refs[Math.floor(Math.random() * refs.length)];
+        const text = await this.getVerseText(randomRef);
+        
+        if (text) {
+          const responses = [
+            `A Bíblia tem uma palavra sobre <strong>${foundTopic}</strong> em <strong>${randomRef}</strong>:<br><br>"${text}"<br><br>🙏 Que isso te traga luz!`,
+            `Veja o que diz em <strong>${randomRef}</strong> sobre isso:<br><br>"${text}"<br><br>✨ Deus está contigo.`,
+            `Encontrei essa passagem em <strong>${randomRef}</strong>:<br><br>"${text}"<br><br>🕊️ Espero que ajude.`
+          ];
+          return responses[Math.floor(Math.random() * responses.length)];
         }
-        response += `<br>`;
-      });
-      response += '<br>';
+      }
     }
-    
-    if (completed.length > 0) {
-      response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
-      completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
+
+    // 2. Verifica se é um pedido de versículo aleatório
+    if (lowerQ.includes('versículo do dia') || lowerQ.includes('aleatório') || lowerQ.includes('palavra de deus')) {
+      return await this.getRandomVerse();
     }
-    
-    if (pending.length > 0) {
-      response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
-    }
-    
-    return response;
+
+    // 3. Resposta genérica humana se não encontrar
+    return "Essa é uma pergunta profunda. A Bíblia é vasta e cheia de sabedoria. Posso não ter o versículo exato agora, mas lembre-se que a Palavra de Deus é lâmpada para os nossos pés. Tente perguntar sobre 'amor', 'ansiedade', 'medo' ou peça um 'versículo do dia'! 🙏";
   },
-  
-  getFinanceSummary() {
-    if (!gameState || !gameState.finances) {
-      return "📊 Você ainda não tem registros financeiros. Diz algo como <strong>gastei 50 no almoço</strong> para começar!";
+
+  async getRandomVerse() {
+    try {
+      const response = await fetch('https://www.abibliadigital.com.br/api/verses/nvi/random');
+      const data = await response.json();
+      return `📖 <strong>${data.book.name} ${data.chapter}:${data.number}</strong><br><br>"${data.text}"<br><br>🙏 Palavra do dia para você!`;
+    } catch (e) {
+      // Fallback para bible-api se falhar
+      try {
+        const fallback = await fetch('https://bible-api.com/john+3:16?translation=almeida');
+        const data = await fallback.json();
+        return `📖 <strong>João 3:16</strong><br><br>"${data.text.trim()}"<br><br>🙏 Deus te abençoe!`;
+      } catch (err) {
+        return "Salmos 23:1 - 'O Senhor é o meu pastor; de nada terei falta.' (Estou offline, mas a Palavra está guardada no coração!)";
+      }
     }
+  }
+};
+
+// Função para injetar a aba Bíblia na interface
+function injectBibleTab() {
+  // 1. Injetar Botão na Navegação
+  const tabContainer = document.querySelector('.tab-btn')?.parentElement;
+  
+  if (tabContainer && !document.querySelector('[data-tab="bible"]')) {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn';
+    btn.dataset.tab = 'bible';
+    btn.innerHTML = '<span class="tab-icon" style="font-size: 1.2rem;">✝️</span><span class="tab-label" style="font-size: 0.7rem;">Bíblia</span>';
     
-    const finances = gameState.finances;
-    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
-    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
-    const balance = income - expenses;
-    
-    // Agrupa gastos por categoria
-    const categories = {};
-    finances.filter(f => f.type === 'expense').forEach(f => {
-      const cat = f.category || 'Outros';
-      categories[cat] = (categories[cat] || 0) + f.value;
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const content = document.getElementById('tab-bible');
+        if (content) content.classList.add('active');
+        if (typeof closeDrawer === 'function') closeDrawer();
     });
-    
-    let response = `<strong>💰 Resumo Financeiro:</strong><br><br>`;
-    response += `📈 Entradas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>`;
-    response += `📉 Saídas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>`;
-    response += `💵 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br><br>`;
-    
-    if (Object.keys(categories).length > 0) {
-      response += `<strong>📊 Gastos por categoria:</strong><br>`;
-      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-      sortedCats.slice(0, 5).forEach(([cat, val]) => {
-        response += `• ${cat}: R$ ${val.toFixed(2)}<br>`;
-      });
-    }
-    
-    response += `<br>${balance >= 0 ? '✅ Suas finanças estão no verde!' : '⚠️ Atenção com os gastos!'}`;
-    
-    return response;
-  },
-  
-  getStatusInfo() {
-    if (!gameState) return "Não consegui acessar seus dados.";
-    
-    const name = OracleMemory.getProfile('name');
-    const treatment = name || 'Aventureiro';
-    
-    const level = gameState.level || 1;
-    const xp = gameState.xp || 0;
-    const pendingTasks = (gameState.dailyTasks || []).filter(t => !t.completed).length;
-    
-    // Calcula saldo financeiro
-    const finances = gameState.finances || [];
-    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
-    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
-    const balance = income - expenses;
-    
-    // Trabalho de hoje
-    const today = new Date().toISOString().split('T')[0];
-    const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
-    const todayProd = todayLogs.reduce((sum, l) => sum + (l.production || 0), 0);
-    const todayMoney = todayLogs.reduce((sum, l) => sum + (l.money || 0), 0);
-    
-    let response = `<strong>🎮 Status de ${treatment}:</strong><br><br>`;
-    response += `⭐ Nível: <strong>${level}</strong> | XP: <strong>${xp}/100</strong><br>`;
-    response += `📝 Tarefas pendentes: <strong>${pendingTasks}</strong><br>`;
-    response += `💰 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>`;
-    
-    if (todayProd > 0 || todayMoney > 0) {
-      response += `<br><strong>📊 Hoje:</strong><br>`;
-      response += `🍕 Produção: ${todayProd} massas<br>`;
-      response += `💵 Ganho: R$ ${todayMoney.toFixed(2)}<br>`;
-    }
-    
-    // Dica personalizada
-    if (pendingTasks > 3) {
-      response += `<br>💡 Você tem muitas tarefas! Foque nas mais importantes.`;
-    } else if (pendingTasks === 0) {
-      response += `<br>🎉 Sem tarefas pendentes! Que tal criar uma nova meta?`;
-    }
-    
-    return response;
-  },
-  
-  getSuccessMessage() {
-    return CHARISMATIC_RESPONSES.success[
-      Math.floor(Math.random() * CHARISMATIC_RESPONSES.success.length)
-    ];
-  },
-  
-  // Helper para dar conselho sobre a meta financeira
-  getSavingsAdvice() {
-    const goal = gameState.financialGoal || 0;
-    if (goal <= 0) return ""; 
 
-    const finances = gameState.finances || [];
-    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
-    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
-    const currentBalance = Math.max(0, income - expenses);
-    
-    const remaining = Math.max(0, goal - currentBalance);
-    
-    if (remaining === 0) return "<br><br>🎉 <strong>Meta atingida!</strong> Você já alcançou seu objetivo financeiro!";
+    tabContainer.appendChild(btn);
+  }
 
-    // Cálculo para 1 ano (12 meses)
-    const months = 12;
-    const monthly = remaining / months;
+  // 2. Injetar Conteúdo da Aba
+  const main = document.getElementById('gameScreen');
+  if (main && !document.getElementById('tab-bible')) {
+    const content = document.createElement('div');
+    content.id = 'tab-bible';
+    content.className = 'tab-content';
+    content.style.cssText = 'padding: 20px; height: 100%; overflow-y: auto;';
     
-    return `<br><br>🎯 <strong>Meta:</strong> Faltam R$ ${remaining.toLocaleString('pt-BR')}.<br>💡 Para atingir em 1 ano, guarde <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>/mês.`;
-  },
+    content.innerHTML = `
+      <div class="bible-interface" style="max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.8); border-radius: 16px; padding: 20px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5);">
+        <div class="bible-header" style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
+          <h2 style="color: #ffdd57; margin: 0; font-family: serif;">✝️ Assistente Bíblico</h2>
+          <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
+        </div>
+        
+        <div id="bibleChatArea" style="height: 400px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="chat-message bot" style="align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%;">
+            Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Estou aqui para ajudar você a encontrar sabedoria na Palavra de Deus. O que gostaria de saber hoje?
+          </div>
+        </div>
 
-  // Ações reais
-  createTask(text) {
-    if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
+        <div class="bible-input-area" style="display: flex; gap: 10px;">
+          <input type="text" id="bibleInput" placeholder="Ex: Versículos sobre ansiedade..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white;">
+          <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;">➤</button>
+        </div>
+        
+        <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 15px; overflow-x: auto; padding-bottom: 5px;">
+          <button class="btn ghost bible-tag" onclick="askBible('versículo do dia')" style="font-size: 0.8rem; white-space: nowrap;">📅 Versículo do Dia</button>
+          <button class="btn ghost bible-tag" onclick="askBible('sobre ansiedade')" style="font-size: 0.8rem; white-space: nowrap;">😰 Ansiedade</button>
+          <button class="btn ghost bible-tag" onclick="askBible('sobre amor')" style="font-size: 0.8rem; white-space: nowrap;">❤️ Amor</button>
+          <button class="btn ghost bible-tag" onclick="askBible('sobre propósito')" style="font-size: 0.8rem; white-space: nowrap;">🎯 Propósito</button>
+        </div>
+      </div>
+    `;
     
-    if (!gameState.dailyTasks) gameState.dailyTasks = [];
+    main.appendChild(content);
     
-    gameState.dailyTasks.push({
-      id: Date.now(),
-      text: text,
-      completed: false,
-      date: new Date().toISOString()
+    // Setup Listeners
+    const input = document.getElementById('bibleInput');
+    const btn = document.getElementById('bibleSendBtn');
+    const chat = document.getElementById('bibleChatArea');
+    
+    const sendMessage = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        
+        // User Message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-message user';
+        userDiv.style.cssText = 'align-self: flex-end; background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 12px 12px 0 12px; max-width: 80%;';
+        userDiv.textContent = text;
+        chat.appendChild(userDiv);
+        input.value = '';
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Bot Thinking
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'chat-message bot thinking';
+        thinkingDiv.style.cssText = 'align-self: flex-start; opacity: 0.7; font-style: italic; margin-top: 5px;';
+        thinkingDiv.textContent = 'Buscando na palavra...';
+        chat.appendChild(thinkingDiv);
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Bot Response
+        const response = await BibleAssistant.ask(text);
+        thinkingDiv.remove();
+        
+        const botDiv = document.createElement('div');
+        botDiv.className = 'chat-message bot';
+        botDiv.style.cssText = 'align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%; margin-top: 5px; line-height: 1.5;';
+        botDiv.innerHTML = response;
+        chat.appendChild(botDiv);
+        chat.scrollTop = chat.scrollHeight;
+    };
+    
+    btn.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+    
+    // Global helper for tags
+    window.askBible = (query) => {
+        const input = document.getElementById('bibleInput');
+        if(input) {
+            input.value = query;
+            document.getElementById('bibleSendBtn').click();
+        }
+    };
+  }
+}
+
+// Métodos auxiliares para NLU
+function getTasksList() {
+  if (!gameState) return "Não consegui acessar seus dados.";
+  
+  const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
+  const completed = (gameState.dailyTasks || []).filter(t => t.completed);
+  
+  if (pending.length === 0 && completed.length === 0) {
+    return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+  }
+  
+  let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
+  
+  if (pending.length > 0) {
+    response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
+    pending.forEach(t => {
+      response += `• ${t.text}`;
+      if (t.dueDate) {
+        const date = new Date(t.dueDate + 'T00:00');
+        response += ` <small>(${date.toLocaleDateString('pt-BR')})</small>`;
+      }
+      response += `<br>`;
     });
+    response += '<br>';
+  }
+  
+  if (completed.length > 0) {
+    response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
+    completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
+  }
+  
+  if (pending.length > 0) {
+    response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
+  }
+  
+  return response;
+}
+
+function getFinanceSummary() {
+  if (!gameState || !gameState.finances) {
+    return "📊 Você ainda não tem registros financeiros. Diz algo como <strong>gastei 50 no almoço</strong> para começar!";
+  }
+  
+  const finances = gameState.finances;
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const balance = income - expenses;
+  
+  // Agrupa gastos por categoria
+  const categories = {};
+  finances.filter(f => f.type === 'expense').forEach(f => {
+    const cat = f.category || 'Outros';
+    categories[cat] = (categories[cat] || 0) + f.value;
+  });
+  
+  let response = `<strong>💰 Resumo Financeiro:</strong><br><br>`;
+  response += `📈 Entradas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>`;
+  response += `📉 Saídas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>`;
+  response += `💵 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br><br>`;
+  
+  if (Object.keys(categories).length > 0) {
+    response += `<strong>📊 Gastos por categoria:</strong><br>`;
+    const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    sortedCats.slice(0, 5).forEach(([cat, val]) => {
+      response += `• ${cat}: R$ ${val.toFixed(2)}<br>`;
+    });
+  }
+  
+  response += `<br>${balance >= 0 ? '✅ Suas finanças estão no verde!' : '⚠️ Atenção com os gastos!'}`;
+  
+  return response;
+}
+
+function getStatusInfo() {
+  if (!gameState) return "Não consegui acessar seus dados.";
+  
+  const name = OracleMemory.getProfile('name');
+  const treatment = name || 'Aventureiro';
+  
+  const level = gameState.level || 1;
+  const xp = gameState.xp || 0;
+  const pendingTasks = (gameState.dailyTasks || []).filter(t => !t.completed).length;
+  
+  // Calcula saldo financeiro
+  const finances = gameState.finances || [];
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const balance = income - expenses;
+  
+  // Trabalho de hoje
+  const today = new Date().toISOString().split('T')[0];
+  const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
+  const todayProd = todayLogs.reduce((sum, l) => sum + (l.production || 0), 0);
+  const todayMoney = todayLogs.reduce((sum, l) => sum + (l.money || 0), 0);
+  
+  let response = `<strong>🎮 Status de ${treatment}:</strong><br><br>`;
+  response += `⭐ Nível: <strong>${level}</strong> | XP: <strong>${xp}/100</strong><br>`;
+  response += `📝 Tarefas pendentes: <strong>${pendingTasks}</strong><br>`;
+  response += `💰 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>`;
+  
+  if (todayProd > 0 || todayMoney > 0) {
+    response += `<br><strong>📊 Hoje:</strong><br>`;
+    response += `🍕 Produção: ${todayProd} massas<br>`;
+    response += `💵 Ganho: R$ ${todayMoney.toFixed(2)}<br>`;
+  }
+  
+  // Dica personalizada
+  if (pendingTasks > 3) {
+    response += `<br>💡 Você tem muitas tarefas! Foque nas mais importantes.`;
+  } else if (pendingTasks === 0) {
+    response += `<br>🎉 Sem tarefas pendentes! Que tal criar uma nova meta?`;
+  }
+  
+  return response;
+}
+
+function getSuccessMessage() {
+  return CHARISMATIC_RESPONSES.success[
+    Math.floor(Math.random() * CHARISMATIC_RESPONSES.success.length)
+  ];
+}
+
+// Helper para dar conselho sobre a meta financeira
+function getSavingsAdvice() {
+  const goal = gameState.financialGoal || 0;
+  if (goal <= 0) return ""; 
+
+  const finances = gameState.finances || [];
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const currentBalance = Math.max(0, income - expenses);
+  
+  const remaining = Math.max(0, goal - currentBalance);
+  
+  if (remaining === 0) return "<br><br>🎉 <strong>Meta atingida!</strong> Você já alcançou seu objetivo financeiro!";
+
+  // Cálculo para 1 ano (12 meses)
+  const months = 12;
+  const monthly = remaining / months;
+  
+  return `<br><br>🎯 <strong>Meta:</strong> Faltam R$ ${remaining.toLocaleString('pt-BR')}.<br>💡 Para atingir em 1 ano, guarde <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>/mês.`;
+}
+
+// Ações reais
+function createTask(text) {
+  if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
+  
+  if (!gameState.dailyTasks) gameState.dailyTasks = [];
+  
+  gameState.dailyTasks.push({
+    id: Date.now(),
+    text: text,
+    completed: false,
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderDailyTasks === 'function') renderDailyTasks();
+  
+  return getSuccessMessage() + `<br><br>📝 Tarefa criada: <strong>${text}</strong><br><br>Quando terminar, diz: <strong>completar ${text}</strong>`;
+}
+
+function completeTask(taskName) {
+  if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
+  
+  const task = gameState.dailyTasks.find(t => 
+    !t.completed && t.text.toLowerCase().includes(taskName.toLowerCase())
+  );
+  
+  if (task) {
+    task.completed = true;
+    task.completedAt = new Date().toISOString();
+    
+    // Dar XP
+    gameState.xp = (gameState.xp || 0) + 10;
+    if (gameState.xp >= 100) {
+      gameState.level = (gameState.level || 1) + 1;
+      gameState.xp -= 100;
+    }
     
     saveGame();
     if (typeof renderDailyTasks === 'function') renderDailyTasks();
+    if (typeof updateUI === 'function') updateUI();
     
-    return this.getSuccessMessage() + `<br><br>📝 Tarefa criada: <strong>${text}</strong><br><br>Quando terminar, diz: <strong>completar ${text}</strong>`;
-  },
-  
-  completeTask(taskName) {
-    if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
-    
-    const task = gameState.dailyTasks.find(t => 
-      !t.completed && t.text.toLowerCase().includes(taskName.toLowerCase())
-    );
-    
-    if (task) {
-      task.completed = true;
-      task.completedAt = new Date().toISOString();
-      
-      // Dar XP
-      gameState.xp = (gameState.xp || 0) + 10;
-      if (gameState.xp >= 100) {
-        gameState.level = (gameState.level || 1) + 1;
-        gameState.xp -= 100;
-      }
-      
-      saveGame();
-      if (typeof renderDailyTasks === 'function') renderDailyTasks();
-      if (typeof updateUI === 'function') updateUI();
-      
-      return this.getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+10 XP 🎉`;
-    }
-    
-    return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
-  },
-  
-  addExpense(value, desc) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    // Detecta categoria automaticamente pela descrição
-    const category = this.detectCategory(desc);
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'expense',
-      category: category,
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    const name = OracleMemory.getProfile('name');
-    const gender = OracleMemory.getProfile('gender');
-    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
-    
-    const advice = this.getSavingsAdvice();
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
-  },
-  
-  addExpenseWithCategory(value, desc, category) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'expense',
-      category: category.charAt(0).toUpperCase() + category.slice(1),
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    const advice = this.getSavingsAdvice();
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
-  },
-  
-  // RENOMEAR GASTO
-  renameExpense(oldName, newName) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const expenses = gameState.finances.filter(t => t.type === 'expense');
-    
-    // Busca por nome parcial (case insensitive)
-    const found = expenses.filter(e => 
-      e.desc.toLowerCase().includes(oldName.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhum gasto com o nome "<strong>${oldName}</strong>".<br><br>` +
-             `💡 Dica: Diga "<strong>ver meus gastos</strong>" para listar todos os seus gastos.`;
-    }
-    
-    if (found.length === 1) {
-      // Apenas um gasto encontrado - renomeia direto
-      const expense = found[0];
-      const oldDesc = expense.desc;
-      expense.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-      
-      // Recalcula categoria se necessário
-      expense.category = this.detectCategory(expense.desc);
-      
-      saveGame();
-      if (typeof renderFinances === 'function') renderFinances();
-      
-      return `✅ Gasto renomeado com sucesso!<br><br>` +
-             `📝 De: <strong>${oldDesc}</strong><br>` +
-             `📝 Para: <strong>${expense.desc}</strong><br>` +
-             `<small>Categoria: ${expense.category}</small>`;
-    }
-    
-    // Múltiplos gastos encontrados - mostra opções
-    this.pendingAction = { type: 'rename_expense_select', newName: newName, matches: found };
-    
-    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${oldName}</strong>".<br>Qual você quer renomear?<br><br>`;
-    
-    const actions = found.slice(0, 5).map((e, i) => ({
-      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-        e.category = this.detectCategory(e.desc);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado com sucesso!`);
-      }
-    }));
-    
-    return { message: response, actions: actions };
-  },
-  
-  // LISTAR GASTOS
-  listExpenses() {
-    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
-    
-    const expenses = gameState.finances
-      .filter(t => t.type === 'expense')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 10); // Últimos 10
-    
-    if (expenses.length === 0) {
-      return "📊 Você ainda não registrou nenhum gasto.<br><br>💡 Dica: Diga \"<strong>gastei 50 no almoço</strong>\" para registrar.";
-    }
-    
-    let response = `📊 <strong>Seus últimos gastos:</strong><br><br>`;
-    
-    expenses.forEach((e, i) => {
-      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
-    });
-    
-    response += `<br>💡 Para renomear: "<strong>renomear gasto X para Y</strong>"<br>`;
-    response += `💡 Para deletar: "<strong>deletar gasto X</strong>"`;
-    
-    return response;
-  },
-  
-  // DELETAR GASTO
-  deleteExpense(name) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const expenses = gameState.finances.filter(t => t.type === 'expense');
-    
-    // Busca por nome parcial
-    const found = expenses.filter(e => 
-      e.desc.toLowerCase().includes(name.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhum gasto com o nome "<strong>${name}</strong>".`;
-    }
-    
-    if (found.length === 1) {
-      const expense = found[0];
-      
-      // Pede confirmação
-      this.pendingAction = { type: 'confirm_delete_expense', expense: expense };
-      
-      return {
-        message: `⚠️ Tem certeza que quer deletar o gasto "<strong>${expense.desc}</strong>" de R$ ${expense.value.toFixed(2)}?`,
-        actions: [
-          { 
-            text: '✅ Sim, deletar', 
-            action: () => {
-              gameState.finances = gameState.finances.filter(f => f.id !== expense.id);
-              saveGame();
-              if (typeof renderFinances === 'function') renderFinances();
-              this.pendingAction = null;
-              this.addBotMessage(`🗑️ Gasto "<strong>${expense.desc}</strong>" deletado!`);
-            }
-          },
-          { 
-            text: '❌ Não, cancelar', 
-            action: () => {
-              this.pendingAction = null;
-              this.addBotMessage('Ok, cancelado! 👍');
-            }
-          }
-        ]
-      };
-    }
-    
-    // Múltiplos encontrados
-    this.pendingAction = { type: 'delete_expense_select', matches: found };
-    
-    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${name}</strong>".<br>Qual você quer deletar?<br><br>`;
-    
-    const actions = found.slice(0, 5).map(e => ({
-      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`🗑️ Gasto "<strong>${e.desc}</strong>" deletado!`);
-      }
-    }));
-    
-    return { message: response, actions: actions };
-  },
-  
-  // Detecta categoria automaticamente
-  detectCategory(desc) {
-    const lower = desc.toLowerCase();
-    
-    const categories = {
-      'Alimentação': ['almoço', 'jantar', 'café', 'lanche', 'comida', 'restaurante', 'pizza', 'hamburguer', 'sushi', 'mercado', 'supermercado', 'feira', 'padaria', 'açougue', 'ifood', 'rappi', 'delivery'],
-      'Transporte': ['uber', '99', 'taxi', 'gasolina', 'combustível', 'estacionamento', 'pedágio', 'ônibus', 'metrô', 'passagem', 'carro', 'moto', 'bicicleta'],
-      'Lazer': ['cinema', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'parque', 'viagem', 'passeio', 'diversão'],
-      'Saúde': ['farmácia', 'remédio', 'médico', 'consulta', 'exame', 'hospital', 'dentista', 'academia', 'suplemento', 'vitamina'],
-      'Educação': ['curso', 'livro', 'escola', 'faculdade', 'mensalidade', 'material', 'apostila', 'aula'],
-      'Moradia': ['aluguel', 'condomínio', 'luz', 'água', 'gás', 'internet', 'telefone', 'celular', 'conta'],
-      'Compras': ['roupa', 'sapato', 'tênis', 'shopping', 'loja', 'presente', 'eletrônico', 'celular']
-    };
-    
-    for (const [cat, keywords] of Object.entries(categories)) {
-      if (keywords.some(kw => lower.includes(kw))) {
-        return cat;
-      }
-    }
-    
-    return 'Outros';
-  },
-  
-  addIncome(value, desc) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'income',
-      category: 'Extra',
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    const advice = this.getSavingsAdvice();
-    return this.getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}${advice}`;
-  },
-  
-  // RENOMEAR RECEITA/ENTRADA
-  renameIncome(oldName, newName) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const incomes = gameState.finances.filter(t => t.type === 'income');
-    
-    const found = incomes.filter(e => 
-      e.desc.toLowerCase().includes(oldName.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${oldName}</strong>".<br><br>` +
-             `💡 Dica: Diga "<strong>ver minhas entradas</strong>" para listar.`;
-    }
-    
-    if (found.length === 1) {
-      const income = found[0];
-      const oldDesc = income.desc;
-      income.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-      
-      saveGame();
-      if (typeof renderFinances === 'function') renderFinances();
-      
-      return `✅ Entrada renomeada!<br><br>` +
-             `📝 De: <strong>${oldDesc}</strong><br>` +
-             `📝 Para: <strong>${income.desc}</strong>`;
-    }
-    
-    // Múltiplos encontrados
-    this.pendingAction = { type: 'rename_income_select', newName: newName, matches: found };
-    
-    const actions = found.slice(0, 5).map(e => ({
-      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado!`);
-      }
-    }));
-    
-    return { message: `🔍 Encontrei ${found.length} entradas. Qual renomear?`, actions: actions };
-  },
-  
-  // LISTAR RECEITAS/ENTRADAS
-  listIncomes() {
-    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
-    
-    const incomes = gameState.finances
-      .filter(t => t.type === 'income')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 10);
-    
-    if (incomes.length === 0) {
-      return "📊 Você ainda não registrou nenhuma entrada.<br><br>💡 Dica: Diga \"<strong>recebi 1000 de salário</strong>\" para registrar.";
-    }
-    
-    let response = `📊 <strong>Suas últimas entradas:</strong><br><br>`;
-    
-    incomes.forEach((e, i) => {
-      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
-    });
-    
-    response += `<br>💡 Para renomear: "<strong>renomear entrada X para Y</strong>"`;
-    
-    return response;
-  },
-  
-  // DELETAR RECEITA/ENTRADA
-  deleteIncome(name) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const incomes = gameState.finances.filter(t => t.type === 'income');
-    
-    const found = incomes.filter(e => 
-      e.desc.toLowerCase().includes(name.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${name}</strong>".`;
-    }
-    
-    if (found.length === 1) {
-      const income = found[0];
-      
-      this.pendingAction = { type: 'confirm_delete_income', income: income };
-      
-      return {
-        message: `⚠️ Deletar entrada "<strong>${income.desc}</strong>" de R$ ${income.value.toFixed(2)}?`,
-        actions: [
-          { 
-            text: '✅ Sim, deletar', 
-            action: () => {
-              gameState.finances = gameState.finances.filter(f => f.id !== income.id);
-              saveGame();
-              if (typeof renderFinances === 'function') renderFinances();
-              this.pendingAction = null;
-              this.addBotMessage(`🗑️ Entrada "<strong>${income.desc}</strong>" deletada!`);
-            }
-          },
-          { 
-            text: '❌ Cancelar', 
-            action: () => {
-              this.pendingAction = null;
-              this.addBotMessage('Ok, cancelado! 👍');
-            }
-          }
-        ]
-      };
-    }
-    
-    // Múltiplos encontrados
-    const actions = found.slice(0, 5).map(e => ({
-      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`🗑️ Entrada "<strong>${e.desc}</strong>" deletada!`);
-      }
-    }));
-    
-    return { message: `🔍 Encontrei ${found.length} entradas. Qual deletar?`, actions: actions };
-  },
-
-  // UI Methods
-  addUserMessage(text) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message user';
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  },
-  
-  addBotMessage(text, actions = null) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message bot';
-    div.innerHTML = text;
-    
-    if (actions && actions.length > 0) {
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'oracle-action-btns';
-      
-      actions.forEach(action => {
-        const btn = document.createElement('button');
-        btn.className = 'oracle-action-btn';
-        btn.textContent = action.text;
-        btn.addEventListener('click', () => {
-          action.action();
-          actionsDiv.remove();
-        });
-        actionsDiv.appendChild(btn);
-      });
-      
-      div.appendChild(actionsDiv);
-    }
-    
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-    playSound('click');
-    
-    // Se estiver em modo conversa, fala a resposta
-    if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
-      // Remove emojis e tags HTML para falar
-      const cleanText = text.replace(/<[^>]*>/g, '').replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F300}-\u{1F5FF}]/gu, '').trim();
-      if (cleanText) {
-        OracleSpeech.speak(cleanText);
-      }
-    }
-  },
-  
-  addSystemMessage(text) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message system';
-    div.innerHTML = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  },
-  
-  showThinking() {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message thinking';
-    div.id = 'oracleThinking';
-    div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-  },
-  
-  removeThinking() {
-    const thinking = document.getElementById('oracleThinking');
-    if (thinking) thinking.remove();
+    return getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+10 XP 🎉`;
   }
-};
+  
+  return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
+}
+
+function addExpense(value, desc) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  // Detecta categoria automaticamente pela descrição
+  const category = detectCategory(desc);
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'expense',
+    category: category,
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const name = OracleMemory.getProfile('name');
+  const gender = OracleMemory.getProfile('gender');
+  const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
+}
+
+function addExpenseWithCategory(value, desc, category) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'expense',
+    category: category.charAt(0).toUpperCase() + category.slice(1),
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
+}
+
+// RENOMEAR GASTO
+function renameExpense(oldName, newName) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const expenses = gameState.finances.filter(t => t.type === 'expense');
+  
+  // Busca por nome parcial (case insensitive)
+  const found = expenses.filter(e => 
+    e.desc.toLowerCase().includes(oldName.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhum gasto com o nome "<strong>${oldName}</strong>".<br><br>` +
+           `💡 Dica: Diga "<strong>ver meus gastos</strong>" para listar todos os seus gastos.`;
+  }
+  
+  if (found.length === 1) {
+    // Apenas um gasto encontrado - renomeia direto
+    const expense = found[0];
+    const oldDesc = expense.desc;
+    expense.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+    
+    // Recalcula categoria se necessário
+    expense.category = detectCategory(expense.desc);
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return `✅ Gasto renomeado com sucesso!<br><br>` +
+           `📝 De: <strong>${oldDesc}</strong><br>` +
+           `📝 Para: <strong>${expense.desc}</strong><br>` +
+           `<small>Categoria: ${expense.category}</small>`;
+  }
+  
+  // Múltiplos gastos encontrados - mostra opções
+  OracleChat.pendingAction = { type: 'rename_expense_select', newName: newName, matches: found };
+  
+  let response = `🔍 Encontrei ${found.length} gastos com "<strong>${oldName}</strong>".<br>Qual você quer renomear?<br><br>`;
+  
+  const actions = found.slice(0, 5).map((e, i) => ({
+    text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      e.category = detectCategory(e.desc);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado com sucesso!`);
+    }
+  }));
+  
+  return { message: response, actions: actions };
+}
+
+// LISTAR GASTOS
+function listExpenses() {
+  if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+  
+  const expenses = gameState.finances
+    .filter(t => t.type === 'expense')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 10); // Últimos 10
+  
+  if (expenses.length === 0) {
+    return "📊 Você ainda não registrou nenhum gasto.<br><br>💡 Dica: Diga \"<strong>gastei 50 no almoço</strong>\" para registrar.";
+  }
+  
+  let response = `📊 <strong>Seus últimos gastos:</strong><br><br>`;
+  
+  expenses.forEach((e, i) => {
+    const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+  });
+  
+  response += `<br>💡 Para renomear: "<strong>renomear gasto X para Y</strong>"<br>`;
+  response += `💡 Para deletar: "<strong>deletar gasto X</strong>"`;
+  
+  return response;
+}
+
+// DELETAR GASTO
+function deleteExpense(name) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const expenses = gameState.finances.filter(t => t.type === 'expense');
+  
+  // Busca por nome parcial
+  const found = expenses.filter(e => 
+    e.desc.toLowerCase().includes(name.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhum gasto com o nome "<strong>${name}</strong>".`;
+  }
+  
+  if (found.length === 1) {
+    const expense = found[0];
+    
+    // Pede confirmação
+    OracleChat.pendingAction = { type: 'confirm_delete_expense', expense: expense };
+    
+    return {
+      message: `⚠️ Tem certeza que quer deletar o gasto "<strong>${expense.desc}</strong>" de R$ ${expense.value.toFixed(2)}?`,
+      actions: [
+        { 
+          text: '✅ Sim, deletar', 
+          action: () => {
+            gameState.finances = gameState.finances.filter(f => f.id !== expense.id);
+            saveGame();
+            if (typeof renderFinances === 'function') renderFinances();
+            OracleChat.pendingAction = null;
+            addBotMessage(`🗑️ Gasto "<strong>${expense.desc}</strong>" deletado!`);
+          }
+        },
+        { 
+          text: '❌ Não, cancelar', 
+          action: () => {
+            OracleChat.pendingAction = null;
+            addBotMessage('Ok, cancelado! 👍');
+          }
+        }
+      ]
+    };
+  }
+  
+  // Múltiplos encontrados
+  OracleChat.pendingAction = { type: 'delete_expense_select', matches: found };
+  
+  let response = `🔍 Encontrei ${found.length} gastos com "<strong>${name}</strong>".<br>Qual você quer deletar?<br><br>`;
+  
+  const actions = found.slice(0, 5).map(e => ({
+    text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`🗑️ Gasto "<strong>${e.desc}</strong>" deletado!`);
+    }
+  }));
+  
+  return { message: response, actions: actions };
+}
+
+// Detecta categoria automaticamente
+function detectCategory(desc) {
+  const lower = desc.toLowerCase();
+  
+  const categories = {
+    'Alimentação': ['almoço', 'jantar', 'café', 'lanche', 'comida', 'restaurante', 'pizza', 'hamburguer', 'sushi', 'mercado', 'supermercado', 'feira', 'padaria', 'açougue', 'ifood', 'rappi', 'delivery'],
+    'Transporte': ['uber', '99', 'taxi', 'gasolina', 'combustível', 'estacionamento', 'pedágio', 'ônibus', 'metrô', 'passagem', 'carro', 'moto', 'bicicleta'],
+    'Lazer': ['cinema', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'parque', 'viagem', 'passeio', 'diversão'],
+    'Saúde': ['farmácia', 'remédio', 'médico', 'consulta', 'exame', 'hospital', 'dentista', 'academia', 'suplemento', 'vitamina'],
+    'Educação': ['curso', 'livro', 'escola', 'faculdade', 'mensalidade', 'material', 'apostila', 'aula'],
+    'Moradia': ['aluguel', 'condomínio', 'luz', 'água', 'gás', 'internet', 'telefone', 'celular', 'conta'],
+    'Compras': ['roupa', 'sapato', 'tênis', 'shopping', 'loja', 'presente', 'eletrônico', 'celular']
+  };
+  
+  for (const [cat, keywords] of Object.entries(categories)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return cat;
+    }
+  }
+  
+  return 'Outros';
+}
+
+function addIncome(value, desc) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'income',
+    category: 'Extra',
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}${advice}`;
+}
+
+// RENOMEAR RECEITA/ENTRADA
+function renameIncome(oldName, newName) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const incomes = gameState.finances.filter(t => t.type === 'income');
+  
+  const found = incomes.filter(e => 
+    e.desc.toLowerCase().includes(oldName.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhuma entrada com o nome "<strong>${oldName}</strong>".<br><br>` +
+           `💡 Dica: Diga "<strong>ver minhas entradas</strong>" para listar.`;
+  }
+  
+  if (found.length === 1) {
+    const income = found[0];
+    const oldDesc = income.desc;
+    income.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return `✅ Entrada renomeada!<br><br>` +
+           `📝 De: <strong>${oldDesc}</strong><br>` +
+           `📝 Para: <strong>${income.desc}</strong>`;
+  }
+  
+  // Múltiplos encontrados
+  OracleChat.pendingAction = { type: 'rename_income_select', newName: newName, matches: found };
+  
+  const actions = found.slice(0, 5).map(e => ({
+    text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado!`);
+    }
+  }));
+  
+  return { message: `🔍 Encontrei ${found.length} entradas. Qual renomear?`, actions: actions };
+}
+
+// LISTAR RECEITAS/ENTRADAS
+function listIncomes() {
+  if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+  
+  const incomes = gameState.finances
+    .filter(t => t.type === 'income')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 10);
+  
+  if (incomes.length === 0) {
+    return "📊 Você ainda não registrou nenhuma entrada.<br><br>💡 Dica: Diga \"<strong>recebi 1000 de salário</strong>\" para registrar.";
+  }
+  
+  let response = `📊 <strong>Suas últimas entradas:</strong><br><br>`;
+  
+  incomes.forEach((e, i) => {
+    const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+  });
+  
+  response += `<br>💡 Para renomear: "<strong>renomear entrada X para Y</strong>"`;
+  
+  return response;
+}
+
+// DELETAR RECEITA/ENTRADA
+function deleteIncome(name) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const incomes = gameState.finances.filter(t => t.type === 'income');
+  
+  const found = incomes.filter(e => 
+    e.desc.toLowerCase().includes(name.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhuma entrada com o nome "<strong>${name}</strong>".`;
+  }
+  
+  if (found.length === 1) {
+    const income = found[0];
+    
+    OracleChat.pendingAction = { type: 'confirm_delete_income', income: income };
+    
+    return {
+      message: `⚠️ Deletar entrada "<strong>${income.desc}</strong>" de R$ ${income.value.toFixed(2)}?`,
+      actions: [
+        { 
+          text: '✅ Sim, deletar', 
+          action: () => {
+            gameState.finances = gameState.finances.filter(f => f.id !== income.id);
+            saveGame();
+            if (typeof renderFinances === 'function') renderFinances();
+            OracleChat.pendingAction = null;
+            addBotMessage(`🗑️ Entrada "<strong>${income.desc}</strong>" deletada!`);
+          }
+        },
+        { 
+          text: '❌ Cancelar', 
+          action: () => {
+            OracleChat.pendingAction = null;
+            addBotMessage('Ok, cancelado! 👍');
+          }
+        }
+      ]
+    };
+  }
+  
+  // Múltiplos encontrados
+  const actions = found.slice(0, 5).map(e => ({
+    text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`🗑️ Entrada "<strong>${e.desc}</strong>" deletada!`);
+    }
+  }));
+  
+  return { message: `🔍 Encontrei ${found.length} entradas. Qual deletar?`, actions: actions };
+}
+
+// UI Methods
+function addUserMessage(text) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message user';
+  div.textContent = text;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addBotMessage(text, actions = null) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message bot';
+  div.innerHTML = text;
+  
+  if (actions && actions.length > 0) {
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'oracle-action-btns';
+    
+    actions.forEach(action => {
+      const btn = document.createElement('button');
+      btn.className = 'oracle-action-btn';
+      btn.textContent = action.text;
+      btn.addEventListener('click', () => {
+        action.action();
+        actionsDiv.remove();
+      });
+      actionsDiv.appendChild(btn);
+    });
+    
+    div.appendChild(actionsDiv);
+  }
+  
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  playSound('click');
+  
+  // Se estiver em modo conversa, fala a resposta
+  if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
+    // Remove emojis e tags HTML para falar
+    const cleanText = text.replace(/<[^>]*>/g, '').replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F300}-\u{1F5FF}]/gu, '').trim();
+    if (cleanText) {
+      OracleSpeech.speak(cleanText);
+    }
+  }
+}
+
+function addSystemMessage(text) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message system';
+  div.innerHTML = text;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showThinking() {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message thinking';
+  div.id = 'oracleThinking';
+  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function removeThinking() {
+  const thinking = document.getElementById('oracleThinking');
+  if (thinking) thinking.remove();
+}
 
 // Expõe globalmente para compatibilidade com onclick no HTML
 window.toggleChat = () => OracleChat.toggle();
@@ -9414,6 +9633,7 @@ window.addEventListener('DOMContentLoaded', () => {
   
   // Inicializa o Oráculo
   setTimeout(() => OracleChat.init(), 500);
+  setTimeout(() => injectBibleTab(), 600); // Injeta a aba Bíblia
   
   // Splash Screen Logic
   const splash = document.getElementById('splashScreen');
