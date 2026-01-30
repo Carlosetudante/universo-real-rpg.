@@ -6027,7 +6027,7 @@ const OracleChat = {
     }
     
     // Metas financeiras
-    if (lowerInput.match(/meta\s+financeira|objetivo\s+financeiro|criar\s+meta|definir\s+meta/i)) {
+    if (lowerInput.match(/meta\s+financeira|objetivo\s+financeiro|criar\s+meta|definir\s+meta|quero\s+(?:ter|fazer|criar|montar)\s+(?:uma\s+)?(?:reserva|poupança|economia)/i)) {
       return this.createFinancialGoal();
     }
     
@@ -6712,6 +6712,28 @@ const OracleChat = {
         this.pendingAction = null;
         return this.createTask(taskName);
         
+      case 'financial_goal_name':
+        let goalName = input.trim();
+        if (goalName.length < 2) {
+          return "Nome muito curto. Qual é o objetivo? (Ex: Viagem, Carro)";
+        }
+        this.pendingAction = { type: 'financial_goal_value', name: goalName };
+        return `Legal! E de quanto você precisa para "${goalName}"? (Digite o valor, ex: 5000)`;
+
+      case 'financial_goal_value':
+        const val = parseMoney(lowerInput);
+        if (isNaN(val) || val <= 0) {
+           return "Valor inválido. Digite um número (ex: 1000).";
+        }
+        this.pendingAction = null;
+        if (gameState) {
+            gameState.financialGoal = val;
+            saveGame();
+            updateUI();
+            return `🎯 Meta definida para <strong>${action.name}</strong>: R$ ${val.toLocaleString('pt-BR')}! 🚀`;
+        }
+        return "Erro ao salvar meta.";
+
       case 'savings_confirm':
         // Confirmar ação de poupança
         if (lowerInput.match(/^(sim|s|yes|y|claro|pode|bora|isso|confirma)$/i)) {
