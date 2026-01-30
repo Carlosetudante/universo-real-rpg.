@@ -4126,6 +4126,14 @@ if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpe
 const OracleNLU = {
   // Mapa de intenções e padrões
   intents: {
+    'finance.goal': {
+      patterns: [
+        /(?:cria|criar|definir|nova|estabelecer)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança)/i,
+        /(?:quero|preciso)\s+(?:juntar|guardar|economizar)\s+(?:dinheiro|grana)/i,
+        /(?:objetivo|alvo)\s+financeiro/i
+      ],
+      extract: () => ({})
+    },
     'task.create': {
       patterns: [
         /(?:cria|criar|adiciona|adicionar|nova|novo|faz|fazer|coloca|colocar|preciso|quero|tenho que|vou)\s+(?:uma?\s+)?(?:tarefa|task|missão|lembrete|reminder)?:?\s*(.+)/i,
@@ -6523,6 +6531,9 @@ const OracleChat = {
       case 'task.list':
         return this.getTasksList();
         
+      case 'finance.goal':
+        return this.createFinancialGoal();
+
       // HANDLERS DOS NOVOS INTENTS
       case 'utility.calc':
         const { n1, op, n2 } = data;
