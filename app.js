@@ -4568,6 +4568,194 @@ const OracleMemory = {
   }
 };
 
+// ========================================
+// SISTEMA DE SCRIPTS DO ORÁCULO
+// Permite carregar instruções e informações personalizadas
+// ========================================
+const OracleScript = {
+  key: 'oracle_scripts',
+  
+  // Obtém scripts salvos
+  getScripts() {
+    try {
+      return JSON.parse(localStorage.getItem(this.key)) || [];
+    } catch {
+      return [];
+    }
+  },
+  
+  // Salva scripts
+  saveScripts(scripts) {
+    localStorage.setItem(this.key, JSON.stringify(scripts));
+  },
+  
+  // Processa um arquivo de script
+  processScriptFile(content, filename) {
+    const script = {
+      id: Date.now(),
+      filename: filename,
+      loadedAt: new Date().toISOString(),
+      instructions: [],
+      facts: [],
+      commands: [],
+      responses: {},
+      personality: {},
+      raw: content
+    };
+    
+    // Detecta formato do arquivo
+    if (filename.endsWith('.json')) {
+      try {
+        const json = JSON.parse(content);
+        script.instructions = json.instructions || [];
+        script.facts = json.facts || json.informacoes || [];
+        script.commands = json.commands || json.comandos || [];
+        script.responses = json.responses || json.respostas || {};
+        script.personality = json.personality || json.personalidade || {};
+        if (json.nome) script.name = json.nome;
+        if (json.name) script.name = json.name;
+      } catch (e) {
+        console.error('Erro ao processar JSON:', e);
+        return { success: false, error: 'Arquivo JSON inválido' };
+      }
+    } else {
+      // Processa arquivo TXT ou MD
+      const lines = content.split('\n');
+      let currentSection = 'general';
+      
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
+          // Detecta seções por cabeçalhos
+          if (trimmed.toLowerCase().includes('instrução') || trimmed.toLowerCase().includes('instruction')) {
+            currentSection = 'instructions';
+          } else if (trimmed.toLowerCase().includes('fato') || trimmed.toLowerCase().includes('informação') || trimmed.toLowerCase().includes('fact')) {
+            currentSection = 'facts';
+          } else if (trimmed.toLowerCase().includes('comando') || trimmed.toLowerCase().includes('command')) {
+            currentSection = 'commands';
+          } else if (trimmed.toLowerCase().includes('resposta') || trimmed.toLowerCase().includes('response')) {
+            currentSection = 'responses';
+          }
+          return;
+        }
+        
+        // Processa linha baseado na seção atual
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+          const value = trimmed.slice(2);
+          if (currentSection === 'instructions') {
+            script.instructions.push(value);
+          } else if (currentSection === 'facts') {
+            script.facts.push(value);
+          } else if (currentSection === 'commands') {
+            // Formato: trigger:response ou trigger -> response
+            const [trigger, response] = value.includes('->') ? value.split('->') : value.split(':');
+            if (trigger && response) {
+              script.commands.push({ trigger: trigger.trim().toLowerCase(), response: response.trim() });
+            }
+          } else {
+            // Linha geral - adiciona como fato
+            script.facts.push(value);
+          }
+        } else if (trimmed.includes(':') && currentSection === 'responses') {
+          const [key, value] = trimmed.split(':');
+          if (key && value) {
+            script.responses[key.trim().toLowerCase()] = value.trim();
+          }
+        } else if (currentSection === 'general') {
+          // Linhas gerais são tratadas como fatos
+          script.facts.push(trimmed);
+        }
+      });
+    }
+    
+    // Salva o script
+    const scripts = this.getScripts();
+    scripts.push(script);
+    this.saveScripts(scripts);
+    
+    // Adiciona fatos à memória do Oráculo
+    script.facts.forEach(fact => {
+      OracleMemory.learn(fact, 'script');
+    });
+    
+    return { 
+      success: true, 
+      script,
+      summary: {
+        instructions: script.instructions.length,
+        facts: script.facts.length,
+        commands: script.commands.length,
+        responses: Object.keys(script.responses).length
+      }
+    };
+  },
+  
+  // Verifica se há comando customizado
+  checkCustomCommand(input) {
+    const scripts = this.getScripts();
+    const inputLower = input.toLowerCase();
+    
+    for (const script of scripts) {
+      // Verifica comandos
+      for (const cmd of script.commands || []) {
+        if (inputLower.includes(cmd.trigger)) {
+          return cmd.response;
+        }
+      }
+      
+      // Verifica respostas diretas
+      for (const [key, response] of Object.entries(script.responses || {})) {
+        if (inputLower.includes(key)) {
+          return response;
+        }
+      }
+    }
+    
+    return null;
+  },
+  
+  // Obtém contexto adicional dos scripts
+  getContext() {
+    const scripts = this.getScripts();
+    let context = {
+      instructions: [],
+      facts: []
+    };
+    
+    scripts.forEach(script => {
+      context.instructions.push(...(script.instructions || []));
+      context.facts.push(...(script.facts || []));
+    });
+    
+    return context;
+  },
+  
+  // Remove um script
+  removeScript(id) {
+    const scripts = this.getScripts().filter(s => s.id !== id);
+    this.saveScripts(scripts);
+  },
+  
+  // Lista todos os scripts
+  listScripts() {
+    return this.getScripts().map(s => ({
+      id: s.id,
+      name: s.name || s.filename,
+      loadedAt: s.loadedAt,
+      stats: {
+        instructions: (s.instructions || []).length,
+        facts: (s.facts || []).length,
+        commands: (s.commands || []).length
+      }
+    }));
+  },
+  
+  // Limpa todos os scripts
+  clearAll() {
+    this.saveScripts([]);
+  }
+};
+
 // Personalidades do Oráculo 2.0
 const ORACLE_PERSONALITIES_V2 = {
   assistant: {
@@ -5004,6 +5192,14 @@ const OracleChat = {
     const settingsBtn = document.getElementById('oracleSettingsBtn');
     if (settingsBtn) settingsBtn.addEventListener('click', () => this.showUserProfile());
     
+    // Botão de carregar script
+    const scriptBtn = document.getElementById('oracleScriptBtn');
+    const scriptInput = document.getElementById('oracleScriptInput');
+    if (scriptBtn && scriptInput) {
+      scriptBtn.addEventListener('click', () => this.showScriptOptions());
+      scriptInput.addEventListener('change', (e) => this.handleScriptUpload(e));
+    }
+    
     // Seletor de personalidade
     const personalitySelect = document.getElementById('oraclePersonalitySelect');
     if (personalitySelect) {
@@ -5076,6 +5272,99 @@ const OracleChat = {
       }},
       { text: '❌ Fechar', action: () => {} }
     ]);
+  },
+  
+  // Mostra opções de scripts
+  showScriptOptions() {
+    const scripts = OracleScript.listScripts();
+    
+    let response = `<strong>📄 Scripts e Configurações</strong><br><br>`;
+    response += `Scripts permitem que você me ensine informações, comandos personalizados e instruções especiais.<br><br>`;
+    
+    if (scripts.length > 0) {
+      response += `<strong>📚 Scripts Carregados:</strong><br>`;
+      scripts.forEach(s => {
+        const date = new Date(s.loadedAt).toLocaleDateString('pt-BR');
+        response += `• <strong>${s.name}</strong> (${date})<br>`;
+        response += `&nbsp;&nbsp;📝 ${s.stats.instructions} instruções, 💭 ${s.stats.facts} fatos, ⚡ ${s.stats.commands} comandos<br>`;
+      });
+      response += '<br>';
+    } else {
+      response += `<em>Nenhum script carregado ainda.</em><br><br>`;
+    }
+    
+    response += `<strong>📁 Formatos aceitos:</strong><br>`;
+    response += `• <code>.txt</code> - Texto simples (um fato por linha)<br>`;
+    response += `• <code>.md</code> - Markdown com seções<br>`;
+    response += `• <code>.json</code> - Estruturado (recomendado)<br><br>`;
+    
+    response += `<strong>📋 Exemplo de JSON:</strong><br>`;
+    response += `<pre style="font-size:11px; background:rgba(0,0,0,0.3); padding:8px; border-radius:6px; overflow-x:auto;">{
+  "nome": "Meu Script",
+  "instructions": ["Seja sempre positivo", "Use emojis"],
+  "facts": ["Meu pet é o Rex", "Gosto de pizza"],
+  "commands": [
+    {"trigger": "oi rex", "response": "Au au! 🐕"}
+  ]
+}</pre>`;
+    
+    this.addBotMessage(response, [
+      { text: '📤 Carregar Script', action: () => {
+        document.getElementById('oracleScriptInput')?.click();
+      }},
+      { text: '🗑️ Limpar Scripts', action: () => {
+        if (scripts.length === 0) {
+          this.addBotMessage('Não há scripts para limpar! 📭');
+          return;
+        }
+        if (confirm(`Deseja remover todos os ${scripts.length} scripts carregados?`)) {
+          OracleScript.clearAll();
+          this.addBotMessage('🗑️ Todos os scripts foram removidos!');
+        }
+      }},
+      { text: '❌ Fechar', action: () => {} }
+    ]);
+  },
+  
+  // Processa upload de arquivo de script
+  handleScriptUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      const result = OracleScript.processScriptFile(content, file.name);
+      
+      if (result.success) {
+        let response = `<strong>✅ Script "${file.name}" carregado com sucesso!</strong><br><br>`;
+        response += `<strong>📊 Resumo:</strong><br>`;
+        response += `• 📝 ${result.summary.instructions} instruções<br>`;
+        response += `• 💭 ${result.summary.facts} fatos aprendidos<br>`;
+        response += `• ⚡ ${result.summary.commands} comandos personalizados<br>`;
+        response += `• 💬 ${result.summary.responses} respostas automáticas<br><br>`;
+        
+        if (result.script.facts?.length > 0) {
+          response += `<strong>Alguns fatos que aprendi:</strong><br>`;
+          result.script.facts.slice(0, 5).forEach(f => {
+            response += `• ${f}<br>`;
+          });
+          if (result.script.facts.length > 5) {
+            response += `<em>...e mais ${result.script.facts.length - 5} fatos</em><br>`;
+          }
+        }
+        
+        this.addBotMessage(response);
+        OracleMemory.updateMemoryDisplay();
+      } else {
+        this.addBotMessage(`❌ Erro ao processar script: ${result.error}`);
+      }
+      
+      // Limpa o input para permitir recarregar o mesmo arquivo
+      event.target.value = '';
+    };
+    
+    reader.readAsText(file);
   },
   
   toggle() {
@@ -5336,6 +5625,12 @@ const OracleChat = {
     // Salva se foi educado para personalizar resposta
     if (wasPolite) {
       OracleMemory.setProfile('isPolite', true);
+    }
+    
+    // -1. VERIFICA COMANDOS PERSONALIZADOS DOS SCRIPTS
+    const scriptResponse = OracleScript.checkCustomCommand(lowerInput);
+    if (scriptResponse) {
+      return scriptResponse;
     }
     
     // 0. PRIMEIRO: Verifica se há ação pendente aguardando resposta
