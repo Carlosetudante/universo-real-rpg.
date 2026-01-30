@@ -4128,8 +4128,8 @@ const OracleNLU = {
   intents: {
     'finance.goal': {
       patterns: [
-        /(?:cria|criar|definir|nova|estabelecer|fazer|montar)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança|de\s+grana)/i,
-        /(?:quero|preciso|vamos|bora)\s+(?:juntar|guardar|economizar|fazer|criar|ter)\s+(?:uma\s+)?(?:meta|reserva|poupança)/i,
+        /(?:cria|criar|crair|definir|nova|estabelecer|fazer|montar)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança|de\s+grana)/i,
+        /(?:quero|preciso|vamos|bora)\s+(?:juntar|guardar|economizar|fazer|criar|crair|ter)\s+(?:uma\s+)?(?:meta|reserva|poupança)/i,
         /(?:objetivo|alvo)\s+financeiro/i,
         /(?:preciso|quero)\s+de\s+(?:uma\s+)?meta/i
       ],
@@ -5915,6 +5915,29 @@ const OracleChat = {
       if (pendingResult) return pendingResult;
     }
     
+    // 0.05. VERIFICAÇÃO DE AMBIGUIDADE (Meta vs Tarefa)
+    const isAmbiguousMeta = lowerInput.match(/\b(meta)\b/i) && !lowerInput.match(/financeira|dinheiro|grana|economia|juntar|guardar|poupar|reserva|reais|r\$/i);
+
+    if (isAmbiguousMeta && !this.pendingAction) {
+        this.pendingAction = { type: 'clarify_meta', originalInput: input };
+        return {
+            message: `Quando você diz "meta", quer criar uma <strong>meta financeira</strong> (para juntar dinheiro) ou uma <strong>tarefa</strong>?`,
+            actions: [
+                { text: '💰 Meta Financeira', action: () => {
+                    this.pendingAction = null;
+                    const response = this.createFinancialGoal();
+                    this.addBotMessage(response.message, response.actions);
+                }},
+                { text: '📝 Tarefa', action: () => {
+                    this.pendingAction = null;
+                    const taskText = input.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
+                    const response = this.createTask(taskText);
+                    this.addBotMessage(response);
+                }}
+            ]
+        };
+    }
+
     // 0.1. DETECÇÃO DE INTENÇÕES PRIORITÁRIAS (Comandos diretos)
     // Isso evita que comandos como "minhas tarefas" sejam interpretados como respostas de conversa
     const nluResult = OracleNLU.detectIntent(input);
@@ -6762,6 +6785,20 @@ const OracleChat = {
     }
     
     switch(action.type) {
+      case 'clarify_meta': // NEW CASE for ambiguity
+        if (lowerInput.includes('financeira')) {
+            this.pendingAction = null;
+            return this.createFinancialGoal();
+        } else if (lowerInput.includes('tarefa')) {
+            this.pendingAction = null;
+            const taskText = action.originalInput.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
+            return this.createTask(taskText);
+        } else {
+            this.pendingAction = null; // Cancel if the response is not clear
+            return "Não entendi. Por favor, escolha entre 'Meta Financeira' ou 'Tarefa'.";
+        }
+        break;
+
       case 'expense_amount': // NEW CASE
         const expenseValue = parseMoney(lowerInput);
         if (isNaN(expenseValue) || expenseValue <= 0) {
