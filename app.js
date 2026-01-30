@@ -3130,6 +3130,13 @@ function renderWorkTab() {
   }
 }
 
+// Estado do modo de entrada (Produção ou Horas)
+window.workEntryMode = 'production';
+window.setWorkEntryMode = function(mode) {
+  window.workEntryMode = mode;
+  renderWorkSingularity();
+};
+
 function renderWorkSingularity() {
   if (!elements.workSingularityContainer) return;
   
@@ -3137,6 +3144,10 @@ function renderWorkSingularity() {
   const def = JOB_TYPES[type];
   const configValue = gameState.job.config ? (gameState.job.config.rate || 0) : 0;
   const today = new Date().toISOString().split('T')[0];
+  
+  // Determina o modo atual
+  const entryMode = window.workEntryMode || 'production';
+  const isTimeMode = entryMode === 'time';
   
   let currentWeek = Math.ceil(new Date().getDate() / 7);
   if (currentWeek > 4) currentWeek = 4; // Limita a 4 semanas conforme solicitado
@@ -3157,6 +3168,12 @@ function renderWorkSingularity() {
         </div>
       </div>
 
+      <!-- Seletor de Tipo de Registro -->
+      <div style="display:flex; background:rgba(255,255,255,0.05); padding:4px; border-radius:8px; margin-bottom:15px; gap: 5px;">
+        <button class="btn ghost" onclick="setWorkEntryMode('production')" style="flex:1; font-size:12px; ${!isTimeMode ? 'background:var(--accent); color:#000; font-weight:bold;' : 'opacity:0.7;'}">${def.label}</button>
+        <button class="btn ghost" onclick="setWorkEntryMode('time')" style="flex:1; font-size:12px; ${isTimeMode ? 'background:var(--accent); color:#000; font-weight:bold;' : 'opacity:0.7;'}">⏱️ Horas</button>
+      </div>
+
       <!-- Formulário de Registro -->
       <div class="form-row" style="margin-bottom: 15px;">
         <div style="flex: 1;">
@@ -3175,8 +3192,8 @@ function renderWorkSingularity() {
       </div>
       <div class="form-row" style="margin-bottom: 15px;">
         <div style="flex: 1;">
-          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">${def.inputLabel}</label>
-          <input type="number" id="workInput" placeholder="0" style="font-size: 1.2rem; font-weight: bold;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">${isTimeMode ? 'Horas Trabalhadas' : def.inputLabel}</label>
+          <input type="number" id="workInput" placeholder="${isTimeMode ? 'Ex: 8.5' : '0'}" style="font-size: 1.2rem; font-weight: bold;">
         </div>
       </div>
       <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px;">
@@ -3229,7 +3246,8 @@ window.addWorkRecord = function() {
     return;
   }
 
-  const type = gameState.job.type;
+  const entryMode = window.workEntryMode || 'production';
+  const type = entryMode === 'time' ? 'time_tracking' : gameState.job.type;
   const rate = gameState.job.config.rate || 0;
   let financialValue = 0;
   let desc = '';
@@ -3237,7 +3255,15 @@ window.addWorkRecord = function() {
   const week = weekInput ? weekInput.value : null;
 
   // Lógica de Singularidade
-  if (type === 'pizzaria') {
+  if (type === 'time_tracking') {
+    // Se for freelancer, calcula valor por hora. Se não, é apenas registro de tempo (0 financeiro)
+    if (gameState.job.type === 'freelancer') {
+        financialValue = val * rate;
+        desc = `Freelance: ${val}h`;
+    } else {
+        desc = `Jornada: ${val}h`;
+    }
+  } else if (type === 'pizzaria') {
     financialValue = val * rate;
     desc = `Produção: ${val} massas`;
   } else if (type === 'vendedor') {
@@ -3266,6 +3292,7 @@ window.addWorkRecord = function() {
     inputVal: val,
     financialVal: loggedFinancialValue,
     type: type,
+    duration: type === 'time_tracking' ? val * 3600000 : 0, // Converte horas para ms se for tempo
     isUnpaid: isUnpaid,
     week: week
   });
@@ -5932,6 +5959,11 @@ const OracleChat = {
       if (pendingResult) return pendingResult;
     }
     
+    // Comando explícito para sair do modo conversa (virar assistente)
+    if (lowerInput.match(/^(parar conversa|modo assistente|chega de papo|virar assistente|focar|sem papo|sair do modo conversa)/i)) {
+        return this.stopConversationMode();
+    }
+    
     // 0.05. VERIFICAÇÃO DE AMBIGUIDADE (Meta vs Tarefa)
     const isAmbiguousMeta = lowerInput.match(/\b(meta)\b/i) && !lowerInput.match(/financeira|dinheiro|grana|economia|juntar|guardar|poupar|reserva|reais|r\$/i);
 
@@ -8012,6 +8044,13 @@ const OracleChat = {
     return questions[topic];
   },
   
+  // Encerra o modo de conversa e volta a ser assistente
+  stopConversationMode() {
+    OracleMemory.setProfile('conversationMode', false);
+    OracleMemory.setProfile('lastQuestion', null);
+    return "Modo conversa encerrado. Estou pronto para ajudar como assistente! 💼";
+  },
+  
   // Processa respostas durante a conversa
   handleConversationResponses(lowerInput) {
     const profile = OracleMemory.get().profile || {};
@@ -8022,6 +8061,12 @@ const OracleChat = {
     
     // Se não está em modo conversa, ignora
     if (!profile.conversationMode) return null;
+
+    // Detecta mudança de contexto para comandos de assistente (ex: Finanças)
+    if (lowerInput.match(/^(finanças|financeiro|saldo|dinheiro|tarefas|tasks|trabalho|job|ajuda|help|status|xp|metas|objetivos|configurações|configuracoes)/i)) {
+        this.stopConversationMode(); // Sai do modo conversa silenciosamente
+        return null; // Permite que o generateResponse continue e processe o comando
+    }
 
     // VALIDAÇÃO DO PERGAMINHO
     const validation = OracleOnboarding.validateInput(lastQuestion, lowerInput);
