@@ -4181,12 +4181,20 @@ const OracleNLU = {
     
     'finance.expense': {
       patterns: [
+        // Padrões que capturam valor e descrição (opcional)
         /(?:gastei|paguei|comprei|perdi|saiu|foi)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:r?\$?\s*)?(?:reais?)?\s*(?:hoje|ontem|amanhã)?\s*(?:em|no|na|com|de|pra|para)?\s*(.+)?/i,
         /(?:coloca|adiciona|registra|bota|põe)\s+(?:uma?\s+)?(?:saída|gasto|despesa)\s+(?:de\s+)?(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com|de)?\s*(.+)?/i,
         /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com)?\s*(.+)?/i,
-        /(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i
+        /(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i,
+        // Novo padrão: apenas a intenção de gastar
+        /^(gastei|paguei|comprei|registra[r]?\s+(?:um\s+)?gasto)$/i
       ],
       extract: (text, match) => {
+        // Se o match não tem o grupo de captura para o valor (padrão novo)
+        if (match.length <= 2 || !match[1] || isNaN(parseFloat(match[1]?.replace(',', '.')))) {
+          return { amount: null, description: null, type: 'expense' };
+        }
+
         const amount = parseFloat(match[1].replace(',', '.'));
         let description = match[2]?.trim() || null;
         
@@ -6476,6 +6484,12 @@ const OracleChat = {
         return this.completeTask(data.taskName);
         
       case 'finance.expense':
+        // Se o NLU não extraiu um valor, pergunta primeiro
+        if (data.amount === null) {
+          this.pendingAction = { type: 'expense_amount' };
+          return `Ok, ${treatment}! 💸 Qual foi o valor do gasto?`;
+        }
+
         if (data.amount) {
           if (data.description) {
             return this.addExpense(data.amount, data.description);
@@ -6748,6 +6762,22 @@ const OracleChat = {
     }
     
     switch(action.type) {
+      case 'expense_amount': // NEW CASE
+        const expenseValue = parseMoney(lowerInput);
+        if (isNaN(expenseValue) || expenseValue <= 0) {
+          return "Por favor, digite um valor válido para o gasto (ex: 50 ou 12,50).";
+        }
+        this.pendingAction = { type: 'expense_description', value: expenseValue };
+        return {
+          message: `Ok, R$ ${expenseValue.toFixed(2)}. E qual o nome que deve ser colocado?`,
+          actions: [
+            { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Alimentação')); } },
+            { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Transporte')); } },
+            { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Lazer')); } },
+            { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Compras')); } }
+          ]
+        };
+
       case 'expense_description':
         // Usuário está dando a descrição para o gasto
         let desc = input.trim();
@@ -6813,9 +6843,40 @@ const OracleChat = {
       case 'guided_goal_income':
         const income = parseMoney(lowerInput);
         if (isNaN(income) || income <= 0) return "Por favor, digite um valor válido para sua renda (ex: 3000).";
+
+        // Analisa o histórico de finanças
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        this.pendingAction = { type: 'guided_goal_expenses', income: income };
-        return `Certo, renda de R$ ${income.toLocaleString('pt-BR')}. 💰\nAgora, qual é o total aproximado das suas **contas e despesas mensais**?`;
+        const recentExpenses = (gameState.finances || [])
+          .filter(f => f.type === 'expense' && new Date(f.date) >= thirtyDaysAgo);
+        
+        // Se tiver mais de 5 gastos nos últimos 30 dias, usa como base
+        if (recentExpenses.length >= 5) {
+          const totalRecentExpenses = recentExpenses.reduce((sum, e) => sum + e.value, 0);
+          const estimatedMonthlyExpenses = totalRecentExpenses; // Simplesmente soma os gastos dos últimos 30 dias
+          
+          const balance = income - estimatedMonthlyExpenses;
+
+          if (balance <= 0) {
+            this.pendingAction = null;
+            return `Analisei seus gastos e eles somam R$ ${estimatedMonthlyExpenses.toLocaleString('pt-BR')} no último mês. Com sua renda de R$ ${income.toLocaleString('pt-BR')}, parece não sobrar muito. 📉\n\nMinha dica: Vamos focar em **reduzir gastos** primeiro?`;
+          }
+
+          const suggestedMonthly = Math.floor(balance * 0.5);
+          const oneYearTotal = suggestedMonthly * 12;
+
+          this.pendingAction = { type: 'guided_goal_confirm', monthly: suggestedMonthly, total: oneYearTotal };
+          
+          return `Analisei seus gastos e eles somam R$ ${estimatedMonthlyExpenses.toLocaleString('pt-BR')} no último mês. 🧐\n\n` +
+                 `Com sua renda de R$ ${income.toLocaleString('pt-BR')}, sobra aproximadamente **R$ ${balance.toLocaleString('pt-BR')}**.\n\n` +
+                 `Se você guardar **R$ ${suggestedMonthly.toLocaleString('pt-BR')}** por mês (metade da sobra), em 1 ano terá **R$ ${oneYearTotal.toLocaleString('pt-BR')}**!\n\n` +
+                 `Podemos definir essa meta de **R$ ${oneYearTotal.toLocaleString('pt-BR')}**?`;
+        } else {
+          // Se não tem dados suficientes, pergunta ao usuário
+          this.pendingAction = { type: 'guided_goal_expenses', income: income };
+          return `Certo, renda de R$ ${income.toLocaleString('pt-BR')}. 💰\nComo não tenho muitos dados sobre seus gastos, qual é o total aproximado das suas **contas e despesas mensais**?`;
+        }
 
       case 'guided_goal_expenses':
         const expenses = parseMoney(lowerInput);
