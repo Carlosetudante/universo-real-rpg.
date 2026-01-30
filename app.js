@@ -805,27 +805,110 @@ async function login() {
           }
         }
 
-        // Carrega TODOS os dados do banco (perfil + tarefas + finanças + memórias)
-        elements.loginBtn.textContent = 'Carregando dados...';
-        const cloudData = await SupabaseService.syncCloudToLocal();
-        
-        if (cloudData) {
-          gameState = normalizeGameState(cloudData);
-          
-          // Carrega memórias do oráculo se existirem
-          if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
-            OracleMemory.data = cloudData.oracleMemory;
-          }
-          
-          console.log('✅ Dados carregados da nuvem:', {
-            tarefas: cloudData.dailyTasks?.length || 0,
-            financas: cloudData.finances?.length || 0,
-            trabalho: cloudData.workLog?.length || 0
-          });
+        // Carrega o perfil primeiro (rápido) e atualiza a UI;
+        // em seguida carrega o restante (tarefas, finanças, workLog, memórias)
+        elements.loginBtn.textContent = 'Carregando perfil...';
+        const profile = await SupabaseService.getProfile().catch(err => {
+          console.warn('Falha ao carregar perfil rapidamente:', err);
+          return null;
+        });
+
+        if (profile) {
+          gameState = normalizeGameState(Object.assign({}, profile, { username: data.user.email }));
         } else {
-          // Primeiro login - cria estado inicial
+          // Primeiro login ou profile indisponível - cria estado inicial
           gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
         }
+
+        // Atualiza a interface rapidamente com o perfil carregado
+        if (elements.rememberUser && elements.rememberUser.checked) {
+          localStorage.setItem('ur_last_user', email);
+        }
+
+        showToast('✅ Login realizado! Carregando o restante dos dados em segundo plano...');
+        isLoggedIn = true;
+        loginTime = new Date();
+        saveSession(email);
+        hideAuthModal();
+        updateUI();
+        if (typeof renderDailyTasks === 'function') renderDailyTasks();
+        if (typeof renderFinances === 'function') renderFinances();
+        if (typeof checkAchievements === 'function') checkAchievements();
+        checkBackupAvailability();
+        checkBillsDueToday();
+        elements.loginUsername.value = '';
+        elements.loginPassword.value = '';
+
+        // Carrega dados pesados em background e atualiza UI conforme chegam
+        (async function loadRemainingCloudData() {
+          try {
+            elements.loginBtn.textContent = 'Sincronizando...';
+            const [tasks, finances, workSessions, oracleMemories] = await Promise.all([
+              SupabaseService.getTasks().catch(() => []),
+              SupabaseService.getFinances().catch(() => []),
+              SupabaseService.getWorkSessions().catch(() => []),
+              SupabaseService.getOracleMemories().catch(() => [])
+            ]);
+
+            // Mapear tarefas e finanças ao formato local esperado (conversão leve)
+            const localTasks = (tasks || []).map(t => ({
+              id: t.id,
+              text: t.title || t.text || '',
+              completed: t.status === 'completed',
+              date: t.created_at || t.date,
+              completedAt: t.completed_at,
+              dueDate: t.due_date,
+              xpReward: t.xp_reward,
+              category: t.category
+            }));
+
+            const localFinances = (finances || []).map(f => ({
+              id: f.id,
+              desc: f.description || f.desc || '',
+              value: f.amount || f.value || 0,
+              type: f.type || 'expense',
+              category: f.category || null,
+              date: f.created_at || f.date
+            }));
+
+            const localWorkLog = (workSessions || []).map(w => ({
+              id: w.id,
+              date: w.start_at ? w.start_at.split('T')[0] : (w.date || new Date().toISOString().split('T')[0]),
+              timestamp: w.start_at ? new Date(w.start_at).getTime() : (w.timestamp || Date.now()),
+              duration: w.total_seconds ? w.total_seconds * 1000 : (w.duration || 0),
+              type: w.activity_type || 'time_tracking',
+              inputVal: w.inputVal || (w.total_seconds ? w.total_seconds / 3600 : 0)
+            }));
+
+            // Integra os dados carregados ao state existente
+            gameState.dailyTasks = localTasks;
+            gameState.finances = localFinances;
+            gameState.workLog = localWorkLog;
+            if (oracleMemories && oracleMemories.length && typeof OracleMemory !== 'undefined') {
+              OracleMemory.data = {
+                learned: oracleMemories.map(m => ({ text: m.fact || m.text, date: m.created_at, tags: m.tags }))
+              };
+            }
+
+            // Re-renderiza as seções que chegaram
+            if (typeof renderDailyTasks === 'function') renderDailyTasks();
+            if (typeof renderFinances === 'function') renderFinances();
+            if (typeof renderWorkLog === 'function') renderWorkLog();
+
+            console.log('✅ Dados adicionais carregados da nuvem:', {
+              tarefas: localTasks.length,
+              financas: localFinances.length,
+              trabalho: localWorkLog.length
+            });
+            showToast('☁️ Dados da nuvem sincronizados.');
+          } catch (bgErr) {
+            console.error('Erro ao carregar dados em background:', bgErr);
+            showToast('⚠️ Falha ao carregar alguns dados da nuvem.');
+          } finally {
+            elements.loginBtn.disabled = false;
+            elements.loginBtn.textContent = 'Entrar';
+          }
+        })();
 
         // Salvar localmente também (para funcionar offline)
         if (elements.rememberUser && elements.rememberUser.checked) {
@@ -4189,6 +4272,48 @@ const OracleNLU = {
       extract: () => ({})
     },
     
+    // NOVOS INTENTS DE UTILIDADE (INTELIGÊNCIA LÓGICA)
+    'utility.calc': {
+      patterns: [
+        /(?:quanto\s+[eé]|calcule|calcula|conta)\s+([\d.,]+)\s*(\+|mais|\-|menos|\*|x|vezes|\/|dividido\s+por)\s*([\d.,]+)/i
+      ],
+      extract: (text, match) => {
+        return {
+          n1: parseFloat(match[1].replace(',', '.')),
+          op: match[2].toLowerCase(),
+          n2: parseFloat(match[3].replace(',', '.'))
+        };
+      }
+    },
+    
+    'utility.decision': {
+      patterns: [
+        /(?:escolha|escolhe|decida|decide|qual|o que)\s+(?:você\s+)?(?:prefere|escolhe|sugere)?\s*(?:entre\s+)?(.+?)\s+(?:ou|e)\s+(.+)/i,
+        /(?:joga|jogar|lança|lançar)\s+(?:uma\s+)?moeda|cara\s+(?:ou|e)\s+coroa/i,
+        /(?:joga|jogar|rola|rolar)\s+(?:um\s+)?dado(?: de (\d+)\s*lados?)?/i
+      ],
+      extract: (text, match) => {
+        if (text.match(/moeda|cara.*coroa/i)) return { type: 'coin' };
+        if (text.match(/dado/i)) return { type: 'dice', sides: match[1] || 6 };
+        return { type: 'choice', options: [match[1], match[2]] };
+      }
+    },
+
+    'utility.date': {
+      patterns: [
+        /(?:que\s+)?(?:horas?|dia|data)\s+(?:são|é|tem)\s*(?:agora|hoje)?/i,
+        /(?:em\s+)?que\s+(?:dia|ano|mês)\s+(?:estamos|é\s+hoje)/i
+      ],
+      extract: () => ({})
+    },
+
+    'system.clear': {
+      patterns: [
+        /(?:limpar?|limpa|apagar?|apaga)\s+(?:o\s+)?(?:chat|conversa|mensagens|histórico)/i
+      ],
+      extract: () => ({})
+    },
+
     'memory.save': {
       patterns: [
         /(?:lembr[ae]|lembrar|guarda|guardar|anota|anotar|salva|salvar|sab[ei]a?)(?:-se)?(?:\s+que)?\s+(?:eu\s+)?(.+)/i,
@@ -5124,6 +5249,93 @@ const OracleSpeech = {
   }
 };
 
+// ========================================
+// SISTEMA DE ONBOARDING (PERGAMINHO)
+// ========================================
+const OracleOnboarding = {
+  data: null,
+  markdown: null,
+  txt: null,
+  activeMode: 'json', // Padrão: validação estrita via JSON
+
+  async init() {
+    try {
+      // Carrega JSON de regras
+      const response = await fetch('pergaminho-onboarding.json');
+      if (response.ok) {
+        this.data = await response.json();
+        console.log('📜 Pergaminho de Onboarding (JSON) carregado.');
+      }
+      
+      // Carrega Markdown de documentação/regras
+      const mdResponse = await fetch('pergaminho-onboarding.md');
+      if (mdResponse.ok) {
+        this.markdown = await mdResponse.text();
+        console.log('📜 Pergaminho de Onboarding (MD) carregado.');
+      }
+      
+      // Carrega TXT de regras simples
+      const txtResponse = await fetch('pergaminho-onboarding.txt');
+      if (txtResponse.ok) {
+        this.txt = await txtResponse.text();
+        console.log('📜 Pergaminho de Onboarding (TXT) carregado.');
+      }
+    } catch (e) {
+      // Silencioso se não existir, segue sem validação estrita
+    }
+  },
+
+  setRuleMode(mode) {
+    if (['json', 'markdown', 'txt'].includes(mode)) {
+      this.activeMode = mode;
+      return `🔄 Modo de regras alterado para: <strong>${mode.toUpperCase()}</strong>`;
+    }
+    return "⚠️ Modo inválido. Use: json, markdown ou txt.";
+  },
+
+  getRulesText() {
+    switch(this.activeMode) {
+      case 'markdown': return this.markdown || "Regras Markdown não carregadas.";
+      case 'txt': return this.txt || "Regras TXT não carregadas.";
+      case 'json': return this.data ? JSON.stringify(this.data, null, 2) : "Regras JSON não carregadas.";
+      default: return "Modo desconhecido.";
+    }
+  },
+
+  validateInput(field, input) {
+    if (this.activeMode !== 'json') return { valid: true };
+    if (!this.data) return { valid: true };
+
+    // Mapeia campos internos do OracleChat para chaves do JSON
+    const fieldMap = {
+      'name': 'user.name',
+      'occupation': 'user.role',
+      'workplace': 'user.workplace',
+      'city': 'user.city'
+    };
+    
+    const key = fieldMap[field];
+    if (!key) return { valid: true };
+
+    const rule = this.data.onboarding_flow?.find(r => r.key === key);
+    if (!rule) return { valid: true };
+
+    const lowerInput = input.toLowerCase();
+
+    // Validação baseada nos exemplos ruins do JSON
+    if (rule.examples_bad) {
+      for (const bad of rule.examples_bad) {
+        if (lowerInput.includes(bad.toLowerCase())) {
+           const msg = this.data.confirmation_policy?.when_mismatch || `Hmm, isso não parece responder à pergunta: "${rule.question}"`;
+           return { valid: false, message: msg };
+        }
+      }
+    }
+
+    return { valid: true };
+  }
+};
+
 // Sistema Principal do Oráculo
 const OracleChat = {
   personality: 'assistant',
@@ -5136,6 +5348,7 @@ const OracleChat = {
     OracleMemory.updateMemoryDisplay();
     VoiceRecognition.init();
     OracleSpeech.init();
+    OracleOnboarding.init(); // Carrega as regras do pergaminho
   },
   
   setupListeners() {
@@ -5385,6 +5598,40 @@ const OracleChat = {
     }
   },
   
+  // Verifica se hoje é aniversário do usuário
+  isBirthday() {
+    const birthday = OracleMemory.getProfile('aniversario');
+    if (!birthday) return false;
+
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.getMonth() + 1;
+
+    const cleanBirthday = birthday.toLowerCase().trim();
+    let targetDay, targetMonth;
+
+    if (cleanBirthday.includes('/')) {
+      const parts = cleanBirthday.split('/');
+      targetDay = parseInt(parts[0]);
+      targetMonth = parseInt(parts[1]);
+    } else if (cleanBirthday.includes(' de ')) {
+      const parts = cleanBirthday.split(' de ');
+      targetDay = parseInt(parts[0]);
+      const months = {
+        'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3, 'abril': 4, 'maio': 5, 'junho': 6,
+        'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+      };
+      for (const [name, num] of Object.entries(months)) {
+        if (parts[1] && parts[1].includes(name)) {
+          targetMonth = num;
+          break;
+        }
+      }
+    }
+
+    return targetDay === currentDay && targetMonth === currentMonth;
+  },
+
   showWelcome() {
     const p = ORACLE_PERSONALITIES_V2[this.personality];
     
@@ -5394,6 +5641,18 @@ const OracleChat = {
     const gender = OracleMemory.getProfile('gender');
     
     this.updateAvatar(p.emoji);
+    
+    // Verifica Aniversário
+    if (this.isBirthday()) {
+      const bdayMessage = `🎉🎂 <strong>FELIZ ANIVERSÁRIO, ${name.toUpperCase()}!</strong> 🎂🎉<br><br>` +
+                          `Que seu novo ciclo seja repleto de conquistas, XP e level ups! 🥳<br>` +
+                          `Preparei uma festa virtual pra você! 🎈`;
+      this.addBotMessage(bdayMessage);
+      playSound('achievement');
+      triggerConfetti();
+      setTimeout(() => triggerConfetti(), 1000);
+      return;
+    }
     
     // Saudação personalizada baseada no gênero
     let greeting = p.greeting(name);
@@ -5638,6 +5897,11 @@ const OracleChat = {
       const pendingResult = this.handlePendingAction(cleanedInput, lowerInput);
       if (pendingResult) return pendingResult;
     }
+    
+    // 0.5. MODO CONVERSA (Prioridade sobre detecção automática)
+    // Se o Oráculo fez uma pergunta específica, a resposta deve ser processada nesse contexto
+    const conversationResult = this.handleConversationResponses(lowerInput);
+    if (conversationResult) return conversationResult;
     
     // 1. DETECÇÃO AUTOMÁTICA de informações pessoais (sempre roda primeiro)
     const autoLearnResult = this.autoLearnFromInput(cleanedInput, lowerInput);
@@ -6199,6 +6463,55 @@ const OracleChat = {
       case 'task.list':
         return this.getTasksList();
         
+      // HANDLERS DOS NOVOS INTENTS
+      case 'utility.calc':
+        const { n1, op, n2 } = data;
+        let res = 0;
+        let opSymbol = '';
+        if (['+', 'mais'].includes(op)) { res = n1 + n2; opSymbol = '+'; }
+        else if (['-', 'menos'].includes(op)) { res = n1 - n2; opSymbol = '-'; }
+        else if (['*', 'x', 'vezes'].includes(op)) { res = n1 * n2; opSymbol = '×'; }
+        else if (['/', 'dividido por'].includes(op)) { res = n1 / n2; opSymbol = '÷'; }
+        
+        const formattedRes = Number.isInteger(res) ? res : parseFloat(res.toFixed(2));
+        return `🔢 A conta é: <strong>${n1} ${opSymbol} ${n2} = ${formattedRes}</strong>`;
+
+      case 'utility.decision':
+        if (data.type === 'coin') {
+          const result = Math.random() < 0.5 ? 'Cara 👑' : 'Coroa 🦅';
+          return `🪙 Joguei a moeda e deu... <strong>${result}</strong>!`;
+        }
+        if (data.type === 'dice') {
+          const sides = parseInt(data.sides) || 6;
+          const result = Math.floor(Math.random() * sides) + 1;
+          return `🎲 Rolei um D${sides} e caiu: <strong>${result}</strong>!`;
+        }
+        if (data.type === 'choice') {
+          const choice = data.options[Math.floor(Math.random() * data.options.length)].trim();
+          const phrases = [
+            `🤔 Hmmm... eu escolheria <strong>${choice}</strong>!`,
+            `Entre esses, prefiro <strong>${choice}</strong>! ✨`,
+            `🎲 O destino diz: <strong>${choice}</strong>!`
+          ];
+          return phrases[Math.floor(Math.random() * phrases.length)];
+        }
+        return null;
+
+      case 'utility.date':
+        const now = new Date();
+        const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        return `📅 Hoje é <strong>${date}</strong>.<br>⌚ Agora são <strong>${time}</strong>.`;
+
+      case 'system.clear':
+        const messages = document.getElementById('chatMessages');
+        if (messages) {
+          messages.innerHTML = '';
+          this.showWelcome();
+          return null;
+        }
+        return "Não consegui limpar o chat.";
+
       case 'memory.save':
         if (data.type === 'relationship' && data.key && data.value) {
           // Salva relacionamento de forma estruturada
@@ -6531,6 +6844,18 @@ const OracleChat = {
     const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
     const isPolite = OracleMemory.getProfile('isPolite');
     const politeResponse = isPolite ? ' 😊' : '';
+    
+    // COMANDOS DE SISTEMA DE REGRAS
+    if (lowerInput.match(/^usar regras (json|markdown|txt)/i)) {
+      const match = lowerInput.match(/^usar regras (json|markdown|txt)/i);
+      return OracleOnboarding.setRuleMode(match[1].toLowerCase());
+    }
+    
+    if (lowerInput.match(/^(ver|mostrar) regras/i)) {
+      const rules = OracleOnboarding.getRulesText();
+      const displayRules = rules.length > 500 ? rules.substring(0, 500) + '...' : rules;
+      return `📜 <strong>Regras Atuais (${OracleOnboarding.activeMode.toUpperCase()}):</strong><br><br><pre style="font-size:10px; white-space:pre-wrap; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">${displayRules}</pre>`;
+    }
     
     // CRIAR TAREFA
     if (lowerInput.match(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i)) {
@@ -7328,10 +7653,6 @@ const OracleChat = {
       return this.startConversationMode();
     }
     
-    // Respostas a perguntas do Oráculo (quando ele pergunta sobre o usuário)
-    const conversationResult = this.handleConversationResponses(lowerInput);
-    if (conversationResult) return conversationResult;
-    
     return null;
   },
   
@@ -7384,6 +7705,12 @@ const OracleChat = {
     
     // Se não está em modo conversa, ignora
     if (!profile.conversationMode) return null;
+
+    // VALIDAÇÃO DO PERGAMINHO
+    const validation = OracleOnboarding.validateInput(lastQuestion, lowerInput);
+    if (!validation.valid) {
+      return validation.message;
+    }
     
     let learned = null;
     let nextQuestion = null;
@@ -8711,16 +9038,7 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   updateSplashGreeting();
-  setTimeout(hideSplash, 2000); // Exibe por 2s ao abrir
-
-  // Reaparecer ao voltar para a aba/app
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      updateSplashGreeting();
-      if (splash) splash.classList.remove('hidden');
-      setTimeout(hideSplash, 1500); // Exibe por 1.5s ao retornar
-    }
-  });
+  setTimeout(hideSplash, 100); // Reduzido para 0.1s para carregar mais rápido
 
   // Feedback Háptico Global para Botões
   document.body.addEventListener('click', (e) => {
