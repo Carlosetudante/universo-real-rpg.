@@ -4128,9 +4128,10 @@ const OracleNLU = {
   intents: {
     'finance.goal': {
       patterns: [
-        /(?:cria|criar|definir|nova|estabelecer)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança)/i,
-        /(?:quero|preciso)\s+(?:juntar|guardar|economizar)\s+(?:dinheiro|grana)/i,
-        /(?:objetivo|alvo)\s+financeiro/i
+        /(?:cria|criar|definir|nova|estabelecer|fazer|montar)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança|de\s+grana)/i,
+        /(?:quero|preciso|vamos|bora)\s+(?:juntar|guardar|economizar|fazer|criar|ter)\s+(?:uma\s+)?(?:meta|reserva|poupança)/i,
+        /(?:objetivo|alvo)\s+financeiro/i,
+        /(?:preciso|quero)\s+de\s+(?:uma\s+)?meta/i
       ],
       extract: () => ({})
     },
@@ -6252,15 +6253,19 @@ const OracleChat = {
   createFinancialGoal() {
     const name = OracleMemory.getProfile('name') || 'amigo';
     
-    this.pendingAction = { type: 'financial_goal_name' };
+    this.pendingAction = null; // Limpa ação anterior
     
     return {
-      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Qual é o seu objetivo? (Ex: "Comprar um carro", "Reserva de emergência", "Viajar")`,
+      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Gostaria de falar suas receitas e contas para somarmos e criar sua meta juntos?`,
       actions: [
-        { text: '🚗 Carro', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Comprar um carro' }; this.addBotMessage('Quanto você precisa para o carro? (Ex: 50000)'); }},
-        { text: '🏠 Casa', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Entrada da casa' }; this.addBotMessage('Quanto você precisa para a entrada? (Ex: 100000)'); }},
-        { text: '✈️ Viagem', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Viagem dos sonhos' }; this.addBotMessage('Quanto você precisa para a viagem? (Ex: 15000)'); }},
-        { text: '🛡️ Reserva', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Reserva de emergência' }; this.addBotMessage('Quanto você quer ter de reserva? (Ex: 30000)'); }}
+        { text: '🧮 Sim, calcular juntos', action: () => { 
+            this.pendingAction = { type: 'guided_goal_income' }; 
+            this.addBotMessage('Ótimo! Para começar, qual é a sua **renda mensal média** (salário + extras)?'); 
+        }},
+        { text: '📝 Não, já tenho o valor', action: () => { 
+            this.pendingAction = { type: 'financial_goal_name' }; 
+            this.addBotMessage('Entendi! Qual é o nome do seu objetivo? (Ex: "Comprar um carro", "Reserva")'); 
+        }}
       ]
     };
   },
@@ -6804,6 +6809,50 @@ const OracleChat = {
             return `🎯 Meta definida para <strong>${action.name}</strong>: R$ ${val.toLocaleString('pt-BR')}! 🚀`;
         }
         return "Erro ao salvar meta.";
+
+      case 'guided_goal_income':
+        const income = parseMoney(lowerInput);
+        if (isNaN(income) || income <= 0) return "Por favor, digite um valor válido para sua renda (ex: 3000).";
+        
+        this.pendingAction = { type: 'guided_goal_expenses', income: income };
+        return `Certo, renda de R$ ${income.toLocaleString('pt-BR')}. 💰\nAgora, qual é o total aproximado das suas **contas e despesas mensais**?`;
+
+      case 'guided_goal_expenses':
+        const expenses = parseMoney(lowerInput);
+        if (isNaN(expenses) || expenses < 0) return "Por favor, digite um valor válido para suas despesas.";
+        
+        const incomeVal = action.income;
+        const balance = incomeVal - expenses;
+        
+        if (balance <= 0) {
+            this.pendingAction = null;
+            return `Poxa, suas despesas (R$ ${expenses}) parecem cobrir toda sua renda (R$ ${incomeVal}). 📉\n\nMinha dica: Vamos focar em **reduzir gastos** primeiro? Posso analisar suas finanças se você disser "analisar gastos".`;
+        }
+
+        // Sugere guardar 50% do que sobra
+        const suggestedMonthly = Math.floor(balance * 0.5); 
+        const oneYearTotal = suggestedMonthly * 12;
+        
+        this.pendingAction = { type: 'guided_goal_confirm', monthly: suggestedMonthly, total: oneYearTotal };
+        
+        return `📊 **Análise:**\n` +
+               `• Sobra mensalmente: R$ ${balance.toLocaleString('pt-BR')}\n\n` +
+               `Se você guardar **R$ ${suggestedMonthly.toLocaleString('pt-BR')}** por mês (metade da sobra), em 1 ano terá **R$ ${oneYearTotal.toLocaleString('pt-BR')}**!\n\n` +
+               `Podemos definir essa meta de **R$ ${oneYearTotal.toLocaleString('pt-BR')}**?`;
+
+      case 'guided_goal_confirm':
+        if (lowerInput.match(/^(sim|s|yes|claro|pode|bora|isso|confirma|ok|tá|ta)$/i)) {
+            if (gameState) {
+                gameState.financialGoal = action.total;
+                saveGame();
+                updateUI();
+            }
+            this.pendingAction = null;
+            return `🎉 **Meta Definida!**\n\nSeu objetivo: **R$ ${action.total.toLocaleString('pt-BR')}**.\nFoco em guardar R$ ${action.monthly.toLocaleString('pt-BR')} todo mês. Estou torcendo por você! 🚀`;
+        } else {
+            this.pendingAction = { type: 'financial_goal_value', name: 'Meta Personalizada' };
+            return "Entendi! Então qual valor total você quer definir para sua meta?";
+        }
 
       case 'savings_confirm':
         // Confirmar ação de poupança
