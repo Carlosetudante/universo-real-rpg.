@@ -466,11 +466,14 @@
             <div style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
               <div class="form-row">
                 <input type="text" inputmode="decimal" id="financeGoalInput" placeholder="Definir Meta (R$)" style="flex: 2;">
-                <button class="btn" id="setFinanceGoalBtn" style="flex: 1;">Definir Meta</button>
+                <button class="btn" id="setFinanceGoalBtn" style="flex: 1;">🎯 Definir</button>
               </div>
               <div id="financeGoalDisplay" class="hidden" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span class="small">Progresso da Meta</span>
+                  <button class="ghost" id="cancelFinanceGoalBtn" style="font-size: 10px; padding: 2px 8px; color: var(--danger);">❌ Cancelar Meta</button>
+                </div>
                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                  <span class="small">Progresso</span>
                   <span class="small" id="financeGoalText">0%</span>
                 </div>
                 <div class="progress-bar">
