@@ -6383,6 +6383,55 @@ const OracleChat = {
       }`;
   },
   
+  calculateSavings(lowerInput) {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    // Tenta extrair um valor do input se houver (ex: "para juntar 5000")
+    const match = lowerInput.match(/(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/);
+    let targetValue = 0;
+    let isSystemGoal = false;
+    
+    if (match) {
+      targetValue = parseFloat(match[1].replace(',', '.'));
+    } else {
+      // Se não tem valor no input, usa a meta definida
+      targetValue = gameState.financialGoal || 0;
+      isSystemGoal = true;
+    }
+    
+    if (targetValue <= 0) {
+      return `${name}, para eu calcular, preciso saber qual é sua meta! 🎯<br><br>
+        Diga algo como: "quanto guardar para juntar 5000" ou defina uma meta financeira na aba de Finanças.`;
+    }
+    
+    // Se for a meta do sistema, considera o que já tem guardado (saldo atual)
+    let currentBalance = 0;
+    if (isSystemGoal) {
+       const finances = gameState.finances || [];
+       const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+       const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+       currentBalance = Math.max(0, income - expenses);
+    }
+    
+    const remaining = Math.max(0, targetValue - currentBalance);
+    
+    if (remaining === 0 && isSystemGoal) {
+      return `🎉 ${name}, você já atingiu sua meta de R$ ${targetValue.toLocaleString('pt-BR')}! Parabéns!`;
+    }
+    
+    // Cálculo para 1 ano (12 meses)
+    const months = 12;
+    const monthly = remaining / months;
+    const weekly = remaining / 52;
+    
+    return `<strong>💰 Plano para atingir R$ ${targetValue.toLocaleString('pt-BR')} em 1 ano:</strong><br><br>
+      ${isSystemGoal ? `Saldo atual: R$ ${currentBalance.toLocaleString('pt-BR')}<br>Faltam: R$ ${remaining.toLocaleString('pt-BR')}<br><br>` : ''}
+      Para chegar lá em 12 meses, você precisa guardar:<br>
+      🗓️ <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> por mês<br>
+      📅 <strong>R$ ${weekly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> por semana<br><br>
+      💡 <em>Dica: Configure uma transferência automática desse valor no dia do seu pagamento!</em>`;
+  },
+
   // Executa a intenção detectada pelo NLU
   executeIntent(nluResult) {
     const { intent, data } = nluResult;
@@ -8336,6 +8385,27 @@ const OracleChat = {
     ];
   },
   
+  // Helper para dar conselho sobre a meta financeira
+  getSavingsAdvice() {
+    const goal = gameState.financialGoal || 0;
+    if (goal <= 0) return ""; 
+
+    const finances = gameState.finances || [];
+    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+    const currentBalance = Math.max(0, income - expenses);
+    
+    const remaining = Math.max(0, goal - currentBalance);
+    
+    if (remaining === 0) return "<br><br>🎉 <strong>Meta atingida!</strong> Você já alcançou seu objetivo financeiro!";
+
+    // Cálculo para 1 ano (12 meses)
+    const months = 12;
+    const monthly = remaining / months;
+    
+    return `<br><br>🎯 <strong>Meta:</strong> Faltam R$ ${remaining.toLocaleString('pt-BR')}.<br>💡 Para atingir em 1 ano, guarde <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>/mês.`;
+  },
+
   // Ações reais
   createTask(text) {
     if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
@@ -8407,7 +8477,8 @@ const OracleChat = {
     const gender = OracleMemory.getProfile('gender');
     const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
     
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
+    const advice = this.getSavingsAdvice();
+    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
   },
   
   addExpenseWithCategory(value, desc, category) {
@@ -8427,7 +8498,8 @@ const OracleChat = {
     saveGame();
     if (typeof renderFinances === 'function') renderFinances();
     
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
+    const advice = this.getSavingsAdvice();
+    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
   },
   
   // RENOMEAR GASTO
@@ -8614,7 +8686,8 @@ const OracleChat = {
     saveGame();
     if (typeof renderFinances === 'function') renderFinances();
     
-    return this.getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}`;
+    const advice = this.getSavingsAdvice();
+    return this.getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}${advice}`;
   },
   
   // RENOMEAR RECEITA/ENTRADA
