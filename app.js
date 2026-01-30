@@ -5898,6 +5898,18 @@ const OracleChat = {
       if (pendingResult) return pendingResult;
     }
     
+    // 0.1. DETECÇÃO DE INTENÇÕES PRIORITÁRIAS (Comandos diretos)
+    // Isso evita que comandos como "minhas tarefas" sejam interpretados como respostas de conversa
+    const nluResult = OracleNLU.detectIntent(input);
+    const isPriorityIntent = nluResult.intent !== 'unknown' && 
+                             nluResult.confidence > 0.8 && 
+                             !['memory.save'].includes(nluResult.intent);
+
+    if (isPriorityIntent) {
+      const intentResponse = this.executeIntent(nluResult);
+      if (intentResponse) return intentResponse;
+    }
+    
     // 0.5. MODO CONVERSA (Prioridade sobre detecção automática)
     // Se o Oráculo fez uma pergunta específica, a resposta deve ser processada nesse contexto
     const conversationResult = this.handleConversationResponses(lowerInput);
@@ -5915,8 +5927,7 @@ const OracleChat = {
     const financeEducationResult = this.handleFinanceEducation(lowerInput);
     if (financeEducationResult) return financeEducationResult;
     
-    // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE
-    const nluResult = OracleNLU.detectIntent(input);
+    // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE (Restante)
     if (nluResult.intent !== 'unknown' && nluResult.confidence > 0.5) {
       const intentResponse = this.executeIntent(nluResult);
       if (intentResponse) return intentResponse;
@@ -7801,7 +7812,7 @@ const OracleChat = {
           userName = userName.split(/\s+/)[0];
           
           // Ignora palavras comuns que não são nomes
-          const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá', 'sim', 'não', 'nao', 'ok', 'tudo'];
+          const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá', 'sim', 'não', 'nao', 'ok', 'tudo', 'quais', 'qual', 'que', 'como'];
           if (userName.length >= 2 && !ignoreWords.includes(userName.toLowerCase())) {
             userName = userName.charAt(0).toUpperCase() + userName.slice(1).toLowerCase();
             OracleMemory.setProfile('name', userName);
