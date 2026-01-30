@@ -805,27 +805,110 @@ async function login() {
           }
         }
 
-        // Carrega TODOS os dados do banco (perfil + tarefas + finanças + memórias)
-        elements.loginBtn.textContent = 'Carregando dados...';
-        const cloudData = await SupabaseService.syncCloudToLocal();
-        
-        if (cloudData) {
-          gameState = normalizeGameState(cloudData);
-          
-          // Carrega memórias do oráculo se existirem
-          if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
-            OracleMemory.data = cloudData.oracleMemory;
-          }
-          
-          console.log('✅ Dados carregados da nuvem:', {
-            tarefas: cloudData.dailyTasks?.length || 0,
-            financas: cloudData.finances?.length || 0,
-            trabalho: cloudData.workLog?.length || 0
-          });
+        // Carrega o perfil primeiro (rápido) e atualiza a UI;
+        // em seguida carrega o restante (tarefas, finanças, workLog, memórias)
+        elements.loginBtn.textContent = 'Carregando perfil...';
+        const profile = await SupabaseService.getProfile().catch(err => {
+          console.warn('Falha ao carregar perfil rapidamente:', err);
+          return null;
+        });
+
+        if (profile) {
+          gameState = normalizeGameState(Object.assign({}, profile, { username: data.user.email }));
         } else {
-          // Primeiro login - cria estado inicial
+          // Primeiro login ou profile indisponível - cria estado inicial
           gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
         }
+
+        // Atualiza a interface rapidamente com o perfil carregado
+        if (elements.rememberUser && elements.rememberUser.checked) {
+          localStorage.setItem('ur_last_user', email);
+        }
+
+        showToast('✅ Login realizado! Carregando o restante dos dados em segundo plano...');
+        isLoggedIn = true;
+        loginTime = new Date();
+        saveSession(email);
+        hideAuthModal();
+        updateUI();
+        if (typeof renderDailyTasks === 'function') renderDailyTasks();
+        if (typeof renderFinances === 'function') renderFinances();
+        if (typeof checkAchievements === 'function') checkAchievements();
+        checkBackupAvailability();
+        checkBillsDueToday();
+        elements.loginUsername.value = '';
+        elements.loginPassword.value = '';
+
+        // Carrega dados pesados em background e atualiza UI conforme chegam
+        (async function loadRemainingCloudData() {
+          try {
+            elements.loginBtn.textContent = 'Sincronizando...';
+            const [tasks, finances, workSessions, oracleMemories] = await Promise.all([
+              SupabaseService.getTasks().catch(() => []),
+              SupabaseService.getFinances().catch(() => []),
+              SupabaseService.getWorkSessions().catch(() => []),
+              SupabaseService.getOracleMemories().catch(() => [])
+            ]);
+
+            // Mapear tarefas e finanças ao formato local esperado (conversão leve)
+            const localTasks = (tasks || []).map(t => ({
+              id: t.id,
+              text: t.title || t.text || '',
+              completed: t.status === 'completed',
+              date: t.created_at || t.date,
+              completedAt: t.completed_at,
+              dueDate: t.due_date,
+              xpReward: t.xp_reward,
+              category: t.category
+            }));
+
+            const localFinances = (finances || []).map(f => ({
+              id: f.id,
+              desc: f.description || f.desc || '',
+              value: f.amount || f.value || 0,
+              type: f.type || 'expense',
+              category: f.category || null,
+              date: f.created_at || f.date
+            }));
+
+            const localWorkLog = (workSessions || []).map(w => ({
+              id: w.id,
+              date: w.start_at ? w.start_at.split('T')[0] : (w.date || new Date().toISOString().split('T')[0]),
+              timestamp: w.start_at ? new Date(w.start_at).getTime() : (w.timestamp || Date.now()),
+              duration: w.total_seconds ? w.total_seconds * 1000 : (w.duration || 0),
+              type: w.activity_type || 'time_tracking',
+              inputVal: w.inputVal || (w.total_seconds ? w.total_seconds / 3600 : 0)
+            }));
+
+            // Integra os dados carregados ao state existente
+            gameState.dailyTasks = localTasks;
+            gameState.finances = localFinances;
+            gameState.workLog = localWorkLog;
+            if (oracleMemories && oracleMemories.length && typeof OracleMemory !== 'undefined') {
+              OracleMemory.data = {
+                learned: oracleMemories.map(m => ({ text: m.fact || m.text, date: m.created_at, tags: m.tags }))
+              };
+            }
+
+            // Re-renderiza as seções que chegaram
+            if (typeof renderDailyTasks === 'function') renderDailyTasks();
+            if (typeof renderFinances === 'function') renderFinances();
+            if (typeof renderWorkLog === 'function') renderWorkLog();
+
+            console.log('✅ Dados adicionais carregados da nuvem:', {
+              tarefas: localTasks.length,
+              financas: localFinances.length,
+              trabalho: localWorkLog.length
+            });
+            showToast('☁️ Dados da nuvem sincronizados.');
+          } catch (bgErr) {
+            console.error('Erro ao carregar dados em background:', bgErr);
+            showToast('⚠️ Falha ao carregar alguns dados da nuvem.');
+          } finally {
+            elements.loginBtn.disabled = false;
+            elements.loginBtn.textContent = 'Entrar';
+          }
+        })();
 
         // Salvar localmente também (para funcionar offline)
         if (elements.rememberUser && elements.rememberUser.checked) {
