@@ -1797,11 +1797,30 @@ function addTransaction() {
   showToast('💰 Transação registrada!');
 }
 
-function removeTransaction(id) {
+async function removeTransaction(id) {
   if (confirm('Remover esta transação?')) {
-    gameState.finances = gameState.finances.filter(t => t.id !== id);
+    // Converte para o tipo correto para comparação
+    const idToRemove = typeof id === 'string' && !isNaN(id) ? Number(id) : id;
+    
+    gameState.finances = gameState.finances.filter(t => {
+      // Compara tanto como string quanto como número
+      return t.id !== id && t.id !== idToRemove && String(t.id) !== String(id);
+    });
+    
     saveGame();
     updateUI();
+    
+    // Remove do Supabase se for UUID
+    try {
+      if (typeof SupabaseService !== 'undefined' && SupabaseService.deleteFinance) {
+        await SupabaseService.deleteFinance(id);
+        console.log('✅ Transação deletada do Supabase:', id);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao deletar transação do Supabase:', error);
+    }
+    
+    showToast('🗑️ Transação removida!');
   }
 }
 
@@ -1903,7 +1922,7 @@ function renderFinances() {
         <div class="small" style="opacity:0.6">${new Date(t.date).toLocaleDateString()}</div>
       </div>
       <div class="finance-value ${t.type}">${t.type === 'income' ? '+' : '-'} R$ ${t.value.toLocaleString('pt-BR')}</div>
-      <button class="ghost" style="padding:4px 8px; margin-left:10px" onclick="removeTransaction(${t.id})">❌</button>
+      <button class="ghost" style="padding:4px 8px; margin-left:10px" onclick="removeTransaction('${t.id}')">❌</button>
     `;
     if (elements.financeList) elements.financeList.appendChild(div);
   });
