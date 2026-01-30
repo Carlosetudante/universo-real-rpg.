@@ -9955,3 +9955,65 @@ window.checkAppVersion = async function() {
 
 // Função global para forçar atualização (pode ser chamada do console)
 window.forceUpdate = forceAppUpdate;
+
+// -------------------------------
+// Ingestão de PDF para o Oracle
+// Requer PDF.js (veja instruções no index.html)
+// -------------------------------
+async function ingestPdfToOracle(url, options = { chunkSize: 2000 }) {
+  if (typeof pdfjsLib === 'undefined') {
+    console.warn('PDF.js não encontrado. Adicione <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script> em index.html');
+    return { success: false, error: 'pdfjs missing' };
+  }
+
+  try {
+    const loadingTask = pdfjsLib.getDocument(url);
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(i => i.str).join(' ');
+      fullText += `\n\n--- Página ${p} ---\n\n` + pageText;
+    }
+
+    const chunkSize = options.chunkSize || 2000;
+    let chunksAdded = 0;
+    for (let i = 0; i < fullText.length; i += chunkSize) {
+      const chunk = fullText.slice(i, i + chunkSize).trim();
+      if (chunk) {
+        OracleMemory.learn(chunk, 'pdf');
+        chunksAdded++;
+      }
+    }
+
+    // Opcional: criar um script resumido no OracleScript
+    try {
+      const script = {
+        id: Date.now(),
+        filename: url.split('/').pop(),
+        loadedAt: new Date().toISOString(),
+        instructions: [],
+        facts: [fullText.slice(0, 2000)],
+        commands: [],
+        responses: {},
+        raw: fullText
+      };
+      const scripts = OracleScript.getScripts();
+      scripts.push(script);
+      OracleScript.saveScripts(scripts);
+    } catch (e) {
+      console.warn('Não foi possível salvar script resumido:', e);
+    }
+
+    OracleMemory.updateMemoryDisplay();
+    return { success: true, pages: pdf.numPages, chunks: chunksAdded };
+  } catch (e) {
+    console.error('Erro ingestando PDF:', e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+// Helper para chamar pela UI (ex: botão)
+window.ingestPdfToOracle = ingestPdfToOracle;
