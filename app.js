@@ -5454,6 +5454,17 @@ const OracleOnboarding = {
 const OracleChat = {
   personality: 'assistant',
   pendingAction: null, // Guarda ação pendente aguardando resposta do usuário
+  // Wrappers para funções globais (evita TypeError quando chamadas como this.xxx())
+  getTasksList() { return typeof getTasksList === 'function' ? getTasksList() : "Função getTasksList não disponível."; },
+  getFinanceSummary() { return typeof getFinanceSummary === 'function' ? getFinanceSummary() : "Função getFinanceSummary não disponível."; },
+  getStatusInfo() { return typeof getStatusInfo === 'function' ? getStatusInfo() : "Função getStatusInfo não disponível."; },
+  createFinancialGoal() { return typeof createFinancialGoal === 'function' ? createFinancialGoal() : "Função createFinancialGoal não disponível."; },
+  getSuccessMessage() { return typeof getSuccessMessage === 'function' ? getSuccessMessage() : "Pronto!"; },
+  addExpense(value, desc) { return typeof addExpense === 'function' ? addExpense(value, desc) : "Função addExpense não disponível."; },
+  addIncome(value, desc) { return typeof addIncome === 'function' ? addIncome(value, desc) : "Função addIncome não disponível."; },
+  addBotMessage(text, actions) { return typeof addBotMessage === 'function' ? addBotMessage(text, actions) : null; },
+  completeTask(taskName) { return typeof completeTask === 'function' ? completeTask(taskName) : `Não encontrei tarefa: ${taskName}`; },
+  createTask(text) { return typeof createTask === 'function' ? createTask(text) : `Não consegui criar tarefa: ${text}`; },
   
   init() {
     this.personality = gameState?.oraclePersonality || 'assistant';
