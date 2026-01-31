@@ -6073,7 +6073,8 @@ const OracleChat = {
     const isAmbiguousMeta = lowerInput.match(/\b(meta)\b/i) && !lowerInput.match(/financeira|dinheiro|grana|economia|juntar|guardar|poupar|reserva|reais|r\$/i);
 
     if (isAmbiguousMeta && !this.pendingAction) {
-        this.pendingAction = { type: 'clarify_meta', originalInput: input };
+        const originalInputForAction = input; // Captura para o escopo da ação
+        this.pendingAction = { type: 'clarify_meta', originalInput: originalInputForAction };
         return {
             message: `Quando você diz "meta", quer criar uma <strong>meta financeira</strong> (para juntar dinheiro) ou uma <strong>tarefa</strong>?`,
             actions: [
@@ -6084,7 +6085,7 @@ const OracleChat = {
                 }},
                 { text: '📝 Tarefa', action: () => {
                     this.pendingAction = null;
-                    const taskText = input.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
+                    const taskText = originalInputForAction.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
                     const response = createTask(taskText);
                     addBotMessage(response);
                 }}
@@ -6895,19 +6896,19 @@ const OracleChat = {
     const task = {
       id: Date.now(),
       text: data.title,
-      done: false,
+      completed: false,
       createdAt: new Date().toISOString(),
       dueDate: data.dueDate,
       dueTime: data.dueTime,
       xpReward: data.xpReward || 20
     };
-    
+
     gameState.dailyTasks.push(task);
     saveGame(true);
-    
+
     // Atualiza a lista de tarefas na UI
-    if (typeof updateTasksUI === 'function') updateTasksUI();
-    
+    if (typeof renderDailyTasks === 'function') renderDailyTasks();
+
     // Monta resposta
     let response = `✅ Tarefa criada: <strong>"${data.title}"</strong>`;
     
@@ -9835,30 +9836,89 @@ function createTask(text) {
 
 function completeTask(taskName) {
   if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
-  
-  const task = gameState.dailyTasks.find(t => 
-    !t.completed && t.text.toLowerCase().includes(taskName.toLowerCase())
-  );
-  
+
+  // Se nenhum nome de tarefa for fornecido, pergunte qual completar.
+  if (!taskName) {
+    const pendingTasks = gameState.dailyTasks.filter(t => !t.completed);
+    if (pendingTasks.length === 0) {
+      return "Você não tem tarefas pendentes para completar! 🎉";
+    }
+    // Retorna um objeto para o OracleChat criar botões de ação
+    return {
+      message: "Qual tarefa você completou? ✅",
+      actions: pendingTasks.slice(0, 4).map(t => ({
+        text: t.text.substring(0, 25) + (t.text.length > 25 ? '...' : ''),
+        action: () => {
+          const response = completeTask(t.text);
+          if (typeof response === 'string') {
+            addBotMessage(response);
+          } else if (response && response.message) {
+            addBotMessage(response.message, response.actions);
+          }
+        }
+      }))
+    };
+  }
+
+  const lowerTaskName = taskName.toLowerCase();
+  const pendingTasks = gameState.dailyTasks.filter(t => !t.completed);
+
+  // 1. Tenta encontrar correspondência exata primeiro
+  let task = pendingTasks.find(t => t.text.toLowerCase() === lowerTaskName);
+
+  // 2. Se não houver correspondência exata, procura por correspondências parciais
+  if (!task) {
+    const matches = pendingTasks.filter(t => t.text.toLowerCase().includes(lowerTaskName));
+
+    if (matches.length === 1) {
+      task = matches[0];
+    } else if (matches.length > 1) {
+      // Múltiplas correspondências, pede esclarecimento
+      OracleChat.pendingAction = { type: 'clarify_complete_task', matches: matches };
+      return {
+        message: `Encontrei ${matches.length} tarefas com "${taskName}". Qual delas você completou?`,
+        actions: matches.slice(0, 4).map(t => ({
+          text: t.text.substring(0, 25) + (t.text.length > 25 ? '...' : ''),
+          action: () => {
+            OracleChat.pendingAction = null;
+            const response = completeTask(t.text);
+            if (typeof response === 'string') {
+              addBotMessage(response);
+            } else if (response && response.message) {
+              addBotMessage(response.message, response.actions);
+            }
+          }
+        }))
+      };
+    }
+  }
+
   if (task) {
     task.completed = true;
     task.completedAt = new Date().toISOString();
-    
+
     // Dar XP
-    gameState.xp = (gameState.xp || 0) + 10;
+    const xpReward = task.xpReward || 10;
+    gameState.xp = (gameState.xp || 0) + xpReward;
+    updateXpHistory(xpReward); // Adicionado para consistência
+
     if (gameState.xp >= 100) {
       gameState.level = (gameState.level || 1) + 1;
       gameState.xp -= 100;
+      gameState.skillPoints = (gameState.skillPoints || 0) + 1;
+      showToast('🎉 Level UP! +1 Ponto de Atributo');
+      playSound('levelUp');
+      triggerLevelUpAnimation();
     }
-    
+
     saveGame();
     if (typeof renderDailyTasks === 'function') renderDailyTasks();
     if (typeof updateUI === 'function') updateUI();
-    
-    return getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+10 XP 🎉`;
+
+    return getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+${xpReward} XP 🎉`;
   }
-  
-  return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
+
+  return `Não encontrei uma tarefa pendente com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
 }
 
 function addExpense(value, desc) {
