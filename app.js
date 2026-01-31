@@ -9370,6 +9370,24 @@ const BibleAssistant = {
   },
 
   // -------------------------
+  // FORMATAÇÃO: lista do que o assistente conhece
+  // Retorna HTML com tópicos, livros e instruções simples
+  // -------------------------
+  formatKnowledgeBase() {
+    const topics = Object.keys(this.topicMap || {}).map(t => `• ${this.escapeHtml(this.titleCase(t))}`).join("<br>");
+    const books = Object.keys(this.bookMap || {}).slice(0, 20).map(b => `• ${this.escapeHtml(this.titleCase(b))}`).join("<br>");
+
+    return `
+      <div>
+        <h3>${this.config.ui.okIcon} O que eu sei</h3>
+        <p><strong>Tópicos:</strong><br>${topics}</p>
+        <p><strong>Alguns livros:</strong><br>${books}</p>
+        <p>${this.config.ui.tipIcon} Peça por tema, livro, personagem ou referência (ex: "ansiedade", "Gênesis", "quem foi Jesus", "João 3:16").</p>
+      </div>
+    `;
+  },
+
+  // -------------------------
   // UTIL: escape HTML
   // -------------------------
   escapeHtml(str) {
