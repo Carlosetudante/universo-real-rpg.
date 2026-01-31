@@ -10361,6 +10361,20 @@ function showThinking() {
   messages.scrollTop = messages.scrollHeight;
 }
 
+// Utilitários de debug para verificar bindings e elementos do Oráculo
+function dumpOracleBindings() {
+  const ids = ['addTaskBtn','addFinanceBtn','editProfileBtn','oracleScriptBtn','oracleSettingsBtn','chatBtn','oracleQuickActions','chatModal','chatInput','sendMessageBtn'];
+  const results = {};
+  console.group('Dump Oracle Bindings');
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    console.log(id, !!el, el);
+    results[id] = !!el;
+  });
+  console.groupEnd();
+  return results;
+}
+
 function removeThinking() {
   const thinking = document.getElementById('oracleThinking');
   if (thinking) thinking.remove();
@@ -10580,8 +10594,18 @@ if (elements.editAura) {
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🎮 Universo Real carregado com sucesso!');
   
-  // Inicializa o Oráculo
-  setTimeout(() => OracleChat.init(), 500);
+  // Inicializa o Oráculo (com try/catch para capturar erros em tempo de execução)
+  setTimeout(() => {
+    try {
+      OracleChat.init();
+      console.log('✅ OracleChat.init executado com sucesso');
+    } catch (e) {
+      console.error('❌ Erro na inicialização do OracleChat:', e);
+      // Mostra uma mensagem na UI para facilitar debugging
+      const chatStatus = document.getElementById('oracleStatusText');
+      if (chatStatus) chatStatus.textContent = 'Erro ao inicializar Oráculo (ver console)';
+    }
+  }, 500);
   setTimeout(() => injectBibleTab(), 600); // Injeta a aba Bíblia
   
   // Splash Screen Logic
