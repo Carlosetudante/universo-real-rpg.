@@ -157,9 +157,11 @@ function createStars(color = '#ffffff') {
   currentStarColor = color;
   starsContainer.style.setProperty('--star-color', color);
   
-  // Cria mais estrelas para um céu mais rico
-  const baseCount = Math.floor(window.innerWidth * window.innerHeight / 8000);
-  const starCount = Math.min(150, Math.max(60, baseCount));
+  // Cria mais estrelas para um céu mais rico, com otimização para mobile
+  const isMobile = window.innerWidth <= 900;
+  const density = isMobile ? 15000 : 8000; // Menos estrelas em telas menores
+  const baseCount = Math.floor(window.innerWidth * window.innerHeight / density);
+  const starCount = isMobile ? Math.min(70, Math.max(40, baseCount)) : Math.min(150, Math.max(60, baseCount));
   
   for (let i = 0; i < starCount; i++) {
     const star = document.createElement('div');
@@ -8673,28 +8675,42 @@ const BibleAssistant = {
 
 // Função para injetar a aba Bíblia na interface
 function injectBibleTab() {
-  // 1. Injetar Botão na Navegação
-  const tabContainer = document.querySelector('.tab-btn')?.parentElement;
-  
-  if (tabContainer && !document.querySelector('[data-tab="bible"]')) {
-    const btn = document.createElement('button');
-    btn.className = 'tab-btn';
-    btn.dataset.tab = 'bible';
-    btn.innerHTML = '<span class="tab-icon" style="font-size: 1.2rem;">✝️</span><span class="tab-label" style="font-size: 0.7rem;">Bíblia</span>';
-    
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        const content = document.getElementById('tab-bible');
-        if (content) content.classList.add('active');
-        if (typeof closeDrawer === 'function') closeDrawer();
-    });
+  const activateBibleTab = () => {
+    // Desativa todos os outros botões de navegação e abas de conteúdo
+    document.querySelectorAll('.nav-item, .mobile-drawer-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
-    tabContainer.appendChild(btn);
+    // Ativa todos os botões da Bíblia (desktop e mobile) e o conteúdo
+    document.querySelectorAll('[data-tab="bible"]').forEach(b => b.classList.add('active'));
+    const content = document.getElementById('tab-bible');
+    if (content) content.classList.add('active');
+
+    if (typeof closeDrawer === 'function') closeDrawer();
+  };
+
+  // 1. Injetar Botão na Navegação Desktop (Sidebar)
+  const desktopNav = document.querySelector('.cinema .app-nav');
+  if (desktopNav && !desktopNav.querySelector('[data-tab="bible"]')) {
+    const btn = document.createElement('button');
+    btn.className = 'nav-item';
+    btn.dataset.tab = 'bible';
+    btn.innerHTML = '<span class="nav-icon">✝️</span><span>Bíblia</span>';
+    btn.addEventListener('click', activateBibleTab);
+    desktopNav.appendChild(btn);
   }
 
-  // 2. Injetar Conteúdo da Aba
+  // 2. Injetar Botão no Drawer Mobile
+  const mobileDrawerItemContainer = document.querySelector('.mobile-drawer-item')?.parentElement;
+  if (mobileDrawerItemContainer && !mobileDrawerItemContainer.querySelector('[data-tab="bible"]')) {
+    const btn = document.createElement('button');
+    btn.className = 'mobile-drawer-item';
+    btn.dataset.tab = 'bible';
+    btn.innerHTML = '<span class="nav-icon" style="font-size: 1.5rem;">✝️</span><span>Bíblia</span>';
+    btn.addEventListener('click', activateBibleTab);
+    mobileDrawerItemContainer.appendChild(btn);
+  }
+
+  // 3. Injetar Conteúdo da Aba
   const main = document.getElementById('gameScreen');
   if (main && !document.getElementById('tab-bible')) {
     const content = document.createElement('div');
@@ -8704,7 +8720,7 @@ function injectBibleTab() {
     
     content.innerHTML = `
       <div class="bible-interface" style="max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.8); border-radius: 16px; padding: 20px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-        <div class="bible-header" style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px;">
+        <div class="bible-header" style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; position: relative;">
           <h2 style="color: #ffdd57; margin: 0; font-family: serif;">✝️ Assistente Bíblico</h2>
           <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
         </div>
@@ -8715,7 +8731,7 @@ function injectBibleTab() {
           </div>
         </div>
 
-        <div class="bible-input-area" style="display: flex; gap: 10px;">
+        <div class="bible-input-area" style="display: flex; gap: 10px; position: relative;">
           <input type="text" id="bibleInput" placeholder="Ex: Versículos sobre ansiedade..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white;">
           <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;">➤</button>
         </div>
