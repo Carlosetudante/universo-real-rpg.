@@ -5456,6 +5456,8 @@ const OracleChat = {
   pendingAction: null, // Guarda ação pendente aguardando resposta do usuário
   // Wrappers para funções globais (evita TypeError quando chamadas como this.xxx())
   getTasksList() { return typeof getTasksList === 'function' ? getTasksList() : "Função getTasksList não disponível."; },
+  // Compatibilidade: algumas partes do código podem chamar getTaskList (singular)
+  getTaskList() { return typeof getTasksList === 'function' ? getTasksList() : "Função getTasksList não disponível."; },
   getFinanceSummary() { return typeof getFinanceSummary === 'function' ? getFinanceSummary() : "Função getFinanceSummary não disponível."; },
   getStatusInfo() { return typeof getStatusInfo === 'function' ? getStatusInfo() : "Função getStatusInfo não disponível."; },
   createFinancialGoal() { return typeof createFinancialGoal === 'function' ? createFinancialGoal() : "Função createFinancialGoal não disponível."; },
@@ -5463,6 +5465,9 @@ const OracleChat = {
   addExpense(value, desc) { return typeof addExpense === 'function' ? addExpense(value, desc) : "Função addExpense não disponível."; },
   addIncome(value, desc) { return typeof addIncome === 'function' ? addIncome(value, desc) : "Função addIncome não disponível."; },
   addBotMessage(text, actions) { return typeof addBotMessage === 'function' ? addBotMessage(text, actions) : null; },
+  // Compatibilidade com nomes antigos/typos
+  addMessages(text, actions) { return typeof addBotMessage === 'function' ? addBotMessage(text, actions) : null; },
+  addMessage(text, actions) { return this.addMessages(text, actions); },
   completeTask(taskName) { return typeof completeTask === 'function' ? completeTask(taskName) : `Não encontrei tarefa: ${taskName}`; },
   createTask(text) { return typeof createTask === 'function' ? createTask(text) : `Não consegui criar tarefa: ${text}`; },
   
@@ -11001,3 +11006,22 @@ async function ingestPdfToOracle(url, options = { chunkSize: 2000 }) {
 
 // Helper para chamar pela UI (ex: botão)
 window.ingestPdfToOracle = ingestPdfToOracle;
+
+// -------------------------------
+// Aliases globais de compatibilidade
+// Evita erros quando código externo/antigo chama nomes diferentes
+// Define apenas se não existir para não sobrescrever implementações atuais
+// -------------------------------
+try {
+  if (typeof window !== 'undefined') {
+    if (!window.getTasksList) window.getTasksList = (typeof getTasksList === 'function') ? getTasksList : () => "Função getTasksList não disponível.";
+    if (!window.getTaskList) window.getTaskList = window.getTasksList;
+
+    if (!window.addMessages) window.addMessages = (...args) => (typeof addBotMessage === 'function' ? addBotMessage(...args) : null);
+    if (!window.addMessage) window.addMessage = window.addMessages;
+
+    if (!window.generateResponse) window.generateResponse = (input) => (typeof OracleChat !== 'undefined' && typeof OracleChat.generateResponse === 'function') ? OracleChat.generateResponse.call(OracleChat, input) : null;
+  }
+} catch (e) {
+  console.warn('Erro ao definir aliases globais de compatibilidade:', e);
+}
