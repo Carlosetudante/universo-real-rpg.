@@ -5584,15 +5584,15 @@ const OracleChat = {
     
     this.addBotMessage(response, [
       { text: '💬 Bora conversar', action: () => { 
-        this.addUserMessage('bora conversar');
+        addUserMessage('bora conversar');
         const resp = this.startConversationMode();
-        this.addBotMessage(resp);
+        addBotMessage(resp);
       }},
       { text: '🗑️ Limpar memória', action: () => {
         if (confirm('Tem certeza que quer apagar tudo que sei sobre você?')) {
           localStorage.removeItem(OracleMemory.key);
           OracleMemory.updateMemoryDisplay();
-          this.addBotMessage('🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊');
+          addBotMessage('🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊');
           OracleMemory.setProfile('conversationMode', true);
           OracleMemory.setProfile('lastQuestion', 'name');
         }
@@ -5641,12 +5641,12 @@ const OracleChat = {
       }},
       { text: '🗑️ Limpar Scripts', action: () => {
         if (scripts.length === 0) {
-          this.addBotMessage('Não há scripts para limpar! 📭');
+          addBotMessage('Não há scripts para limpar! 📭');
           return;
         }
         if (confirm(`Deseja remover todos os ${scripts.length} scripts carregados?`)) {
           OracleScript.clearAll();
-          this.addBotMessage('🗑️ Todos os scripts foram removidos!');
+          addBotMessage('🗑️ Todos os scripts foram removidos!');
         }
       }},
       { text: '❌ Fechar', action: () => {} }
@@ -5688,10 +5688,10 @@ const OracleChat = {
           }
         }
         
-        this.addBotMessage(response);
+        addBotMessage(response);
         OracleMemory.updateMemoryDisplay();
       } else {
-        this.addBotMessage(`❌ Erro ao processar script: ${result.error}`);
+        addBotMessage(`❌ Erro ao processar script: ${result.error}`);
       }
       
       // Limpa o input para permitir recarregar o mesmo arquivo
@@ -5705,11 +5705,11 @@ const OracleChat = {
   async processPdfUpload(file) {
     // Verifica se a biblioteca PDF.js está disponível
     if (typeof pdfjsLib === 'undefined') {
-      this.addBotMessage(`⚠️ <strong>Biblioteca PDF não detectada!</strong><br>Para eu ler o arquivo <em>${file.name}</em>, você precisa adicionar o PDF.js no seu <code>index.html</code>.<br><br>Ou se preferir, crie um script <code>.json</code> com as informações principais!`);
+      addBotMessage(`⚠️ <strong>Biblioteca PDF não detectada!</strong><br>Para eu ler o arquivo <em>${file.name}</em>, você precisa adicionar o PDF.js no seu <code>index.html</code>.<br><br>Ou se preferir, crie um script <code>.json</code> com as informações principais!`);
       return;
     }
 
-    this.addBotMessage(`📖 Abrindo <strong>${file.name}</strong>...<br><em>Estudando o conteúdo (isso pode levar alguns segundos)...</em>`);
+    addBotMessage(`📖 Abrindo <strong>${file.name}</strong>...<br><em>Estudando o conteúdo (isso pode levar alguns segundos)...</em>`);
 
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -5722,7 +5722,7 @@ const OracleChat = {
       const pagesToRead = Math.min(pdf.numPages, maxPages);
       
       if (pdf.numPages > maxPages) {
-        this.addBotMessage(`⚠️ O arquivo é muito grande (${pdf.numPages} páginas). Vou ler apenas as primeiras ${maxPages} páginas para não sobrecarregar sua memória.`);
+        addBotMessage(`⚠️ O arquivo é muito grande (${pdf.numPages} páginas). Vou ler apenas as primeiras ${maxPages} páginas para não sobrecarregar sua memória.`);
       }
 
       for (let i = 1; i <= pagesToRead; i++) {
@@ -5736,13 +5736,13 @@ const OracleChat = {
       const result = OracleScript.processScriptFile(fullText, file.name);
       
       if (result.success) {
-        this.addBotMessage(`✅ <strong>Leitura concluída!</strong><br>Absorvi ${result.summary.facts} novos conhecimentos deste PDF.`);
+        addBotMessage(`✅ <strong>Leitura concluída!</strong><br>Absorvi ${result.summary.facts} novos conhecimentos deste PDF.`);
       } else {
-        this.addBotMessage(`❌ Não consegui extrair informações úteis deste PDF.`);
+        addBotMessage(`❌ Não consegui extrair informações úteis deste PDF.`);
       }
     } catch (e) {
       console.error(e);
-      this.addBotMessage(`❌ Erro ao ler PDF: ${e.message}`);
+      addBotMessage(`❌ Erro ao ler PDF: ${e.message}`);
     }
   },
 
@@ -5813,7 +5813,7 @@ const OracleChat = {
       const bdayMessage = `🎉🎂 <strong>FELIZ ANIVERSÁRIO, ${name.toUpperCase()}!</strong> 🎂🎉<br><br>` +
                           `Que seu novo ciclo seja repleto de conquistas, XP e level ups! 🥳<br>` +
                           `Preparei uma festa virtual pra você! 🎈`;
-      this.addBotMessage(bdayMessage);
+      addBotMessage(bdayMessage);
       playSound('achievement');
       triggerConfetti();
       setTimeout(() => triggerConfetti(), 1000);
@@ -5828,16 +5828,16 @@ const OracleChat = {
       greeting = `Oi, ${name}! Tudo bem, linda? 💖 Conta comigo pra o que precisar!`;
     }
     
-    this.addBotMessage(greeting);
+    addBotMessage(greeting);
     
     // Se não conhece o nome ainda, pergunta
     if (!memorizedName && !gameState?.name) {
       setTimeout(() => {
-        this.addBotMessage("A propósito, como posso te chamar? 🤔");
+        addBotMessage("A propósito, como posso te chamar? 🤔");
       }, 1000);
     } else {
       setTimeout(() => {
-        this.addBotMessage(this.getTimeGreeting());
+        addBotMessage(this.getTimeGreeting());
       }, 800);
     }
   },
@@ -5924,20 +5924,20 @@ const OracleChat = {
     const text = input.value.trim();
     if (!text) return;
     
-    this.addUserMessage(text);
+    addUserMessage(text);
     input.value = '';
     
     // Mostra "pensando"
-    this.showThinking();
+    showThinking();
     
     // Processa com delay para parecer natural
     setTimeout(() => {
-      this.removeThinking();
+      removeThinking();
       const response = this.generateResponse(text);
       if (typeof response === 'string') {
-        this.addBotMessage(response);
+        addBotMessage(response);
       } else if (response.message) {
-        this.addBotMessage(response.message, response.actions);
+        addBotMessage(response.message, response.actions);
       }
     }, 600 + Math.random() * 400);
   },
@@ -6080,13 +6080,13 @@ const OracleChat = {
                 { text: '💰 Meta Financeira', action: () => {
                     this.pendingAction = null;
                     const response = this.createFinancialGoal();
-                    this.addBotMessage(response.message, response.actions);
+                    addBotMessage(response.message, response.actions);
                 }},
                 { text: '📝 Tarefa', action: () => {
                     this.pendingAction = null;
                     const taskText = input.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
-                    const response = this.createTask(taskText);
-                    this.addBotMessage(response);
+                    const response = createTask(taskText);
+                    addBotMessage(response);
                 }}
             ]
         };
@@ -6212,11 +6212,11 @@ const OracleChat = {
           const newUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}&seed=${Date.now()}`;
           const img = document.querySelector('.oracle-generated-image');
           if (img) img.src = newUrl;
-          this.addBotMessage('🎨 Nova versão gerada! Atualizando imagem...');
+          addBotMessage('🎨 Nova versão gerada! Atualizando imagem...');
         }},
         { text: '💾 Salvar', action: () => {
           window.open(finalUrl, '_blank');
-          this.addBotMessage('✅ Abrindo imagem em nova aba para você salvar!');
+          addBotMessage('✅ Abrindo imagem em nova aba para você salvar!');
         }}
       ]
     };
@@ -6271,8 +6271,8 @@ const OracleChat = {
           • <strong>20%</strong> para poupança e investimentos<br><br>
           📊 Quer que eu analise seus gastos para ver como você está?`,
         actions: [
-          { text: '📊 Analisar meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Analisar meus gastos', action: () => addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -6282,8 +6282,8 @@ const OracleChat = {
           💡 Não espere sobrar dinheiro. Separe antes de gastar!<br><br>
           "Não é sobre quanto você ganha, mas quanto você guarda." - Warren Buffett`,
         actions: [
-          { text: '📈 Como investir?', action: () => this.addBotMessage(this.teachFinance('investimento')) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📈 Como investir?', action: () => addBotMessage(this.teachFinance('investimento')) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -6294,8 +6294,8 @@ const OracleChat = {
           3. <strong>Investimento automático</strong> mensal em fundos ou Tesouro<br><br>
           🧠 Assim você não precisa de força de vontade - acontece sozinho!`,
         actions: [
-          { text: '🎯 Criar meta', action: () => this.addBotMessage(this.createFinancialGoal()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '🎯 Criar meta', action: () => addBotMessage(this.createFinancialGoal()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -6305,8 +6305,8 @@ const OracleChat = {
           Se depois de 24h você ainda quiser, ok, compre. Mas na maioria das vezes, o impulso passa.<br><br>
           💡 Isso evita gastos por emoção e economiza centenas por mês!`,
         actions: [
-          { text: '📊 Ver meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Ver meus gastos', action: () => addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -6317,8 +6317,8 @@ const OracleChat = {
           Onde deixar? <strong>Tesouro Selic</strong> ou <strong>CDB com liquidez diária</strong>.<br><br>
           ⚠️ Nunca invista em renda variável sem ter esse colchão!`,
         actions: [
-          { text: '🎯 Calcular minha reserva', action: () => this.addBotMessage(this.calculateEmergencyFund()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '🎯 Calcular minha reserva', action: () => addBotMessage(this.calculateEmergencyFund()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -6330,8 +6330,8 @@ const OracleChat = {
           • Empréstimo pessoal (100%+ ao ano!)<br><br>
           Se já está endividado: <strong>NEGOCIE!</strong> Bancos preferem receber com desconto do que não receber.`,
         actions: [
-          { text: '📊 Diagnóstico financeiro', action: () => this.addBotMessage(this.getFinancialDiagnosis()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Diagnóstico financeiro', action: () => addBotMessage(this.getFinancialDiagnosis()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       }
     ];
@@ -6420,17 +6420,17 @@ const OracleChat = {
       message: `<strong>${lesson.title}</strong><br><br>${lesson.content}`,
       actions: [
         { text: '📚 Outro tema', action: () => {
-          this.addBotMessage({
+          addBotMessage({
             message: `O que você quer aprender, ${name}?`,
             actions: [
-              { text: '📈 Investimentos', action: () => this.addBotMessage(this.teachFinance('investimento')) },
-              { text: '🏛️ Tesouro Direto', action: () => this.addBotMessage(this.teachFinance('tesouro')) },
-              { text: '📊 Ações', action: () => this.addBotMessage(this.teachFinance('acoes')) },
-              { text: '🔢 Juros Compostos', action: () => this.addBotMessage(this.teachFinance('juros')) }
+              { text: '📈 Investimentos', action: () => addBotMessage(this.teachFinance('investimento')) },
+              { text: '🏛️ Tesouro Direto', action: () => addBotMessage(this.teachFinance('tesouro')) },
+              { text: '📊 Ações', action: () => addBotMessage(this.teachFinance('acoes')) },
+              { text: '🔢 Juros Compostos', action: () => addBotMessage(this.teachFinance('juros')) }
             ]
           });
         }},
-        { text: '💡 Dicas práticas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        { text: '💡 Dicas práticas', action: () => addBotMessage(this.getFinancialTip()) }
       ]
     };
   },
@@ -6445,11 +6445,11 @@ const OracleChat = {
       actions: [
         { text: '🧮 Sim, calcular juntos', action: () => { 
             this.pendingAction = { type: 'guided_goal_income' }; 
-            this.addBotMessage('Ótimo! Para começar, qual é a sua **renda mensal média** (salário + extras)?'); 
+            addBotMessage('Ótimo! Para começar, qual é a sua **renda mensal média** (salário + extras)?'); 
         }},
         { text: '📝 Não, já tenho o valor', action: () => { 
             this.pendingAction = { type: 'financial_goal_name' }; 
-            this.addBotMessage('Entendi! Qual é o nome do seu objetivo? (Ex: "Comprar um carro", "Reserva")'); 
+            addBotMessage('Entendi! Qual é o nome do seu objetivo? (Ex: "Comprar um carro", "Reserva")'); 
         }}
       ]
     };
@@ -6958,9 +6958,9 @@ const OracleChat = {
         setTimeout(() => {
              const response = this.generateResponse(definition);
              if (typeof response === 'string') {
-                this.addBotMessage(response);
+                addBotMessage(response);
              } else if (response && response.message) {
-                this.addBotMessage(response.message, response.actions);
+                addBotMessage(response.message, response.actions);
              }
         }, 1000);
 
@@ -6987,14 +6987,14 @@ const OracleChat = {
         this.pendingAction = null;
 
         // Confirm and execute the new command
-        this.addBotMessage(`✅ Entendido! Da próxima vez que você disser "<strong>${originalCommand}</strong>", vou entender como "<strong>${newCommand}</strong>".<br><br>Agora, executando o comando...`);
+        addBotMessage(`✅ Entendido! Da próxima vez que você disser "<strong>${originalCommand}</strong>", vou entender como "<strong>${newCommand}</strong>".<br><br>Agora, executando o comando...`);
         
         setTimeout(() => {
             const response = this.generateResponse(newCommand);
             if (typeof response === 'string') {
-                this.addBotMessage(response);
+                addBotMessage(response);
             } else if (response.message) {
-                this.addBotMessage(response.message, response.actions);
+                addBotMessage(response.message, response.actions);
             }
         }, 500);
 
@@ -7006,7 +7006,7 @@ const OracleChat = {
         } else if (lowerInput.includes('tarefa')) {
             this.pendingAction = null;
             const taskText = action.originalInput.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
-            return this.createTask(taskText);
+            return createTask(taskText);
         } else {
             this.pendingAction = null; // Cancel if the response is not clear
             return "Não entendi. Por favor, escolha entre 'Meta Financeira' ou 'Tarefa'.";
@@ -7022,10 +7022,10 @@ const OracleChat = {
         return {
           message: `Ok, R$ ${expenseValue.toFixed(2)}. E qual o nome que deve ser colocado?`,
           actions: [
-            { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Alimentação')); } },
-            { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Transporte')); } },
-            { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Lazer')); } },
-            { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(expenseValue, 'Compras')); } }
+            { text: '🍔 Alimentação', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Alimentação')); } },
+            { text: '🚗 Transporte', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Transporte')); } },
+            { text: '🎮 Lazer', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Lazer')); } },
+            { text: '🛒 Compras', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Compras')); } }
           ]
         };
 
@@ -7038,7 +7038,7 @@ const OracleChat = {
         
         this.pendingAction = null;
         desc = desc.charAt(0).toUpperCase() + desc.slice(1);
-        return this.addExpense(action.value, desc);
+        return addExpense(action.value, desc);
         
       case 'expense_category':
         // Usuário escolhendo categoria
@@ -7046,7 +7046,7 @@ const OracleChat = {
         const chosenCat = categories.find(c => lowerInput.includes(c)) || 'outros';
         
         this.pendingAction = null;
-        return this.addExpenseWithCategory(action.value, action.description, chosenCat);
+        return addExpenseWithCategory(action.value, action.description, chosenCat);
         
       case 'income_description':
         // Usuário dando descrição para receita
@@ -7057,7 +7057,7 @@ const OracleChat = {
         
         this.pendingAction = null;
         incDesc = incDesc.charAt(0).toUpperCase() + incDesc.slice(1);
-        return this.addIncome(action.value, incDesc);
+        return addIncome(action.value, incDesc);
         
       case 'task_name':
         // Usuário dando nome para tarefa
@@ -7067,7 +7067,7 @@ const OracleChat = {
         }
         
         this.pendingAction = null;
-        return this.createTask(taskName);
+        return createTask(taskName);
         
       case 'financial_goal_name':
         let goalName = input.trim();
@@ -7170,7 +7170,7 @@ const OracleChat = {
         // Confirmar ação de poupança
         if (lowerInput.match(/^(sim|s|yes|y|claro|pode|bora|isso|confirma)$/i)) {
           this.pendingAction = null;
-          return this.addSavings(action.value);
+          return addSavings(action.value);
         } else if (lowerInput.match(/^(não|nao|n|no|cancela)$/i)) {
           this.pendingAction = null;
           return `Ok, ${treatment}! Cancelado. 😊`;
@@ -7316,16 +7316,16 @@ const OracleChat = {
       const taskText = originalInput.replace(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i, '').trim();
       
       if (taskText && taskText.length > 2) {
-        return this.createTask(taskText);
+        return createTask(taskText);
       } else {
         // Pergunta interativa
         this.pendingAction = { type: 'task_name' };
         return {
           message: `Claro, ${treatment}! Qual tarefa você quer criar? 📝`,
           actions: [
-            { text: '📚 Estudar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Estudar')); } },
-            { text: '🏃 Exercitar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Fazer exercícios')); } },
-            { text: '🧹 Organizar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Organizar ambiente')); } }
+            { text: '📚 Estudar', action: () => { this.pendingAction = null; addBotMessage(createTask('Estudar')); } },
+            { text: '🏃 Exercitar', action: () => { this.pendingAction = null; addBotMessage(createTask('Fazer exercícios')); } },
+            { text: '🧹 Organizar', action: () => { this.pendingAction = null; addBotMessage(createTask('Organizar ambiente')); } }
           ]
         };
       }
@@ -7366,15 +7366,15 @@ const OracleChat = {
           return {
             message: `Beleza, ${treatment}! 💸 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de saída.${politeResponse}<br><br>Qual nome devo colocar nessa despesa?`,
             actions: [
-              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Alimentação')); } },
-              { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Transporte')); } },
-              { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Lazer')); } },
-              { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Compras')); } }
+              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Alimentação')); } },
+              { text: '🚗 Transporte', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Transporte')); } },
+              { text: '🎮 Lazer', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Lazer')); } },
+              { text: '🛒 Compras', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Compras')); } }
             ]
           };
         }
         
-        return this.addExpense(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+        return addExpense(value, desc.charAt(0).toUpperCase() + desc.slice(1));
       }
     }
     
@@ -7407,15 +7407,15 @@ const OracleChat = {
           return {
             message: `Show, ${treatment}! 💰 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de entrada.${politeResponse}<br><br>De onde veio essa grana?`,
             actions: [
-              { text: '💼 Salário', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Salário')); } },
-              { text: '💻 Freelance', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Freelance')); } },
-              { text: '🎁 Presente', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Presente')); } },
-              { text: '📈 Investimento', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Investimento')); } }
+              { text: '💼 Salário', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Salário')); } },
+              { text: '💻 Freelance', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Freelance')); } },
+              { text: '🎁 Presente', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Presente')); } },
+              { text: '📈 Investimento', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Investimento')); } }
             ]
           };
         }
         
-        return this.addIncome(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+        return addIncome(value, desc.charAt(0).toUpperCase() + desc.slice(1));
       }
     }
     
@@ -7430,7 +7430,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.addSavings(value);
+        return addSavings(value);
       }
     }
     
@@ -7444,7 +7444,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.withdrawSavings(value);
+        return withdrawSavings(value);
       }
     }
     
@@ -7459,25 +7459,25 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.setSavingsGoal(value);
+        return setSavingsGoal(value);
       }
     }
     
     // VER POUPANÇA/ECONOMIAS
     if (lowerInput.match(/(?:quanto\s+)?(?:tenho|tem)\s+(?:na|de)\s+(?:poupança|economia|reserva|guardado)|(?:minha|ver)\s+(?:poupança|economia|reserva)/i)) {
-      return this.getSavingsStatus();
+      return getSavingsStatus();
     }
     
     // COMPLETAR TAREFA
     if (lowerInput.match(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i)) {
       const taskName = originalInput.replace(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i, '').trim();
-      return this.completeTask(taskName);
+      return completeTask(taskName);
     }
     
     // DELETAR TAREFA
     if (lowerInput.match(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i)) {
       const taskName = originalInput.replace(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i, '').trim();
-      return this.deleteTask(taskName);
+      return deleteTask(taskName);
     }
     
     // INICIAR/PARAR TRABALHO
@@ -7540,14 +7540,14 @@ const OracleChat = {
       if (match) {
         const oldName = match[1].trim();
         const newName = match[2].trim();
-        return this.renameExpense(oldName, newName);
+        return renameExpense(oldName, newName);
       }
     }
     
     // VER GASTOS / LISTAR DESPESAS (para poder escolher qual renomear)
     if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:meus?\s+)?(?:gastos?|despesas?|saídas?)/i) ||
         lowerInput.match(/(?:meus?\s+)?(?:gastos?|despesas?|saídas?)\s+(?:recentes?)?/i)) {
-      return this.listExpenses();
+      return listExpenses();
     }
     
     // DELETAR/REMOVER GASTO
@@ -7560,7 +7560,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const name = match[1].trim();
-        return this.deleteExpense(name);
+        return deleteExpense(name);
       }
     }
     
@@ -7574,14 +7574,14 @@ const OracleChat = {
       if (match) {
         const oldName = match[1].trim();
         const newName = match[2].trim();
-        return this.renameIncome(oldName, newName);
+        return renameIncome(oldName, newName);
       }
     }
     
     // VER RECEITAS / LISTAR ENTRADAS
     if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)/i) ||
         lowerInput.match(/(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)\s+(?:recentes?)?/i)) {
-      return this.listIncomes();
+      return listIncomes();
     }
     
     // DELETAR/REMOVER ENTRADA
@@ -7593,7 +7593,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const name = match[1].trim();
-        return this.deleteIncome(name);
+        return deleteIncome(name);
       }
     }
     
@@ -8474,7 +8474,7 @@ const OracleChat = {
       actions: [
         { text: '❌ Deixa pra lá', action: () => { 
           this.pendingAction = null; 
-          this.addBotMessage('Tudo bem! Se precisar de algo, estou aqui. 😊'); 
+          addBotMessage('Tudo bem! Se precisar de algo, estou aqui. 😊'); 
         }}
       ]
     };
@@ -8998,6 +8998,11 @@ const BibleAssistant = {
   // PERSONAGENS
   // -------------------------
   characterMap: {
+    "jesus": {
+      who: "Jesus Cristo, o Filho de Deus, é a figura central da fé cristã e da Bíblia.",
+      call: "Sua missão foi revelada desde o nascimento: 'Ele salvará o seu povo dos seus pecados' (Mateus 1:21). Ele não foi chamado, Ele é o chamado.",
+      role: "Ele é o Messias prometido, o Salvador da humanidade, o Cordeiro de Deus que tira o pecado do mundo. Através de Sua vida, morte e ressurreição, Ele oferece reconciliação entre Deus e os homens."
+    },
     "mateus": {
       who: "Mateus (Levi) foi um dos 12 apóstolos e tradicionalmente considerado autor do Evangelho de Mateus.",
       call: "Chamado enquanto era cobrador de impostos; largou tudo para seguir Jesus (Mt 9:9).",
@@ -9449,6 +9454,11 @@ const BibleAssistant = {
 
     if (!t) return this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').");
 
+    // 0) Detecta pedido de conhecimento
+    if (t.includes("o que voce sabe") || t.includes("o que vc sabe") || t.includes("seu conhecimento") || t.includes("lista de topicos")) {
+      return this.formatKnowledgeBase();
+    }
+
     // 1) Detecta pedido de plano
     if (t.includes("plano") || t.includes("leitura") || t.includes("devocional")) {
       // tenta capturar número de dias
@@ -9600,9 +9610,9 @@ function injectBibleTab() {
         </div>
         
         <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 5px; flex-shrink: 0;">
-          <button class="btn ghost bible-tag" onclick="askBible('versículo do dia')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📅 Versículo</button>
-          <button class="btn ghost bible-tag" onclick="askBible('sobre ansiedade')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">😰 Ansiedade</button>
-          <button class="btn ghost bible-tag" onclick="askBible('Gênesis')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📖 Gênesis</button>
+          <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">✝️ Jesus</button>
+          <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">🧠 O que você sabe?</button>
+          <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📅 Plano de Leitura</button>
         </div>
       </div>
     `;
