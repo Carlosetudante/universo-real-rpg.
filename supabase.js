@@ -551,6 +551,55 @@ async function getOracleMemories(searchTags = null) {
   return data || [];
 }
 
+async function deleteAllUserData() {
+  if (!currentUser) {
+    console.error('❌ deleteAllUserData: currentUser é null');
+    return false;
+  }
+
+  const userId = currentUser.id;
+  console.log(`🗑️ Iniciando exclusão de todos os dados para o usuário: ${userId}`);
+
+  // Lista de tabelas que contêm dados do usuário e usam 'user_id'
+  const tablesWithUserId = [
+    'oracle_messages',
+    'oracle_memory',
+    'xp_events',
+    'work_sessions',
+    'finance_transactions',
+    'tasks'
+  ];
+
+  try {
+    const deletePromises = tablesWithUserId.map(table => {
+      console.log(`   -> Deletando da tabela ${table}...`);
+      return supabaseClient
+        .from(table)
+        .delete()
+        .eq('user_id', userId);
+    });
+    
+    console.log(`   -> Deletando da tabela profiles...`);
+    deletePromises.push(
+      supabaseClient
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+    );
+        
+    const results = await Promise.all(deletePromises);
+
+    const hadError = results.some(r => r.error);
+    if (hadError) console.warn('⚠️ Alguns dados podem não ter sido removidos da nuvem.');
+
+    console.log('✅ Exclusão de dados na nuvem concluída.');
+    return !hadError;
+
+  } catch (error) {
+    console.error('❌ Erro catastrófico durante a exclusão de dados:', error);
+    return false;
+  }
+}
 // ===========================================
 // ORÁCULO - PROCESSADOR DE AÇÕES
 // ===========================================
@@ -1023,6 +1072,7 @@ window.SupabaseService = {
   getOracleMemories,
   processOracleActions,
   
+  deleteAllUserData,
   // Sync
   syncLocalToCloud,
   syncCloudToLocal,

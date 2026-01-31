@@ -1468,6 +1468,55 @@ function restoreBackup() {
   }
 }
 
+async function resetAccount() {
+  if (!isLoggedIn || !gameState) {
+    showToast('⚠️ Você não está logado.');
+    return;
+  }
+
+  const confirmation = prompt('🚨 ATENÇÃO! 🚨\n\nIsso apagará TODOS os seus dados (perfil, tarefas, finanças, etc.) permanentemente, tanto neste dispositivo quanto na nuvem.\n\nPara confirmar, digite "DELETAR":');
+
+  if (confirmation !== 'DELETAR') {
+    showToast('❌ Ação cancelada.');
+    return;
+  }
+
+  try {
+    showToast('🗑️ Resetando sua conta... Por favor, aguarde.', 5000);
+
+    // Se estiver usando Supabase, deleta os dados da nuvem
+    if (useSupabase()) {
+      console.log('☁️ Deletando dados da nuvem...');
+      const success = await SupabaseService.deleteAllUserData();
+      if (!success) {
+        // Mesmo que falhe na nuvem, continua o reset local para deslogar o usuário
+        showToast('⚠️ Falha ao resetar dados na nuvem, mas continuando reset local.');
+      } else {
+        console.log('✅ Dados da nuvem deletados.');
+      }
+    }
+
+    // Deleta os dados locais
+    const username = getSession();
+    let users = getUsers();
+    if (users[username]) {
+      delete users[username];
+      setUsers(users);
+    }
+    
+    localStorage.removeItem(`ur_backup_${username}`);
+    clearSession();
+    isLoggedIn = false;
+    gameState = null;
+
+    showToast('✅ Conta resetada com sucesso! Você será redirecionado.', 3000);
+
+    setTimeout(() => window.location.reload(), 3000);
+  } catch (error) {
+    showToast(`❌ Erro ao resetar a conta: ${error.message}`);
+  }
+}
+
 function getAttributeCost(currentLevel) {
   // Sistema de Níveis: Custo aumenta a cada 5 níveis
   // Nível 1-4: 1 pt | 5-9: 2 pts | 10-14: 3 pts
@@ -4146,6 +4195,8 @@ if (elements.configJobBtn) elements.configJobBtn.addEventListener('click', reset
 if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click', openGroupConfig);
 if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
+
+if (elements.resetAccountBtn) elements.resetAccountBtn.addEventListener('click', resetAccount);
 
 // ========================================
 // SISTEMA DE LINGUAGEM NATURAL (NLU) 2.0
@@ -8623,130 +8674,865 @@ const OracleChat = {
 // ===========================================
 // MÓDULO BÍBLIA - ASSISTENTE BÍBLICO
 // ===========================================
+//
+// Objetivo: responder perguntas bíblicas por:
+// - Tópicos (ansiedade, medo, perdão...)
+// - Livros (resumo, temas, estrutura)
+// - Personagens (quem foi, chamada, papel)
+// - Referências (ex: "João 3:16", "Rm 8:28")
+// - Recursos: versículo do dia (referência), plano de leitura, sugestão de oração
+//
+// Observação: NÃO inclui texto literal de versículos (traduções são protegidas).
+// Em vez disso, devolve referência + ideia/paráfrase curta.
+//
+// Uso: BibleAssistant.reply("tô com ansiedade")
+// ===========================================
 
 const BibleAssistant = {
-  // Base de conhecimento expandida com referências
+  // -------------------------
+  // CONFIG
+  // -------------------------
+  config: {
+    maxRefsToShow: 7,
+    minFuzzyScore: 0.62, // quanto maior, mais "exigente"
+    enableDebug: false,
+    ui: {
+      titleIcon: "📖",
+      sectionIcon: "•",
+      warnIcon: "⚠️",
+      okIcon: "✅",
+      tipIcon: "💡",
+      prayIcon: "🙏",
+      bookIcon: "📚",
+      personIcon: "👤",
+      topicIcon: "🧭",
+    }
+  },
+
+  // -------------------------
+  // SINÔNIMOS / GATILHOS
+  // (ajuda a mapear o que a pessoa escreve para um tópico)
+  // -------------------------
+  synonyms: {
+    ansiedade: ["ansioso", "preocupação", "preocupado", "aflição", "apreensão", "angústia", "stress", "estresse"],
+    medo: ["pavor", "terror", "insegurança", "ameaça", "assustado", "medroso", "ansiedade social"],
+    amor: ["amar", "carinho", "afeição", "relacionamento", "casamento", "compaixão"],
+    dinheiro: ["finanças", "rico", "pobre", "dívida", "ganância", "avareza", "prosperidade"],
+    tristeza: ["depressão", "desânimo", "choro", "luto", "dor", "vazio", "coração partido"],
+    proposito: ["propósito", "vocação", "chamado", "sentido", "missão", "direção", "plano"],
+    perdao: ["perdão", "culpa", "arrependimento", "restauração", "reconciliação"],
+    fe: ["fé", "crer", "dúvida", "confiança", "incredulidade"],
+    esperanca: ["esperança", "futuro", "promessa", "desesperança"],
+    paz: ["calma", "tranquilidade", "descanso", "shlom", "shalom", "serenidade"],
+    sabedoria: ["decisão", "discernimento", "conselho", "prudência", "inteligência"],
+    gratidao: ["gratidão", "agradecer", "louvar", "reconhecer"],
+    familia: ["pais", "filhos", "mãe", "pai", "lar", "casamento", "esposa", "marido"],
+    trabalho: ["emprego", "carreira", "profissão", "produtividade", "preguiça"],
+    amizade: ["amigo", "amizades", "companheiro", "relacionamentos"],
+    cura: ["doença", "enfermidade", "saúde", "dor", "medicina"],
+    tentacao: ["tentação", "vício", "pecado", "fraqueza", "queda"],
+    paciencia: ["paciência", "esperar", "pressa", "irritação", "raiva"],
+    orgulho: ["orgulho", "vaidade", "arrogância", "humildade"],
+    raiva: ["ira", "ódio", "ressentimento", "vingança"],
+    injustica: ["injustiça", "opressão", "sofrimento", "perseguição"],
+    solidao: ["solidão", "sozinho", "abandono", "rejeição"],
+    casamento: ["casamento", "namoro", "noivado", "conflito", "briga", "divórcio"],
+  },
+
+  // -------------------------
+  // BASE DE CONHECIMENTO POR TÓPICOS
+  // refs: referências
+  // summary: ideia geral (sem citação literal)
+  // practice: prática sugerida (oração/ação)
+  // -------------------------
   topicMap: {
-    'ansiedade': ['Filipenses 4:6-7', '1 Pedro 5:7', 'Mateus 6:25-34', 'Salmos 94:19'],
-    'medo': ['Isaías 41:10', 'Salmos 23:4', '2 Timóteo 1:7', 'Salmos 27:1', 'Josué 1:9'],
-    'amor': ['1 Coríntios 13:4-7', 'João 3:16', '1 João 4:8', 'Romanos 8:38-39', 'Provérbios 10:12'],
-    'dinheiro': ['Hebreus 13:5', '1 Timóteo 6:10', 'Provérbios 22:7', 'Mateus 6:24', 'Eclesiastes 5:10'],
-    'tristeza': ['Salmos 34:18', 'Mateus 5:4', 'Apocalipse 21:4', 'Salmos 147:3', 'João 16:22'],
-    'proposito': ['Jeremias 29:11', 'Efésios 2:10', 'Romanos 8:28', 'Provérbios 19:21', 'Eclesiastes 3:1'],
-    'perdao': ['1 João 1:9', 'Mateus 6:14-15', 'Efésios 4:32', 'Colossenses 3:13', 'Miqueias 7:18'],
-    'fe': ['Hebreus 11:1', 'Marcos 11:22-24', 'Romanos 10:17', 'Tiago 2:14-26', '2 Coríntios 5:7'],
-    'esperanca': ['Romanos 15:13', 'Isaías 40:31', 'Lamentações 3:21-23', 'Salmos 39:7'],
-    'paz': ['João 14:27', 'Filipenses 4:7', 'Isaías 26:3', 'Mateus 5:9', 'Salmos 29:11'],
-    'sabedoria': ['Tiago 1:5', 'Provérbios 1:7', 'Provérbios 3:13-18', 'Colossenses 2:2-3'],
-    'gratidao': ['1 Tessalonicenses 5:18', 'Salmos 107:1', 'Colossenses 3:17', 'Salmos 118:24'],
-    'familia': ['Êxodo 20:12', 'Provérbios 22:6', 'Efésios 6:1-4', 'Salmos 127:3-5', 'Gênesis 2:24'],
-    'trabalho': ['Colossenses 3:23', 'Provérbios 14:23', '2 Tessalonicenses 3:10', 'Salmos 90:17'],
-    'amizade': ['Provérbios 17:17', 'Provérbios 27:17', 'Eclesiastes 4:9-10', 'João 15:13'],
-    'cura': ['Jeremias 17:14', 'Tiago 5:14-15', 'Salmos 103:2-3', 'Isaías 53:5']
+    ansiedade: {
+      refs: ["Filipenses 4:6-7", "1 Pedro 5:7", "Mateus 6:25-34", "Salmos 94:19", "Salmos 55:22"],
+      summary: "Deus convida você a trocar a ansiedade por oração, entrega e confiança. A paz vem como guarda do coração e da mente.",
+      practice: [
+        "Transforme preocupação em oração objetiva (o que você quer pedir?).",
+        "Anote 3 coisas fora do seu controle e entregue a Deus conscientemente.",
+        "Respire fundo e repita: 'Eu confio no cuidado de Deus hoje.'"
+      ]
+    },
+    medo: {
+      refs: ["Isaías 41:10", "Salmos 23:4", "2 Timóteo 1:7", "Salmos 27:1", "Josué 1:9"],
+      summary: "O medo perde força quando você lembra quem está com você. Coragem bíblica não é ausência de medo, é fé em meio a ele.",
+      practice: [
+        "Nomeie o medo (o que exatamente você teme?).",
+        "Ore pedindo força e clareza para dar o próximo passo pequeno.",
+        "Evite decisões grandes no pico do medo; primeiro acalme o coração."
+      ]
+    },
+    amor: {
+      refs: ["1 Coríntios 13:4-7", "João 3:16", "1 João 4:8", "Romanos 8:38-39", "Provérbios 10:12"],
+      summary: "O amor bíblico é atitude: paciente, bondoso, firme, que perdoa e busca o bem do outro.",
+      practice: [
+        "Escolha uma ação concreta de amor hoje (mensagem, ajuda, perdão).",
+        "Evite revidar no impulso; responda com mansidão.",
+        "Ore por alguém difícil (isso muda você por dentro)."
+      ]
+    },
+    dinheiro: {
+      refs: ["Hebreus 13:5", "1 Timóteo 6:10", "Provérbios 22:7", "Mateus 6:24", "Eclesiastes 5:10", "Provérbios 21:5"],
+      summary: "Dinheiro é ferramenta, não senhor. Contentamento, prudência e generosidade protegem o coração.",
+      practice: [
+        "Faça um plano simples: renda, gastos fixos, dívidas, prioridade do mês.",
+        "Evite compras emocionais: espere 24h antes de decidir.",
+        "Separe um valor (mesmo pequeno) para generosidade."
+      ]
+    },
+    tristeza: {
+      refs: ["Salmos 34:18", "Mateus 5:4", "Apocalipse 21:4", "Salmos 147:3", "João 16:22"],
+      summary: "Deus se aproxima do coração quebrado. A tristeza não é o fim da história; há consolo e esperança.",
+      practice: [
+        "Fale com Deus sem filtro (lamento é bíblico).",
+        "Procure uma pessoa de confiança; isolamento piora.",
+        "Durma e coma minimamente bem: corpo e alma se afetam."
+      ]
+    },
+    proposito: {
+      refs: ["Jeremias 29:11", "Efésios 2:10", "Romanos 8:28", "Provérbios 19:21", "Eclesiastes 3:1"],
+      summary: "Propósito não é só 'grande missão'; é fidelidade diária, passos guiados por Deus e boas obras preparadas.",
+      practice: [
+        "Pergunte: 'Que bem eu posso fazer hoje, com o que tenho agora?'",
+        "Escreva 1 dom + 1 dor + 1 oportunidade → uma direção possível.",
+        "Peça sabedoria para o próximo passo, não para o mapa inteiro."
+      ]
+    },
+    perdao: {
+      refs: ["1 João 1:9", "Mateus 6:14-15", "Efésios 4:32", "Colossenses 3:13", "Miqueias 7:18"],
+      summary: "Perdão não é negar a dor, é soltar a dívida moral e deixar Deus tratar justiça e cura.",
+      practice: [
+        "Confesse a Deus o que te feriu e o que você sente de verdade.",
+        "Decida não alimentar vingança (perdão é um processo).",
+        "Se for seguro, estabeleça limites saudáveis."
+      ]
+    },
+    fe: {
+      refs: ["Hebreus 11:1", "Marcos 11:22-24", "Romanos 10:17", "Tiago 2:14-26", "2 Coríntios 5:7", "Marcos 9:24"],
+      summary: "Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva gera frutos, não só discurso.",
+      practice: [
+        "Leia um trecho curto e aplique 1 coisa prática hoje.",
+        "Ore: 'Senhor, eu creio; ajuda minha incredulidade.'",
+        "Aproxime-se de uma comunidade/irmãos na fé."
+      ]
+    },
+    esperanca: {
+      refs: ["Romanos 15:13", "Isaías 40:31", "Lamentações 3:21-23", "Salmos 39:7", "1 Pedro 1:3"],
+      summary: "Esperança bíblica não é otimismo vazio: é certeza de que Deus é fiel e renova suas misericórdias.",
+      practice: [
+        "Troque 'nunca vai mudar' por 'um dia de cada vez'.",
+        "Liste 3 evidências de cuidado de Deus no passado.",
+        "Faça uma oração curta de esperança pela manhã."
+      ]
+    },
+    paz: {
+      refs: ["João 14:27", "Filipenses 4:7", "Isaías 26:3", "Mateus 5:9", "Salmos 29:11"],
+      summary: "A paz de Cristo não depende do caos externo; ela vem da confiança e do foco em Deus.",
+      practice: [
+        "Diminua estímulos por 15 min (silêncio).",
+        "Ore e entregue o que te agita.",
+        "Faça a próxima coisa certa, sem antecipar o amanhã."
+      ]
+    },
+    sabedoria: {
+      refs: ["Tiago 1:5", "Provérbios 1:7", "Provérbios 3:13-18", "Colossenses 2:2-3", "Provérbios 11:14"],
+      summary: "Sabedoria começa no temor do Senhor e cresce com conselho, prudência e discernimento.",
+      practice: [
+        "Peça sabedoria específica (não genérica).",
+        "Consulte alguém maduro antes de decisão grande.",
+        "Pergunte: isso me aproxima de Deus ou só do ego?"
+      ]
+    },
+    gratidao: {
+      refs: ["1 Tessalonicenses 5:18", "Salmos 107:1", "Colossenses 3:17", "Salmos 118:24", "Filipenses 4:4"],
+      summary: "Gratidão reposiciona o coração: você passa a enxergar o bem mesmo em tempos difíceis.",
+      practice: [
+        "Anote 3 motivos reais de gratidão agora.",
+        "Agradeça uma pessoa diretamente.",
+        "Louvor em voz baixa muda o clima interno."
+      ]
+    },
+
+    // Tópicos novos (bem úteis)
+    tentacao: {
+      refs: ["1 Coríntios 10:13", "Tiago 1:13-15", "Mateus 26:41", "Salmos 119:9-11"],
+      summary: "Tentação é real, mas Deus dá escape. Vigilância, oração e Palavra fortalecem.",
+      practice: [
+        "Identifique gatilhos (horário, lugar, emoção).",
+        "Corte o caminho do pecado antes da queda.",
+        "Peça ajuda (prestação de contas) se for vício recorrente."
+      ]
+    },
+    raiva: {
+      refs: ["Efésios 4:26-27", "Provérbios 15:1", "Tiago 1:19-20", "Romanos 12:19"],
+      summary: "Raiva pode virar pecado quando domina. A Bíblia ensina mansidão, autocontrole e justiça nas mãos de Deus.",
+      practice: [
+        "Espere 10 minutos antes de responder.",
+        "Fale firme sem ferir (verdade com amor).",
+        "Entregue a vingança a Deus."
+      ]
+    },
+    solidao: {
+      refs: ["Salmos 68:6", "Hebreus 13:5", "Mateus 28:20", "Salmos 23:1-4"],
+      summary: "Deus não abandona. Ele também cria família espiritual e laços reais para sustentar você.",
+      practice: [
+        "Procure um grupo/comunidade (não caminhe só).",
+        "Mande mensagem para 1 pessoa hoje.",
+        "Ore pedindo conexões saudáveis."
+      ]
+    },
+    paciencia: {
+      refs: ["Gálatas 5:22-23", "Romanos 5:3-5", "Tiago 1:2-4", "Salmos 37:7"],
+      summary: "Paciência é fruto do Espírito e é forjada em processo, não em atalhos.",
+      practice: [
+        "Troque pressa por consistência.",
+        "Aceite o 'processo' como parte do crescimento.",
+        "Faça pequenas escolhas certas repetidas."
+      ]
+    },
+    casamento: {
+      refs: ["Efésios 5:25-33", "1 Coríntios 13:4-7", "Colossenses 3:13-14", "Provérbios 15:1"],
+      summary: "Relacionamento saudável exige amor sacrificial, perdão, conversa honesta e mansidão.",
+      practice: [
+        "Ouça para entender, não para vencer.",
+        "Peça perdão rápido, sem justificar demais.",
+        "Conversem sobre expectativas e limites."
+      ]
+    }
   },
 
-  // Resumos dos Livros da Bíblia
+  // -------------------------
+  // LIVROS (resumo + temas + como ler)
+  // (Você pode adicionar o resto depois; estrutura já pronta)
+  // -------------------------
   bookMap: {
-    'gênesis': '📖 <strong>Gênesis (O Início)</strong><br><br>É o livro das origens. Narra a criação do universo, a queda da humanidade, o dilúvio e a história dos patriarcas: Abraão, Isaque, Jacó e José. É o fundamento de toda a história bíblica.',
-    'êxodo': '📖 <strong>Êxodo (A Saída)</strong><br><br>Relata a libertação do povo de Israel da escravidão no Egito, a travessia do Mar Vermelho, a entrega dos Dez Mandamentos no Monte Sinai e a construção do Tabernáculo.',
-    'levítico': '📖 <strong>Levítico (Santidade)</strong><br><br>Contém as leis sobre ofertas, sacerdócio e pureza, ensinando como um povo pode viver em santidade diante de Deus.',
-    'números': '📖 <strong>Números (A Jornada)</strong><br><br>Registra a peregrinação de Israel pelo deserto durante 40 anos rumo à Terra Prometida.',
-    'deuteronômio': '📖 <strong>Deuteronômio (A Lei Repetida)</strong><br><br>Moisés relembra a Lei para a nova geração antes da entrada em Canaã, exortando à obediência.',
-    'salmos': '📖 <strong>Salmos (Louvor)</strong><br><br>Uma coleção de 150 cânticos e orações que expressam emoções humanas diante de Deus: louvor, lamento, gratidão e confiança.',
-    'provérbios': '📖 <strong>Provérbios (Sabedoria)</strong><br><br>Ditos práticos para viver com sabedoria, justiça e temor ao Senhor no dia a dia.',
-    'mateus': '📖 <strong>Mateus</strong><br><br>O Evangelho que apresenta Jesus como o Rei Messias prometido, cumprindo as profecias do Antigo Testamento.',
-    'marcos': '📖 <strong>Marcos</strong><br><br>Um evangelho dinâmico focado nas ações e milagres de Jesus como o Servo Sofredor.',
-    'lucas': '📖 <strong>Lucas</strong><br><br>Destaca a humanidade de Jesus e sua compaixão pelos marginalizados, pobres e perdidos.',
-    'joão': '📖 <strong>João</strong><br><br>Foca na divindade de Jesus ("O Verbo"), seus discursos profundos e os sinais que provam que Ele é o Filho de Deus.',
-    'atos': '📖 <strong>Atos dos Apóstolos</strong><br><br>A história do nascimento da Igreja, a descida do Espírito Santo e a expansão do Evangelho pelo mundo.',
-    'romanos': '📖 <strong>Romanos</strong><br><br>A carta magna da fé cristã, explicando o plano da salvação, a justificação pela fé e a vida no Espírito.',
-    'apocalipse': '📖 <strong>Apocalipse (Revelação)</strong><br><br>Visões proféticas sobre o fim dos tempos, o triunfo final de Cristo sobre o mal e a Nova Jerusalém.'
-  },
-
-  // Cache para evitar requisições repetidas
-  verseCache: {},
-
-  // Busca o texto do versículo na API
-  async getVerseText(reference) {
-    if (this.verseCache[reference]) return this.verseCache[reference];
-
-    try {
-      // Usa bible-api.com com tradução Almeida (português)
-      const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}?translation=almeida`);
-      if (!response.ok) throw new Error('Erro na API');
-      const data = await response.json();
-      
-      const text = data.text.trim();
-      this.verseCache[reference] = text;
-      return text;
-    } catch (e) {
-      console.warn('Erro ao buscar versículo:', e);
-      return null;
+    "gênesis": {
+      title: "Gênesis (O Início)",
+      summary: "Origens: criação, queda, dilúvio, patriarcas (Abraão, Isaque, Jacó, José). Base do plano redentor.",
+      themes: ["Criação e propósito", "Pecado e promessa", "Aliança", "Fé e providência"],
+      readTip: "Leia em blocos: 1–11 (origens) e 12–50 (patriarcas)."
+    },
+    "êxodo": {
+      title: "Êxodo (A Saída)",
+      summary: "Libertação do Egito, aliança no Sinai, Lei, tabernáculo e presença de Deus com o povo.",
+      themes: ["Libertação", "Aliança", "Santidade", "Adoração"],
+      readTip: "Repare no padrão: clamor → libertação → identidade → lei → presença."
+    },
+    "levítico": {
+      title: "Levítico (Santidade)",
+      summary: "Leis de pureza, sacrifícios e sacerdócio. Ensina que Deus é santo e aproximação exige reverência.",
+      themes: ["Santidade", "Sacrifício", "Pureza", "Adoração"],
+      readTip: "Leia com o foco: o que isso revela sobre Deus e sobre a seriedade do pecado?"
+    },
+    "números": {
+      title: "Números (A Jornada)",
+      summary: "Peregrinação no deserto. Rebeldia, disciplina e fidelidade de Deus apesar da infidelidade humana.",
+      themes: ["Deserto", "Obediência", "Liderança", "Consequências"],
+      readTip: "Observe o contraste: fidelidade de Deus vs. instabilidade do povo."
+    },
+    "deuteronômio": {
+      title: "Deuteronômio (A Lei Relembrada)",
+      summary: "Discursos finais de Moisés: aliança, obediência, amor a Deus e preparação para Canaã.",
+      themes: ["Aliança", "Obediência", "Amor a Deus", "Memória"],
+      readTip: "Leia como 'renovação de compromisso' e princípios para a vida."
+    },
+    "salmos": {
+      title: "Salmos (Louvor e Lamento)",
+      summary: "Orações e cânticos: alegria, dor, arrependimento, esperança e adoração.",
+      themes: ["Adoração", "Lamento", "Confiança", "Reino de Deus"],
+      readTip: "Use como oração: transforme o salmo em palavras suas."
+    },
+    "provérbios": {
+      title: "Provérbios (Sabedoria Prática)",
+      summary: "Sabedoria para decisões, palavras, trabalho, relacionamentos e caráter.",
+      themes: ["Temor do Senhor", "Prudência", "Disciplina", "Palavras"],
+      readTip: "Leia 1 capítulo por dia (31 capítulos)."
+    },
+    "mateus": {
+      title: "Mateus",
+      summary: "Jesus como Rei-Messias prometido. Ênfase no Reino e cumprimento das profecias.",
+      themes: ["Reino dos céus", "Cumprimento profético", "Discipulado"],
+      readTip: "Destaque o Sermão do Monte (caps. 5–7)."
+    },
+    "marcos": {
+      title: "Marcos",
+      summary: "Evangelho rápido e objetivo: ações e autoridade de Jesus como Servo.",
+      themes: ["Autoridade de Jesus", "Serviço", "Fé prática"],
+      readTip: "Perceba o ritmo: milagres → confronto → cruz → ressurreição."
+    },
+    "lucas": {
+      title: "Lucas",
+      summary: "Jesus como Salvador compassivo, com atenção aos excluídos e detalhes históricos.",
+      themes: ["Compaixão", "Salvação", "Alegria", "Espírito Santo"],
+      readTip: "Observe as parábolas exclusivas (Bom Samaritano, Filho Pródigo)."
+    },
+    "joão": {
+      title: "João",
+      summary: "Ênfase na divindade de Jesus e nos sinais para crer. Linguagem profunda e pastoral.",
+      themes: ["Eu Sou", "Sinais", "Vida eterna", "Amor"],
+      readTip: "Leia devagar e medite nos discursos (caps. 13–17)."
+    },
+    "atos": {
+      title: "Atos dos Apóstolos",
+      summary: "Nascimento e expansão da Igreja pelo Espírito Santo; Pedro e Paulo em missão.",
+      themes: ["Espírito Santo", "Missão", "Igreja", "Coragem"],
+      readTip: "Anote: onde o Evangelho chegou e o que mudou nas pessoas."
+    },
+    "romanos": {
+      title: "Romanos",
+      summary: "Explica o evangelho: pecado, graça, fé, justificação e vida no Espírito.",
+      themes: ["Justificação", "Graça", "Santificação", "Vida no Espírito"],
+      readTip: "Leia em partes: 1–3 (problema), 4–8 (solução), 9–11 (Israel), 12–16 (prática)."
+    },
+    "apocalipse": {
+      title: "Apocalipse (Revelação)",
+      summary: "Visões sobre conflito espiritual, perseverança e vitória final de Cristo.",
+      themes: ["Perseverança", "Justiça", "Esperança", "Reino final"],
+      readTip: "Leia com foco: consolo e esperança para a igreja perseguida."
     }
   },
 
-  // Tenta responder usando a base local ou API
-  async ask(question) {
-    const lowerQ = question.toLowerCase().trim();
-    
-    // 0. Verifica se é uma pergunta sobre um livro específico
-    for (const [book, summary] of Object.entries(this.bookMap)) {
-      if (lowerQ.includes(book)) {
-        return `${summary}<br><br>💡 Quer ler um capítulo? Tente pesquisar no Google por enquanto, em breve trarei o texto completo!`;
+  // -------------------------
+  // PERSONAGENS
+  // -------------------------
+  characterMap: {
+    "mateus": {
+      who: "Mateus (Levi) foi um dos 12 apóstolos e tradicionalmente considerado autor do Evangelho de Mateus.",
+      call: "Chamado enquanto era cobrador de impostos; largou tudo para seguir Jesus (Mt 9:9).",
+      role: "Escreve com foco em leitores judeus, enfatizando Jesus como Messias e Rei."
+    },
+    "pedro": {
+      who: "Simão Pedro, pescador da Galileia, tornou-se liderança apostólica na igreja primitiva.",
+      call: "Chamado por Jesus no trabalho; 'pescador de homens' (Mt 4:19).",
+      role: "Pregou no Pentecostes e ajudou a abrir portas para judeus e gentios."
+    },
+    "paulo": {
+      who: "Paulo de Tarso (Saulo) foi fariseu e perseguidor; convertido, virou grande missionário aos gentios.",
+      call: "Encontro com Cristo no caminho de Damasco (At 9).",
+      role: "Plantou igrejas e escreveu cartas fundamentais do NT."
+    },
+    "davi": {
+      who: "Rei de Israel; pastor que se tornou líder. Figura central na linhagem messiânica.",
+      call: "Ungido por Samuel ainda jovem (1Sm 16).",
+      role: "Unificou Israel, escreveu muitos salmos e apontou para o reinado de Cristo."
+    },
+    "moisés": {
+      who: "Libertador e legislador; liderou Israel na saída do Egito.",
+      call: "Chamado na sarça ardente (Êx 3).",
+      role: "Mediador da aliança no Sinai; conduziu o povo no deserto."
+    },
+    "joão": {
+      who: "Apóstolo, conhecido como 'discípulo amado'.",
+      call: "Chamado ainda jovem, deixou as redes para seguir Jesus.",
+      role: "Escreveu Evangelho de João, cartas e Apocalipse; ênfase em amor e verdade."
+    },
+
+    // extras (muito úteis)
+    "abraão": {
+      who: "Patriarca da fé; recebeu promessas e alianças que moldam toda a história bíblica.",
+      call: "Chamado a sair da sua terra e confiar na promessa (Gn 12).",
+      role: "Exemplo de fé e obediência; pai de muitas nações."
+    },
+    "josé": {
+      who: "Filho de Jacó; vendido pelos irmãos, tornou-se governador no Egito.",
+      call: "Vida guiada por providência mesmo em sofrimento (Gn 37–50).",
+      role: "Deus transformou mal em bem para salvar muitos."
+    },
+    "ester": {
+      who: "Rainha judia na Pérsia; corajosa em defender seu povo.",
+      call: "Assumiu risco para interceder diante do rei.",
+      role: "Exemplo de coragem, identidade e providência."
+    },
+    "daniel": {
+      who: "Exilado fiel na Babilônia; conhecido por integridade e oração.",
+      call: "Permaneceu firme sob pressão cultural.",
+      role: "Mostra fidelidade e soberania de Deus sobre reinos."
+    }
+  },
+
+  // -------------------------
+  // ALIAS DE LIVROS (abreviações e variações comuns)
+  // (serve pra reconhecer "jo", "joao", "1jo", "rm", etc.)
+  // -------------------------
+  bookAliases: {
+    "gênesis": ["genesis", "gn", "ge"],
+    "êxodo": ["exodo", "ex", "êx"],
+    "levítico": ["levitico", "lv", "lev"],
+    "números": ["numeros", "nm", "num"],
+    "deuteronômio": ["deuteronomio", "dt", "deut"],
+    "salmos": ["salmo", "sl", "sal", "ps", "psalm"],
+    "provérbios": ["proverbios", "pv", "prov"],
+    "mateus": ["mt", "mat"],
+    "marcos": ["mc", "mr", "marc"],
+    "lucas": ["lc", "lk"],
+    "joão": ["joao", "jo", "jn"],
+    "atos": ["at", "acts"],
+    "romanos": ["rm", "rom"],
+    "apocalipse": ["apoc", "ap", "rev", "revelacao", "revelação"],
+  },
+
+  // -------------------------
+  // UTIL: normalização de texto
+  // -------------------------
+  normalize(text = "") {
+    return String(text)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .replace(/[^\w\s:]/g, " ")       // remove pontuação (exceto :)
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  // -------------------------
+  // UTIL: debug
+  // -------------------------
+  debug(...args) {
+    if (this.config.enableDebug) console.log("[BibleAssistant]", ...args);
+  },
+
+  // -------------------------
+  // UTIL: fuzzy score simples (Jaccard + prefix bônus)
+  // -------------------------
+  fuzzyScore(a, b) {
+    a = this.normalize(a);
+    b = this.normalize(b);
+    if (!a || !b) return 0;
+
+    if (a === b) return 1;
+
+    const aWords = new Set(a.split(" "));
+    const bWords = new Set(b.split(" "));
+    let inter = 0;
+    for (const w of aWords) if (bWords.has(w)) inter++;
+
+    const union = aWords.size + bWords.size - inter;
+    const jacc = union ? inter / union : 0;
+
+    // bônus se um começa com o outro (bom pra "jo" -> "joao")
+    const prefixBonus =
+      (a.startsWith(b) || b.startsWith(a)) ? 0.15 : 0;
+
+    return Math.min(1, jacc + prefixBonus);
+  },
+
+  // -------------------------
+  // UTIL: encontra chave por aliases
+  // -------------------------
+  resolveBookName(input) {
+    const t = this.normalize(input);
+
+    // 1) Match direto pelo nome principal
+    for (const main of Object.keys(this.bookMap)) {
+      if (this.normalize(main) === t) return main;
+    }
+
+    // 2) Match por alias
+    for (const [main, aliases] of Object.entries(this.bookAliases)) {
+      for (const al of aliases) {
+        if (this.normalize(al) === t) return main;
       }
     }
-    
-    // 1. Verifica tópicos mapeados
-    let foundTopic = null;
+
+    // 3) Fuzzy match (aproximação)
+    let best = { name: null, score: 0 };
+    for (const main of Object.keys(this.bookMap)) {
+      const score = this.fuzzyScore(t, main);
+      if (score > best.score) best = { name: main, score };
+    }
+    if (best.score >= this.config.minFuzzyScore) return best.name;
+
+    return null;
+  },
+
+  // -------------------------
+  // UTIL: resolve tópico via sinônimos
+  // -------------------------
+  resolveTopic(input) {
+    const t = this.normalize(input);
+
+    // 1) Se o texto já contém a chave exata do tópico
     for (const topic of Object.keys(this.topicMap)) {
-      if (lowerQ.includes(topic)) {
-        foundTopic = topic;
-        break;
+      if (t.includes(this.normalize(topic))) return topic;
+    }
+
+    // 2) Se contém algum sinônimo
+    for (const [topic, syns] of Object.entries(this.synonyms)) {
+      for (const s of syns) {
+        if (t.includes(this.normalize(s))) return topic;
       }
     }
 
-    if (foundTopic) {
-      const refs = this.topicMap[foundTopic];
-      // Tenta até 3 vezes encontrar um versículo que a API retorne
-      for (let i = 0; i < 3; i++) {
-        const randomRef = refs[Math.floor(Math.random() * refs.length)];
-        const text = await this.getVerseText(randomRef);
-        
-        if (text) {
-          const responses = [
-            `A Bíblia tem uma palavra sobre <strong>${foundTopic}</strong> em <strong>${randomRef}</strong>:<br><br>"${text}"<br><br>🙏 Que isso te traga luz!`,
-            `Veja o que diz em <strong>${randomRef}</strong> sobre isso:<br><br>"${text}"<br><br>✨ Deus está contigo.`,
-            `Encontrei essa passagem em <strong>${randomRef}</strong>:<br><br>"${text}"<br><br>🕊️ Espero que ajude.`
-          ];
-          return responses[Math.floor(Math.random() * responses.length)];
-        }
-      }
+    // 3) fuzzy contra chaves de tópico
+    let best = { topic: null, score: 0 };
+    for (const topic of Object.keys(this.topicMap)) {
+      const score = this.fuzzyScore(t, topic);
+      if (score > best.score) best = { topic, score };
     }
+    if (best.score >= this.config.minFuzzyScore) return best.topic;
 
-    // 2. Verifica se é um pedido de versículo aleatório
-    if (lowerQ.includes('versículo do dia') || lowerQ.includes('aleatório') || lowerQ.includes('palavra de deus')) {
-      return await this.getRandomVerse();
-    }
-
-    // 3. Resposta genérica humana se não encontrar
-    return "Essa é uma pergunta profunda. A Bíblia é vasta e cheia de sabedoria. Posso não ter o versículo exato agora, mas lembre-se que a Palavra de Deus é lâmpada para os nossos pés. Tente perguntar sobre 'amor', 'ansiedade', 'medo' ou peça um 'versículo do dia'! 🙏";
+    return null;
   },
 
-  async getRandomVerse() {
-    try {
-      const response = await fetch('https://www.abibliadigital.com.br/api/verses/nvi/random');
-      const data = await response.json();
-      return `📖 <strong>${data.book.name} ${data.chapter}:${data.number}</strong><br><br>"${data.text}"<br><br>🙏 Palavra do dia para você!`;
-    } catch (e) {
-      // Fallback para bible-api se falhar
-      try {
-        const fallback = await fetch('https://bible-api.com/john+3:16?translation=almeida');
-        const data = await fallback.json();
-        return `📖 <strong>João 3:16</strong><br><br>"${data.text.trim()}"<br><br>🙏 Deus te abençoe!`;
-      } catch (err) {
-        return "Salmos 23:1 - 'O Senhor é o meu pastor; de nada terei falta.' (Estou offline, mas a Palavra está guardada no coração!)";
-      }
+  // -------------------------
+  // UTIL: resolve personagem
+  // -------------------------
+  resolveCharacter(input) {
+    const t = this.normalize(input);
+
+    // match direto
+    for (const name of Object.keys(this.characterMap)) {
+      if (t.includes(this.normalize(name))) return name;
     }
+
+    // fuzzy
+    let best = { name: null, score: 0 };
+    for (const name of Object.keys(this.characterMap)) {
+      const score = this.fuzzyScore(t, name);
+      if (score > best.score) best = { name, score };
+    }
+    if (best.score >= this.config.minFuzzyScore) return best.name;
+
+    return null;
+  },
+
+  // -------------------------
+  // PARSER de referência bíblica
+  // Ex: "joao 3:16", "Rm 8:28", "1jo 1:9", "1 joao 4:8"
+  // Retorna: { book, chapter, verseStart, verseEnd, raw } ou null
+  // -------------------------
+  parseReference(input) {
+    const raw = String(input || "");
+    const t = this.normalize(raw);
+
+    // padrões:
+    // 1) "1 joao 4:8" / "1joao 4:8" / "1 jo 4:8"
+    // 2) "joao 3:16-18"
+    // 3) "rm 8:28"
+    const refRegex = /^(\d{1}\s*)?([a-z\u00C0-\u017F]+)\s+(\d{1,3})\s*:\s*(\d{1,3})(?:\s*-\s*(\d{1,3}))?$/i;
+    const m = t.match(refRegex);
+    if (!m) return null;
+
+    const num = (m[1] || "").replace(/\s+/g, "").trim(); // "1"
+    const bookRaw = (m[2] || "").trim();
+    const chapter = parseInt(m[3], 10);
+    const verseStart = parseInt(m[4], 10);
+    const verseEnd = m[5] ? parseInt(m[5], 10) : null;
+
+    // tenta resolver livro com prefixo numérico (1 joão etc.)
+    // como seu bookMap não inclui "1 João", vamos manter "João" como livro base
+    // e colocar numPrefix no raw.
+    const bookName = this.resolveBookName(bookRaw);
+    if (!bookName) return null;
+
+    return {
+      raw,
+      numPrefix: num || null,
+      book: bookName,
+      chapter,
+      verseStart,
+      verseEnd
+    };
+  },
+
+  // -------------------------
+  // FORMATADORES (HTML)
+  // -------------------------
+  formatTopic(topicKey) {
+    const t = this.topicMap[topicKey];
+    if (!t) return this.formatNotFound(`Tópico "${topicKey}" não encontrado.`);
+
+    const refs = (t.refs || []).slice(0, this.config.maxRefsToShow);
+    const practices = (t.practice || []).slice(0, 4);
+
+    return `
+      <div>
+        <h3>${this.config.ui.topicIcon} Tema: ${this.escapeHtml(this.titleCase(topicKey))}</h3>
+        <p><strong>Resumo:</strong> ${this.escapeHtml(t.summary || "")}</p>
+
+        <p><strong>Referências:</strong><br>
+          ${refs.map(r => `• ${this.escapeHtml(r)}`).join("<br>")}
+        </p>
+
+        ${practices.length ? `
+          <p><strong>${this.config.ui.tipIcon} Práticas:</strong><br>
+            ${practices.map(p => `• ${this.escapeHtml(p)}`).join("<br>")}
+          </p>
+        ` : ""}
+
+        ${this.formatPrayerSuggestion(topicKey)}
+      </div>
+    `;
+  },
+
+  formatBook(bookKey) {
+    const b = this.bookMap[bookKey];
+    if (!b) return this.formatNotFound(`Livro "${bookKey}" não encontrado.`);
+
+    const themes = (b.themes || []).slice(0, 8);
+
+    return `
+      <div>
+        <h3>${this.config.ui.bookIcon} ${this.escapeHtml(b.title || this.titleCase(bookKey))}</h3>
+        <p>${this.escapeHtml(b.summary || "")}</p>
+
+        ${themes.length ? `
+          <p><strong>Temas:</strong><br>
+            ${themes.map(x => `• ${this.escapeHtml(x)}`).join("<br>")}
+          </p>
+        ` : ""}
+
+        ${b.readTip ? `<p><strong>${this.config.ui.tipIcon} Como ler:</strong> ${this.escapeHtml(b.readTip)}</p>` : ""}
+      </div>
+    `;
+  },
+
+  formatCharacter(nameKey) {
+    const c = this.characterMap[nameKey];
+    if (!c) return this.formatNotFound(`Personagem "${nameKey}" não encontrado.`);
+
+    return `
+      <div>
+        <h3>${this.config.ui.personIcon} Personagem: ${this.escapeHtml(this.titleCase(nameKey))}</h3>
+        <p><strong>Quem foi:</strong> ${this.escapeHtml(c.who || "")}</p>
+        <p><strong>Chamado:</strong> ${this.escapeHtml(c.call || "")}</p>
+        <p><strong>Papel:</strong> ${this.escapeHtml(c.role || "")}</p>
+      </div>
+    `;
+  },
+
+  formatReference(refObj) {
+    // Sem texto literal. Retorna referência formatada + dica do que fazer.
+    const prefix = refObj.numPrefix ? `${refObj.numPrefix} ` : "";
+    const range = refObj.verseEnd ? `${refObj.verseStart}-${refObj.verseEnd}` : `${refObj.verseStart}`;
+    const pretty = `${prefix}${this.titleCase(refObj.book)} ${refObj.chapter}:${range}`;
+
+    return `
+      <div>
+        <h3>${this.config.ui.okIcon} Referência detectada</h3>
+        <p><strong>${this.escapeHtml(pretty)}</strong></p>
+        <p>${this.config.ui.tipIcon} Dica: se você quiser, me diga o <em>tema</em> (ex: ansiedade, perdão, fé) e eu conecto essa referência com outras passagens relacionadas.</p>
+      </div>
+    `;
+  },
+
+  formatPrayerSuggestion(topicKey) {
+    const prayers = {
+      ansiedade: "Senhor, eu entrego minhas preocupações a Ti. Guarda meu coração com a Tua paz e me dá clareza para viver um passo de cada vez. Amém.",
+      medo: "Deus, fortalece meu coração. Ajuda-me a confiar na Tua presença e me dá coragem para fazer o que é certo. Amém.",
+      perdao: "Pai, cura meu coração e me ensina a perdoar como fui perdoado. Dá-me limites saudáveis e paz. Amém.",
+      tristeza: "Senhor, acolhe minha dor. Renova minha esperança e me sustenta hoje. Amém.",
+      fe: "Jesus, aumenta minha fé. Ajuda minha incredulidade e guia meus passos em obediência. Amém."
+    };
+    const p = prayers[topicKey];
+    if (!p) return "";
+    return `<p><strong>${this.config.ui.prayIcon} Oração sugerida:</strong> ${this.escapeHtml(p)}</p>`;
+  },
+
+  formatNotFound(message) {
+    return `
+      <div>
+        <h3>${this.config.ui.warnIcon} Não encontrei</h3>
+        <p>${this.escapeHtml(message || "Não consegui identificar sua pergunta.")}</p>
+        <p><strong>Você pode tentar assim:</strong><br>
+          • "tema ansiedade"<br>
+          • "resumo de romanos"<br>
+          • "quem foi paulo"<br>
+          • "joão 3:16"<br>
+          • "plano de leitura 7 dias"
+        </p>
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // UTIL: escape HTML
+  // -------------------------
+  escapeHtml(str) {
+    return String(str || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  },
+
+  titleCase(str) {
+    return String(str || "")
+      .toLowerCase()
+      .split(" ")
+      .map(w => w ? w[0].toUpperCase() + w.slice(1) : w)
+      .join(" ");
+  },
+
+  // -------------------------
+  // FUNÇÕES EXTRAS
+  // -------------------------
+  getRandomTopic() {
+    const keys = Object.keys(this.topicMap);
+    return keys[Math.floor(Math.random() * keys.length)];
+  },
+
+  getVerseOfTheDayHint() {
+    // Sem web; apenas escolhe uma referência forte
+    const pool = [
+      "Salmos 23:1-4",
+      "Filipenses 4:6-7",
+      "Romanos 8:28",
+      "João 14:27",
+      "Isaías 41:10",
+      "Mateus 6:33",
+      "1 Pedro 5:7",
+      "2 Timóteo 1:7"
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  },
+
+  buildReadingPlan(days = 7) {
+    // Plano simples e muito útil (pode ajustar)
+    // Retorna referências (não texto)
+    const plans = {
+      3: [
+        { day: 1, title: "Começo com Jesus", refs: ["Marcos 1", "João 1"] },
+        { day: 2, title: "Coração e sabedoria", refs: ["Salmos 23", "Provérbios 3"] },
+        { day: 3, title: "Fé e vida nova", refs: ["Romanos 8", "Filipenses 4"] }
+      ],
+      7: [
+        { day: 1, title: "Jesus e o Reino", refs: ["Mateus 5–7"] },
+        { day: 2, title: "Descanso e confiança", refs: ["Salmos 23", "Salmos 91"] },
+        { day: 3, title: "Sabedoria prática", refs: ["Provérbios 1–3"] },
+        { day: 4, title: "Vida no Espírito", refs: ["Romanos 8"] },
+        { day: 5, title: "Paz e alegria", refs: ["Filipenses 4"] },
+        { day: 6, title: "Amor que transforma", refs: ["1 Coríntios 13", "1 João 4"] },
+        { day: 7, title: "Esperança e perseverança", refs: ["Isaías 40", "Lamentações 3:21-23"] }
+      ],
+      14: [
+        { day: 1, title: "Começo", refs: ["Marcos 1–2"] },
+        { day: 2, title: "Jesus em ação", refs: ["Marcos 3–4"] },
+        { day: 3, title: "Fé e poder", refs: ["Marcos 5–6"] },
+        { day: 4, title: "Identidade e missão", refs: ["Marcos 7–8"] },
+        { day: 5, title: "Cruz e discipulado", refs: ["Marcos 9–10"] },
+        { day: 6, title: "Entrega final", refs: ["Marcos 11–12"] },
+        { day: 7, title: "Paixão e ressurreição", refs: ["Marcos 13–16"] },
+        { day: 8, title: "Sabedoria", refs: ["Provérbios 3–4"] },
+        { day: 9, title: "Oração e lamento", refs: ["Salmos 23", "Salmos 42"] },
+        { day: 10, title: "Evangelho explicado", refs: ["Romanos 1–3"] },
+        { day: 11, title: "Graça e fé", refs: ["Romanos 4–5"] },
+        { day: 12, title: "Nova vida", refs: ["Romanos 6–8"] },
+        { day: 13, title: "Vida prática", refs: ["Romanos 12"] },
+        { day: 14, title: "Paz e alegria", refs: ["Filipenses 4", "João 14"] }
+      ]
+    };
+
+    const chosen = plans[days] || plans[7];
+    return `
+      <div>
+        <h3>${this.config.ui.bookIcon} Plano de Leitura: ${days} dias</h3>
+        ${chosen.map(d => `
+          <p><strong>Dia ${d.day} — ${this.escapeHtml(d.title)}:</strong><br>
+          ${d.refs.map(r => `• ${this.escapeHtml(r)}`).join("<br>")}
+          </p>
+        `).join("")}
+        <p>${this.config.ui.tipIcon} Dica: após ler, me diga “o que isso significa?” ou “aplica na minha vida como?”</p>
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // DETECÇÃO DE INTENÇÃO + RESPOSTA
+  // -------------------------
+  reply(userText = "") {
+    const raw = String(userText || "");
+    const t = this.normalize(raw);
+
+    if (!t) return this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').");
+
+    // 1) Detecta pedido de plano
+    if (t.includes("plano") || t.includes("leitura") || t.includes("devocional")) {
+      // tenta capturar número de dias
+      const m = t.match(/(\d{1,3})\s*(dias|dia)/);
+      const days = m ? Math.max(3, Math.min(30, parseInt(m[1], 10))) : 7;
+      // temos planos 3,7,14 — se vier outro número, cai no 7
+      const normalizedDays = [3,7,14].includes(days) ? days : 7;
+      return this.buildReadingPlan(normalizedDays);
+    }
+
+    // 2) Detecta "versículo do dia"
+    if (t.includes("versiculo do dia") || t.includes("versículo do dia") || t.includes("hoje me da um versiculo") || t.includes("me da um versiculo")) {
+      const ref = this.getVerseOfTheDayHint();
+      return `
+        <div>
+          <h3>${this.config.ui.okIcon} Sugestão de hoje</h3>
+          <p><strong>${this.escapeHtml(ref)}</strong></p>
+          <p>${this.config.ui.tipIcon} Quer que eu conecte esse versículo com um tema (ansiedade, fé, paz, propósito…)?</p>
+        </div>
+      `;
+    }
+
+    // 3) Detecta referência tipo "João 3:16"
+    const refObj = this.parseReference(raw);
+    if (refObj) return this.formatReference(refObj);
+
+    // 4) Detecta livro ("resumo de romanos")
+    if (t.includes("resumo") || t.includes("livro") || t.includes("sobre o livro") || t.includes("o que fala")) {
+      // tenta pegar última palavra importante como candidato
+      const parts = t.split(" ");
+      const tail = parts.slice(-3).join(" "); // tentativa
+      const book = this.resolveBookName(tail) || this.resolveBookName(parts[parts.length - 1]) || this.resolveBookName(t);
+      if (book) return this.formatBook(book);
+    } else {
+      // mesmo sem "resumo", pode ter digitado só o nome do livro
+      const maybeBook = this.resolveBookName(t);
+      if (maybeBook) return this.formatBook(maybeBook);
+    }
+
+    // 5) Detecta personagem
+    if (t.includes("quem foi") || t.includes("quem e") || t.includes("personagem") || t.includes("historia de")) {
+      const candidate = t.replace("quem foi", "").replace("quem e", "").replace("historia de", "").trim();
+      const ch = this.resolveCharacter(candidate) || this.resolveCharacter(t);
+      if (ch) return this.formatCharacter(ch);
+    } else {
+      const maybeChar = this.resolveCharacter(t);
+      if (maybeChar) return this.formatCharacter(maybeChar);
+    }
+
+    // 6) Detecta tópico (principal)
+    const topic = this.resolveTopic(t);
+    if (topic) return this.formatTopic(topic);
+
+    // 7) fallback: sugerir opções próximas
+    const suggestions = this.suggest(t);
+    if (suggestions.length) {
+      return `
+        <div>
+          <h3>${this.config.ui.warnIcon} Não identifiquei com certeza</h3>
+          <p>Talvez você quis dizer:</p>
+          <p>${suggestions.map(s => `• ${this.escapeHtml(s)}`).join("<br>")}</p>
+          <p>${this.config.ui.tipIcon} Exemplos: "ansiedade", "resumo de romanos", "quem foi davi", "joão 3:16"</p>
+        </div>
+      `;
+    }
+
+    return this.formatNotFound("Não consegui identificar o tema/livro/personagem/referência.");
+  },
+
+  // -------------------------
+  // SUGESTÕES (tópicos, livros, personagens)
+  // -------------------------
+  suggest(input) {
+    const t = this.normalize(input);
+    const bag = [];
+
+    for (const k of Object.keys(this.topicMap)) bag.push({ type: "Tema", key: k, score: this.fuzzyScore(t, k) });
+    for (const k of Object.keys(this.bookMap)) bag.push({ type: "Livro", key: k, score: this.fuzzyScore(t, k) });
+    for (const k of Object.keys(this.characterMap)) bag.push({ type: "Pessoa", key: k, score: this.fuzzyScore(t, k) });
+
+    bag.sort((a, b) => b.score - a.score);
+    const top = bag.filter(x => x.score >= 0.45).slice(0, 5);
+
+    return top.map(x => `${x.type}: ${this.titleCase(x.key)} (${Math.round(x.score * 100)}%)`);
   }
 };
 
@@ -8793,7 +9579,7 @@ function injectBibleTab() {
     const content = document.createElement('div');
     content.id = 'tab-bible';
     content.className = 'tab-content';
-    content.style.cssText = 'padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;';
+    content.style.cssText = 'padding: 10px; height: 100%; overflow: hidden;';
     
     content.innerHTML = `
       <div class="bible-interface" style="width: 100%; max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.95); border-radius: 16px; padding: 15px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 100%; max-height: 100%;">
@@ -8850,7 +9636,7 @@ function injectBibleTab() {
         chat.scrollTop = chat.scrollHeight;
         
         // Bot Response
-        const response = await BibleAssistant.ask(text);
+        const response = BibleAssistant.reply(text);
         thinkingDiv.remove();
         
         const botDiv = document.createElement('div');
@@ -9584,6 +10370,7 @@ document.getElementById('drawerUpdateBtn')?.addEventListener('click', () => { cl
 document.getElementById('drawerExportBtn')?.addEventListener('click', () => { closeDrawer(); elements.exportBtn?.click(); });
 document.getElementById('drawerImportBtn')?.addEventListener('click', () => { closeDrawer(); elements.importBtn?.click(); });
 document.getElementById('drawerLogoutBtn')?.addEventListener('click', () => { closeDrawer(); logout(); });
+document.getElementById('drawerResetBtn')?.addEventListener('click', () => { closeDrawer(); resetAccount(); });
 
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {
