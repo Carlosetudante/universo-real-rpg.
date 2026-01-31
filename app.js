@@ -5607,6 +5607,13 @@ const OracleChat = {
     const file = event.target.files[0];
     if (!file) return;
     
+    // Suporte a PDF
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      this.processPdfUpload(file);
+      event.target.value = ''; // Limpa o input para permitir re-upload
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = (e) => {
       const content = e.target.result;
@@ -5643,6 +5650,51 @@ const OracleChat = {
     reader.readAsText(file);
   },
   
+  // Processa upload de PDF
+  async processPdfUpload(file) {
+    // Verifica se a biblioteca PDF.js está disponível
+    if (typeof pdfjsLib === 'undefined') {
+      this.addBotMessage(`⚠️ <strong>Biblioteca PDF não detectada!</strong><br>Para eu ler o arquivo <em>${file.name}</em>, você precisa adicionar o PDF.js no seu <code>index.html</code>.<br><br>Ou se preferir, crie um script <code>.json</code> com as informações principais!`);
+      return;
+    }
+
+    this.addBotMessage(`📖 Abrindo <strong>${file.name}</strong>...<br><em>Estudando o conteúdo (isso pode levar alguns segundos)...</em>`);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      
+      let fullText = '';
+      // Limite de segurança para não travar o navegador com arquivos gigantes
+      const maxPages = 50; 
+      const pagesToRead = Math.min(pdf.numPages, maxPages);
+      
+      if (pdf.numPages > maxPages) {
+        this.addBotMessage(`⚠️ O arquivo é muito grande (${pdf.numPages} páginas). Vou ler apenas as primeiras ${maxPages} páginas para não sobrecarregar sua memória.`);
+      }
+
+      for (let i = 1; i <= pagesToRead; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        fullText += strings.join(' ') + '\n';
+      }
+
+      // Envia o texto extraído para o processador de scripts
+      const result = OracleScript.processScriptFile(fullText, file.name);
+      
+      if (result.success) {
+        this.addBotMessage(`✅ <strong>Leitura concluída!</strong><br>Absorvi ${result.summary.facts} novos conhecimentos deste PDF.`);
+      } else {
+        this.addBotMessage(`❌ Não consegui extrair informações úteis deste PDF.`);
+      }
+    } catch (e) {
+      console.error(e);
+      this.addBotMessage(`❌ Erro ao ler PDF: ${e.message}`);
+    }
+  },
+
   toggle() {
     const modal = document.getElementById('chatModal');
     if (!modal) return;
@@ -8593,6 +8645,24 @@ const BibleAssistant = {
     'cura': ['Jeremias 17:14', 'Tiago 5:14-15', 'Salmos 103:2-3', 'Isaías 53:5']
   },
 
+  // Resumos dos Livros da Bíblia
+  bookMap: {
+    'gênesis': '📖 <strong>Gênesis (O Início)</strong><br><br>É o livro das origens. Narra a criação do universo, a queda da humanidade, o dilúvio e a história dos patriarcas: Abraão, Isaque, Jacó e José. É o fundamento de toda a história bíblica.',
+    'êxodo': '📖 <strong>Êxodo (A Saída)</strong><br><br>Relata a libertação do povo de Israel da escravidão no Egito, a travessia do Mar Vermelho, a entrega dos Dez Mandamentos no Monte Sinai e a construção do Tabernáculo.',
+    'levítico': '📖 <strong>Levítico (Santidade)</strong><br><br>Contém as leis sobre ofertas, sacerdócio e pureza, ensinando como um povo pode viver em santidade diante de Deus.',
+    'números': '📖 <strong>Números (A Jornada)</strong><br><br>Registra a peregrinação de Israel pelo deserto durante 40 anos rumo à Terra Prometida.',
+    'deuteronômio': '📖 <strong>Deuteronômio (A Lei Repetida)</strong><br><br>Moisés relembra a Lei para a nova geração antes da entrada em Canaã, exortando à obediência.',
+    'salmos': '📖 <strong>Salmos (Louvor)</strong><br><br>Uma coleção de 150 cânticos e orações que expressam emoções humanas diante de Deus: louvor, lamento, gratidão e confiança.',
+    'provérbios': '📖 <strong>Provérbios (Sabedoria)</strong><br><br>Ditos práticos para viver com sabedoria, justiça e temor ao Senhor no dia a dia.',
+    'mateus': '📖 <strong>Mateus</strong><br><br>O Evangelho que apresenta Jesus como o Rei Messias prometido, cumprindo as profecias do Antigo Testamento.',
+    'marcos': '📖 <strong>Marcos</strong><br><br>Um evangelho dinâmico focado nas ações e milagres de Jesus como o Servo Sofredor.',
+    'lucas': '📖 <strong>Lucas</strong><br><br>Destaca a humanidade de Jesus e sua compaixão pelos marginalizados, pobres e perdidos.',
+    'joão': '📖 <strong>João</strong><br><br>Foca na divindade de Jesus ("O Verbo"), seus discursos profundos e os sinais que provam que Ele é o Filho de Deus.',
+    'atos': '📖 <strong>Atos dos Apóstolos</strong><br><br>A história do nascimento da Igreja, a descida do Espírito Santo e a expansão do Evangelho pelo mundo.',
+    'romanos': '📖 <strong>Romanos</strong><br><br>A carta magna da fé cristã, explicando o plano da salvação, a justificação pela fé e a vida no Espírito.',
+    'apocalipse': '📖 <strong>Apocalipse (Revelação)</strong><br><br>Visões proféticas sobre o fim dos tempos, o triunfo final de Cristo sobre o mal e a Nova Jerusalém.'
+  },
+
   // Cache para evitar requisições repetidas
   verseCache: {},
 
@@ -8617,7 +8687,14 @@ const BibleAssistant = {
 
   // Tenta responder usando a base local ou API
   async ask(question) {
-    const lowerQ = question.toLowerCase();
+    const lowerQ = question.toLowerCase().trim();
+    
+    // 0. Verifica se é uma pergunta sobre um livro específico
+    for (const [book, summary] of Object.entries(this.bookMap)) {
+      if (lowerQ.includes(book)) {
+        return `${summary}<br><br>💡 Quer ler um capítulo? Tente pesquisar no Google por enquanto, em breve trarei o texto completo!`;
+      }
+    }
     
     // 1. Verifica tópicos mapeados
     let foundTopic = null;
@@ -8716,31 +8793,30 @@ function injectBibleTab() {
     const content = document.createElement('div');
     content.id = 'tab-bible';
     content.className = 'tab-content';
-    content.style.cssText = 'padding: 20px; height: 100%; overflow-y: auto;';
+    content.style.cssText = 'padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column;';
     
     content.innerHTML = `
-      <div class="bible-interface" style="max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.8); border-radius: 16px; padding: 20px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-        <div class="bible-header" style="text-align: center; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; position: relative;">
-          <h2 style="color: #ffdd57; margin: 0; font-family: serif;">✝️ Assistente Bíblico</h2>
-          <p style="opacity: 0.7; font-size: 0.9rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
+      <div class="bible-interface" style="width: 100%; max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.95); border-radius: 16px; padding: 15px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 100%; max-height: 100%;">
+        <div class="bible-header" style="text-align: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; flex-shrink: 0;">
+          <h2 style="color: #ffdd57; margin: 0; font-family: serif; font-size: 1.4rem;">✝️ Assistente Bíblico</h2>
+          <p style="opacity: 0.7; font-size: 0.8rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
         </div>
         
-        <div id="bibleChatArea" style="height: 400px; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
-          <div class="chat-message bot" style="align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%;">
-            Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Estou aqui para ajudar você a encontrar sabedoria na Palavra de Deus. O que gostaria de saber hoje?
+        <div id="bibleChatArea" style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="chat-message bot" style="align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 85%; font-size: 0.95rem;">
+            Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Posso explicar sobre livros (ex: "Gênesis"), temas (ex: "ansiedade") ou dar um versículo do dia.
           </div>
         </div>
 
-        <div class="bible-input-area" style="display: flex; gap: 10px; position: relative;">
-          <input type="text" id="bibleInput" placeholder="Ex: Versículos sobre ansiedade..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white;">
-          <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;">➤</button>
+        <div class="bible-input-area" style="display: flex; gap: 10px; position: relative; flex-shrink: 0;">
+          <input type="text" id="bibleInput" placeholder="Ex: Gênesis, Salmos..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white; font-size: 16px;">
+          <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">➤</button>
         </div>
         
-        <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 15px; overflow-x: auto; padding-bottom: 5px;">
-          <button class="btn ghost bible-tag" onclick="askBible('versículo do dia')" style="font-size: 0.8rem; white-space: nowrap;">📅 Versículo do Dia</button>
-          <button class="btn ghost bible-tag" onclick="askBible('sobre ansiedade')" style="font-size: 0.8rem; white-space: nowrap;">😰 Ansiedade</button>
-          <button class="btn ghost bible-tag" onclick="askBible('sobre amor')" style="font-size: 0.8rem; white-space: nowrap;">❤️ Amor</button>
-          <button class="btn ghost bible-tag" onclick="askBible('sobre propósito')" style="font-size: 0.8rem; white-space: nowrap;">🎯 Propósito</button>
+        <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 5px; flex-shrink: 0;">
+          <button class="btn ghost bible-tag" onclick="askBible('versículo do dia')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📅 Versículo</button>
+          <button class="btn ghost bible-tag" onclick="askBible('sobre ansiedade')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">😰 Ansiedade</button>
+          <button class="btn ghost bible-tag" onclick="askBible('Gênesis')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📖 Gênesis</button>
         </div>
       </div>
     `;
