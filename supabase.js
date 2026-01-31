@@ -379,6 +379,60 @@ async function addFinance(transaction) {
   return data;
 }
 
+// ===========================================
+// ORACLE / BIBLIA - helpers para conversas e memória
+// ===========================================
+async function saveOracleChatMessage(role, content, meta = {}) {
+  if (!isSupabaseConfigured() || !currentUser) return null;
+
+  const { data, error } = await supabaseClient
+    .from('oracle_messages')
+    .insert({ user_id: currentUser.id, role, content, meta })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao salvar oracle message:', error);
+    return null;
+  }
+  return data;
+}
+
+async function addOracleMemory(title, fact, tags = [], importance = 5) {
+  if (!isSupabaseConfigured() || !currentUser) return null;
+
+  const { data, error } = await supabaseClient
+    .from('oracle_memory')
+    .insert({ user_id: currentUser.id, title, fact, tags, importance })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao salvar oracle memory:', error);
+    return null;
+  }
+  return data;
+}
+
+async function searchOracleMemory(query) {
+  if (!isSupabaseConfigured() || !currentUser) return [];
+
+  // busca por título, tags ou texto do fato (fuzzy simples via ilike)
+  const { data, error } = await supabaseClient
+    .from('oracle_memory')
+    .select('*')
+    .or(`title.ilike.%${query}%,fact.ilike.%${query}%`) // simple OR
+    .eq('user_id', currentUser.id)
+    .order('importance', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('❌ Erro ao consultar oracle memory:', error);
+    return [];
+  }
+  return data || [];
+}
+
 async function deleteFinance(transactionId) {
   if (!currentUser) return;
 

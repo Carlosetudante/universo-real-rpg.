@@ -8738,7 +8738,7 @@ const BibleAssistant = {
     tristeza: ["depressão", "desânimo", "choro", "luto", "dor", "vazio", "coração partido"],
     proposito: ["propósito", "vocação", "chamado", "sentido", "missão", "direção", "plano"],
     perdao: ["perdão", "culpa", "arrependimento", "restauração", "reconciliação"],
-    fe: ["fé", "crer", "dúvida", "confiança", "incredulidade"],
+    fe: ["fé", "crer", "dúvida", "confiança", "incredulidade", "graca", "graça", "misericordia", "misericórdia"],
     esperanca: ["esperança", "futuro", "promessa", "desesperança"],
     paz: ["calma", "tranquilidade", "descanso", "shlom", "shalom", "serenidade"],
     sabedoria: ["decisão", "discernimento", "conselho", "prudência", "inteligência"],
@@ -8754,6 +8754,7 @@ const BibleAssistant = {
     injustica: ["injustiça", "opressão", "sofrimento", "perseguição"],
     solidao: ["solidão", "sozinho", "abandono", "rejeição"],
     casamento: ["casamento", "namoro", "noivado", "conflito", "briga", "divórcio"],
+    "novos mandamentos": ["mandamento novo", "novo mandamento", "amar uns aos outros", "amar ao próximo", "mandamentos de jesus"],
   },
 
   // -------------------------
@@ -8918,6 +8919,16 @@ const BibleAssistant = {
         "Conversem sobre expectativas e limites."
       ]
     }
+    ,
+    "novos mandamentos": {
+      refs: ["João 13:34-35", "João 15:12", "1 João 4:7-8"],
+      summary: "O 'mandamento novo' de Jesus resume-se em amar: amar a Deus e amar ao próximo com dedicação prática. Esse amor é a marca dos seus discípulos.",
+      practice: [
+        "Pratique um ato concreto de amor hoje (ouvir, perdoar, ajudar).",
+        "Peça perdão onde for necessário e ofereça perdão quando possível.",
+        "Sirva alguém sem esperar reconhecimento; observe como isso muda seu coração."
+      ]
+    }
   },
 
   // -------------------------
@@ -9009,6 +9020,127 @@ const BibleAssistant = {
       themes: ["Perseverança", "Justiça", "Esperança", "Reino final"],
       readTip: "Leia com foco: consolo e esperança para a igreja perseguida."
     }
+    ,
+    "1 coríntios": {
+      title: "1 Coríntios",
+      summary: "Carta de Paulo tratando divisões, moral, dons espirituais e a importância do amor sacrificial.",
+      themes: ["Comunidade", "Dons espirituais", "Amor", "Ressurreição"],
+      readTip: "Observe como a igreja prática precisa de ensino e amor mútuo."
+    },
+    "2 coríntios": {
+      title: "2 Coríntios",
+      summary: "Paulo defende seu ministério, fala de perdão, reconciliação e o conforto em meio ao sofrimento.",
+      themes: ["Ministério", "Sofrimento", "Reconciliação", "Generosidade"],
+      readTip: "Leia buscando entender a relação entre poder humano e graça de Deus."
+    },
+    "gálatas": {
+      title: "Gálatas",
+      summary: "Enfatiza a justificação pela fé, liberdade cristã e o perigo do legalismo.",
+      themes: ["Graça", "Liberdade", "Justificação", "Fruto do Espírito"],
+      readTip: "Preste atenção aos contrastes entre lei e graça."
+    },
+    "efésios": {
+      title: "Efésios",
+      summary: "Carta sobre a identidade em Cristo, unidade da igreja e instruções para vida familiar e comunitária.",
+      themes: ["Identidade", "Unidade", "Espiritualidade prática"],
+      readTip: "Leia devagar; há muita teologia prática aplicada à comunidade."
+    },
+    "filipenses": {
+      title: "Filipenses",
+      summary: "Carta de alegria e encorajamento: viver em humildade, alegria e foco em Cristo.",
+      themes: ["Alegria", "Humildade", "Chamado em Cristo"],
+      readTip: "Ótima para devoção: destaque versos de encorajamento."
+    },
+    "colossenses": {
+      title: "Colossenses",
+      summary: "Afirma a supremacia de Cristo e adverte contra filosofias que desviam da verdade do evangelho.",
+      themes: ["Supremacia de Cristo", "Doutrina", "Vida prática"],
+      readTip: "Observe como a teologia molda a conduta cristã."
+    },
+    "1 tessalonicenses": {
+      title: "1 Tessalonicenses",
+      summary: "Incentivo pastoral sobre fé, amor e esperança, com ensinamentos sobre a volta de Cristo.",
+      themes: ["Esperança", "Segurança" ,"Retorno de Cristo"],
+      readTip: "Leia para fortalecer esperança e vigilância cristã."
+    },
+    "2 tessalonicenses": {
+      title: "2 Tessalonicenses",
+      summary: "Complementa o ensino sobre a volta de Cristo e exorta à estabilidade e trabalho responsável.",
+      themes: ["Escatologia", "Perseverança", "Trabalho"],
+      readTip: "Útil para entender sinais e postura cristã diante de crises."
+    },
+    "1 timóteo": {
+      title: "1 Timóteo",
+      summary: "Instruções pastorais sobre liderança, culto e vida de igreja dirigidas a Timóteo.",
+      themes: ["Liderança", "Doutrina", "Disciplina"],
+      readTip: "Leia como manual prático para liderança e cuidado pastoral."
+    },
+    "2 timóteo": {
+      title: "2 Timóteo",
+      summary: "Últimas palavras de Paulo: perseverança, fidelidade às Escrituras e coragem no ministério.",
+      themes: ["Fidelidade", "Perseverança", "Escrituras"],
+      readTip: "Leia como encorajamento para ministério fiel mesmo em sofrimento."
+    },
+    "tito": {
+      title: "Tito",
+      summary: "Instruções práticas para organização de igrejas e ensino saudável em Creta.",
+      themes: ["Ordem eclesiástica", "Ensino", "Caráter"],
+      readTip: "Foque em como a doutrina molda a vida da comunidade."
+    },
+    "filemom": {
+      title: "Filemom",
+      summary: "Carta breve pedindo reconciliação entre Filemom e seu escravo irmão, mostrando poder transformador do evangelho.",
+      themes: ["Reconciliação", "Graça", "Relações pessoais"],
+      readTip: "Leia como exemplo prático de aplicação do evangelho em relações humanas."
+    },
+    "hebreus": {
+      title: "Hebreus",
+      summary: "Profunda exposição de Cristo como sumo sacerdote e superioridade da nova aliança sobre a antiga.",
+      themes: ["Cristologia", "Sacerdócio", "Perseverança"],
+      readTip: "Leia devagar; há tipologia e argumentos teológicos densos."
+    },
+    "tiago": {
+      title: "Tiago",
+      summary: "Foco em fé prática: fé que se demonstra em obras, sabedoria e controle da língua.",
+      themes: ["Sabedoria prática", "Ética", "Fé em ação"],
+      readTip: "Aplicável ao dia a dia; destaque instruções práticas."
+    },
+    "1 pedro": {
+      title: "1 Pedro",
+      summary: "Carta de encorajamento aos sofrimentos, chamada à santidade e esperança viva em Cristo.",
+      themes: ["Sofrimento", "Santidade", "Esperança"],
+      readTip: "Leia com foco em identidade e esperança no sofrimento."
+    },
+    "2 pedro": {
+      title: "2 Pedro",
+      summary: "Adverte contra falsos mestres e lembra da certeza da volta de Cristo.",
+      themes: ["Falsos mestres", "Escatologia", "Crescimento"],
+      readTip: "Útil para discernimento doutrinário."
+    },
+    "1 joão": {
+      title: "1 João",
+      summary: "Carta sobre amor, verdade e comunhão; reafirma que o critério da fé é o amor prático.",
+      themes: ["Amor", "Verdade", "Comunhão"],
+      readTip: "Leia para fortalecer vida relacional e discernimento."
+    },
+    "2 joão": {
+      title: "2 João",
+      summary: "Breve carta enfatizando amor e vigilância contra enganadores.",
+      themes: ["Amor", "Vigilância", "Evangelho"],
+      readTip: "Curta e direta; útil para advertência pastoral."
+    },
+    "3 joão": {
+      title: "3 João",
+      summary: "Carta sobre hospitalidade, apoio a missionários e cuidado com líderes fiéis.",
+      themes: ["Hospitalidade", "Suporte missionário", "Integridade"],
+      readTip: "Leia para exemplos práticos de apoio ao ministério."
+    },
+    "judas": {
+      title: "Judas",
+      summary: "Breve admoestação contra impostores que corrompem a fé; exorta a perseverar na verdade.",
+      themes: ["Contenção doutrinária", "Perseverança", "Santidade"],
+      readTip: "Leia para fortalecer vigilância doutrinária."
+    }
   },
 
   // -------------------------
@@ -9071,6 +9203,11 @@ const BibleAssistant = {
       who: "Exilado fiel na Babilônia; conhecido por integridade e oração.",
       call: "Permaneceu firme sob pressão cultural.",
       role: "Mostra fidelidade e soberania de Deus sobre reinos."
+    },
+    "maria": {
+      who: "Maria, mãe de Jesus, jovem de fé que respondeu ao chamado com submissão e confiança.",
+      call: "Chamado extraordinário ao papel de mãe do Messias; respondeu com 'faça-se em mim segundo a tua palavra' (Lucas).",
+      role: "Presente nos momentos de alegria e dor; exemplo de fé, serviço e perseverança diante do sofrimento."
     }
   },
 
@@ -9092,6 +9229,26 @@ const BibleAssistant = {
     "joão": ["joao", "jo", "jn"],
     "atos": ["at", "acts"],
     "romanos": ["rm", "rom"],
+    "1 coríntios": ["1 corintios", "1 cor", "1cor", "1corintios"],
+    "2 coríntios": ["2 corintios", "2 cor", "2cor", "2corintios"],
+    "gálatas": ["galatas", "gl"],
+    "efésios": ["efesios", "ef"],
+    "filipenses": ["filipenses", "flp", "fp"],
+    "colossenses": ["colossenses", "cl"],
+    "1 tessalonicenses": ["1 tessalonicenses", "1 tess", "1th"],
+    "2 tessalonicenses": ["2 tessalonicenses", "2 tess", "2th"],
+    "1 timóteo": ["1 timoteo", "1 tim", "1tm"],
+    "2 timóteo": ["2 timoteo", "2 tim", "2tm"],
+    "tito": ["tito"],
+    "filemom": ["filemom", "flm"],
+    "hebreus": ["hebreus", "hb"],
+    "tiago": ["tiago", "tg"],
+    "1 pedro": ["1 pedro", "1 pe", "1ptr"],
+    "2 pedro": ["2 pedro", "2 pe", "2ptr"],
+    "1 joão": ["1 joao", "1 jo", "1jn"],
+    "2 joão": ["2 joao", "2 jo", "2jn"],
+    "3 joão": ["3 joao", "3 jo", "3jn"],
+    "judas": ["judas", "jude"],
     "apocalipse": ["apoc", "ap", "rev", "revelacao", "revelação"],
   },
 
@@ -9221,6 +9378,129 @@ const BibleAssistant = {
   },
 
   // -------------------------
+  // MAPA DE NOMES EM HEBRAICO (forma, translit, significado)
+  // Priorize entradas aqui para intenções 'hebrew_name'
+  // -------------------------
+  hebrewNames: {
+    "joao": { heb: "יוֹחָנָן", translit: "Yôḥānān (Yohanan)", meaning: "YHWH foi gracioso" },
+    "joao batista": { heb: "יוֹחָנָן הַמַּטְבִּיל", translit: "Yôḥānān ha-Matbil", meaning: "João, o que batiza (o que imerge)" },
+    "joao apóstolo": { heb: "יוֹחָנָן", translit: "Yôḥānān (Yohanan)", meaning: "YHWH foi gracioso" },
+    "jesus": { heb: "יֵשׁוּעַ", translit: "Yeshua", meaning: "Salvação / o Senhor salva" },
+    "paulo": { heb: "שָׁאוּל", translit: "Sha'ul (Saul)", meaning: "Pedido/oração (Saul) — Paulo é forma latina" },
+    "pedro": { heb: "שִׁמְעוֹן", translit: "Shim'on (Simão)", meaning: "Ouvir / ouvinte" },
+    "maria": { heb: "מִרְיָם", translit: "Miryam", meaning: "Possivelmente 'amada' ou ligado a 'amar' (origem incerta)" }
+  },
+
+  // -------------------------
+  // DETECTA INTENÇÃO 'hebrew_name'
+  // Retorna { intent: 'hebrew_name', entity: 'joao' } ou null
+  // -------------------------
+  detectHebrewNameIntent(raw) {
+    if (!raw) return null;
+    const r = String(raw).trim();
+
+    // Padrões fortes
+    const patterns = [
+      /nome hebraico de\s+(.+)$/i,
+      /qual (?:é|e) o nome (?:em )?hebraico de\s+(.+)$/i,
+      /qual o nome de\s+(.+) em hebraico/i,
+      /escreva em hebraico\s+(.+)$/i,
+      /como escreve em hebraico\s+(.+)$/i
+    ];
+
+    for (const p of patterns) {
+      const m = r.match(p);
+      if (m && m[1]) {
+        // limpa instruções extras que users frequentemente adicionam
+        let ent = m[1].trim().replace(/[?.!]/g, "");
+        // remove frases como "escreva em hebraico" ou "escreva em hebraico e significado"
+        ent = ent.replace(/,?\s*escreva.*$/i, "");
+        ent = ent.replace(/,?\s*escreva em hebraico.*$/i, "");
+        // remove conteúdo entre parênteses e textos adicionais após vírgula
+        ent = ent.replace(/\(.*?\)/g, "").replace(/,.*$/g, "");
+        ent = ent.replace(/\s+$/g, "").trim();
+        return { intent: 'hebrew_name', entity: ent };
+      }
+    }
+
+    return null;
+  },
+
+  // -------------------------
+  // FORMATAÇÃO: resposta para intent = hebrew_name
+  // Regras aplicadas: desambiguação para 'João', bloqueio de Maria->Jesus
+  // -------------------------
+  formatHebrewName(rawEntity) {
+    if (!rawEntity) return this.formatNotFound('Sobre qual pessoa você quer o nome em hebraico? Ex: "João Batista".');
+
+    // limpa ruído comum (ex: "escreva em hebraico", parênteses, vírgulas)
+    let entity = String(rawEntity || '').replace(/,?\s*escreva.*$/i, '');
+    entity = entity.replace(/\(.*?\)/g, '').replace(/,.*$/g, '').trim();
+    const norm = this.normalize(entity);
+
+    // Desambiguação apenas se o usuário escreveu somente 'joao' sem contexto
+    if (norm === 'joao') {
+      return this.formatNotFound('Você quer "João Batista" ou "João apóstolo"? Escreva o suficiente para diferenciar (ex: "João Batista").');
+    }
+
+    // Garantia: se perguntar por 'maria', não roteie para Jesus
+    if (norm.includes('maria')) {
+      // normaliza para 'maria' exato
+      const key = 'maria';
+      const h = this.hebrewNames[key];
+      const bio = this.characterMap['maria'] || null;
+      const who = bio ? bio.who : 'Maria, conhecida na tradição cristã como mãe de Jesus, figura de fé e serviço.';
+      return `
+        <div>
+          <h3>${this.config.ui.personIcon} ${this.escapeHtml(this.titleCase(key))} — Nome em hebraico</h3>
+          <p><strong>Hebraico:</strong> ${this.escapeHtml(h.heb)} <small>(${this.escapeHtml(h.translit)})</small></p>
+          <p><strong>Significado:</strong> ${this.escapeHtml(h.meaning)}</p>
+          <p><strong>Caminhada:</strong> ${this.escapeHtml(who)}</p>
+        </div>
+      `;
+    }
+
+    // Tenta mapear por chave direta (comparando versões normalizadas das chaves)
+    let foundKey = null;
+    for (const k of Object.keys(this.hebrewNames)) {
+      if (this.normalize(k) === norm) { foundKey = k; break; }
+    }
+
+    // Se ainda não achou, tenta personagem exato (normalized)
+    if (!foundKey) {
+      for (const k of Object.keys(this.characterMap)) {
+        if (this.normalize(k) === norm) { foundKey = k; break; }
+      }
+    }
+
+    // fallback: fuzzy match against hebrewNames keys
+    if (!foundKey) {
+      let best = { k: null, score: 0 };
+      for (const k of Object.keys(this.hebrewNames)) {
+        const s = this.fuzzyScore(norm, this.normalize(k));
+        if (s > best.score) best = { k, score: s };
+      }
+      if (best.score >= 0.6) foundKey = best.k;
+    }
+
+    if (!foundKey) return this.formatNotFound(`Não encontrei o nome hebraico para "${rawEntity}". Tente escrever o nome completo (ex: "João Batista").`);
+
+    // Monta resposta
+    const h = this.hebrewNames[foundKey] || null;
+    const bio = this.characterMap[foundKey] || null;
+    const who = bio ? (bio.who + ' ' + (bio.call || '') + ' ' + (bio.role || '')) : '';
+
+    return `
+      <div>
+        <h3>${this.config.ui.personIcon} ${this.escapeHtml(this.titleCase(foundKey))} — Nome em hebraico</h3>
+        ${h ? `<p><strong>Hebraico:</strong> ${this.escapeHtml(h.heb)} <small>(${this.escapeHtml(h.translit)})</small></p>
+               <p><strong>Significado:</strong> ${this.escapeHtml(h.meaning)}</p>` : ''}
+        ${who ? `<p><strong>Caminhada (resumo):</strong> ${this.escapeHtml(who)}</p>` : `<p><em>Biografia não disponível; peça por "quem foi ${this.titleCase(foundKey)}" para mais detalhes.</em></p>`}
+      </div>
+    `;
+  },
+
+  // -------------------------
   // PARSER de referência bíblica
   // Ex: "joao 3:16", "Rm 8:28", "1jo 1:9", "1 joao 4:8"
   // Retorna: { book, chapter, verseStart, verseEnd, raw } ou null
@@ -9311,9 +9591,22 @@ const BibleAssistant = {
     `;
   },
 
-  formatCharacter(nameKey) {
+  async formatCharacter(nameKey) {
     const c = this.characterMap[nameKey];
     if (!c) return this.formatNotFound(`Personagem "${nameKey}" não encontrado.`);
+
+    // Tenta enriquecer com memórias do usuário (se o Supabase estiver configurado)
+    let extra = '';
+    try {
+      if (typeof searchOracleMemory === 'function') {
+        const mems = await searchOracleMemory(nameKey);
+        if (mems && mems.length) {
+          extra = '<p><strong>Memórias relacionadas:</strong><br>' + mems.map(m => `• ${this.escapeHtml(m.fact)} <small>(${this.escapeHtml(m.title)})</small>`).join('<br>') + '</p>';
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar memórias:', e);
+    }
 
     return `
       <div>
@@ -9321,6 +9614,8 @@ const BibleAssistant = {
         <p><strong>Quem foi:</strong> ${this.escapeHtml(c.who || "")}</p>
         <p><strong>Chamado:</strong> ${this.escapeHtml(c.call || "")}</p>
         <p><strong>Papel:</strong> ${this.escapeHtml(c.role || "")}</p>
+        ${extra}
+        <p><em>Dica:</em> Pergunte mais: "me conte mais sobre ${this.titleCase(nameKey)}" ou salve uma memória dizendo: "lembre que ${this.titleCase(nameKey)} foi..."</p>
       </div>
     `;
   },
@@ -9483,11 +9778,21 @@ const BibleAssistant = {
   // -------------------------
   // DETECÇÃO DE INTENÇÃO + RESPOSTA
   // -------------------------
-  reply(userText = "") {
+  async reply(userText = "") {
     const raw = String(userText || "");
     const t = this.normalize(raw);
 
     if (!t) return this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').");
+
+    // Prioridade: detectar pedido explícito de "nome hebraico"
+    try {
+      const heb = this.detectHebrewNameIntent(raw);
+      if (heb && heb.intent === 'hebrew_name') {
+        return this.formatHebrewName(heb.entity);
+      }
+    } catch (e) {
+      this.debug('Erro ao detectar hebrew_name', e);
+    }
 
     // 0) Detecta pedido de conhecimento
     if (t.includes("o que voce sabe") || t.includes("o que vc sabe") || t.includes("seu conhecimento") || t.includes("lista de topicos")) {
@@ -9537,10 +9842,10 @@ const BibleAssistant = {
     if (t.includes("quem foi") || t.includes("quem e") || t.includes("personagem") || t.includes("historia de")) {
       const candidate = t.replace("quem foi", "").replace("quem e", "").replace("historia de", "").trim();
       const ch = this.resolveCharacter(candidate) || this.resolveCharacter(t);
-      if (ch) return this.formatCharacter(ch);
+      if (ch) return await this.formatCharacter(ch);
     } else {
       const maybeChar = this.resolveCharacter(t);
-      if (maybeChar) return this.formatCharacter(maybeChar);
+      if (maybeChar) return await this.formatCharacter(maybeChar);
     }
 
     // 6) Detecta tópico (principal)
@@ -9669,7 +9974,6 @@ function injectBibleTab() {
         userDiv.style.cssText = 'align-self: flex-end; background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 12px 12px 0 12px; max-width: 80%;';
         userDiv.textContent = text;
         chat.appendChild(userDiv);
-        input.value = '';
         chat.scrollTop = chat.scrollHeight;
         
         // Bot Thinking
@@ -9680,15 +9984,41 @@ function injectBibleTab() {
         chat.appendChild(thinkingDiv);
         chat.scrollTop = chat.scrollHeight;
         
-        // Bot Response
-        const response = BibleAssistant.reply(text);
+        // Bot Response (agora assíncrono)
+        try {
+          if (typeof saveOracleChatMessage === 'function') {
+            saveOracleChatMessage('user', text).catch(e => console.warn('Erro ao salvar mensagem do usuário:', e));
+          }
+        } catch (e) {
+          console.warn('saveOracleChatMessage não disponível', e);
+        }
+
+        // limpar o input somente após enfileirar/salvar a mensagem do usuário
+        try { input.value = ''; } catch(e) { /* ignore */ }
+
+        const response = await BibleAssistant.reply(text);
         thinkingDiv.remove();
         
         const botDiv = document.createElement('div');
         botDiv.className = 'chat-message bot';
         botDiv.style.cssText = 'align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%; margin-top: 5px; line-height: 1.5;';
-        botDiv.innerHTML = response;
+        // Proteção anti-welcome: se a resposta for apenas a mensagem de boas-vindas, tente esclarecer
+        let finalResponse = response;
+        try {
+          if (String(finalResponse).includes('Sou seu assistente bíblico') && text) {
+            finalResponse = BibleAssistant.formatNotFound(`Parece que não entendi. Você quis dizer: "${BibleAssistant.escapeHtml(text)}"?`);
+          }
+        } catch (e) { /* ignore */ }
+
+        botDiv.innerHTML = finalResponse;
         chat.appendChild(botDiv);
+        try {
+          if (typeof saveOracleChatMessage === 'function') {
+            saveOracleChatMessage('assistant', finalResponse).catch(e => console.warn('Erro ao salvar mensagem do assistente:', e));
+          }
+        } catch (e) {
+          console.warn('saveOracleChatMessage não disponível', e);
+        }
         chat.scrollTop = chat.scrollHeight;
     };
     
@@ -9703,6 +10033,13 @@ function injectBibleTab() {
             document.getElementById('bibleSendBtn').click();
         }
     };
+    // sinaliza que a aba Bíblia e handlers estão prontos
+    try {
+      window.__BIBLE_READY__ = true;
+      document.dispatchEvent(new CustomEvent('bible:ready'));
+    } catch (e) {
+      console.warn('Não foi possível setar __BIBLE_READY__', e);
+    }
   }
 }
 

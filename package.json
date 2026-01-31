@@ -1,0 +1,15 @@
+{
+  "name": "bible-ingest-tool",
+  "version": "1.0.0",
+  "description": "Ferramenta para extrair texto da Bíblia em PDF e popular oracle_memory no Supabase",
+  "main": "tools/ingest_pdf.js",
+  "scripts": {
+    "ingest": "node tools/ingest_pdf.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0",
+    "dotenv": "^16.0.0",
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^19.11.1"
+  }
+}
