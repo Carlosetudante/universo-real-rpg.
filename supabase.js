@@ -13,7 +13,10 @@
 
 // ⚠️ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE ⚠️
 const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
+// Não deixe chaves embutidas em arquivos versionados.
+// Use a Anon Key pública aqui — NÃO a Service Role Key.
+// Substitua por sua Anon Key ou injete via processo de build / variável de ambiente.
+const SUPABASE_ANON_KEY = 'SUA-ANON-KEY-AQUI';
 
 // Importação do Supabase Client (via CDN)
 // Adicionado no index.html: <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -379,6 +382,60 @@ async function addFinance(transaction) {
   return data;
 }
 
+// ===========================================
+// ORACLE / BIBLIA - helpers para conversas e memória
+// ===========================================
+async function saveOracleChatMessage(role, content, meta = {}) {
+  if (!isSupabaseConfigured() || !currentUser) return null;
+
+  const { data, error } = await supabaseClient
+    .from('oracle_messages')
+    .insert({ user_id: currentUser.id, role, content, meta })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao salvar oracle message:', error);
+    return null;
+  }
+  return data;
+}
+
+async function addOracleMemory(title, fact, tags = [], importance = 5) {
+  if (!isSupabaseConfigured() || !currentUser) return null;
+
+  const { data, error } = await supabaseClient
+    .from('oracle_memory')
+    .insert({ user_id: currentUser.id, title, fact, tags, importance })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('❌ Erro ao salvar oracle memory:', error);
+    return null;
+  }
+  return data;
+}
+
+async function searchOracleMemory(query) {
+  if (!isSupabaseConfigured() || !currentUser) return [];
+
+  // busca por título, tags ou texto do fato (fuzzy simples via ilike)
+  const { data, error } = await supabaseClient
+    .from('oracle_memory')
+    .select('*')
+    .or(`title.ilike.%${query}%,fact.ilike.%${query}%`) // simple OR
+    .eq('user_id', currentUser.id)
+    .order('importance', { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error('❌ Erro ao consultar oracle memory:', error);
+    return [];
+  }
+  return data || [];
+}
+
 async function deleteFinance(transactionId) {
   if (!currentUser) return;
 
@@ -551,6 +608,55 @@ async function getOracleMemories(searchTags = null) {
   return data || [];
 }
 
+async function deleteAllUserData() {
+  if (!currentUser) {
+    console.error('❌ deleteAllUserData: currentUser é null');
+    return false;
+  }
+
+  const userId = currentUser.id;
+  console.log(`🗑️ Iniciando exclusão de todos os dados para o usuário: ${userId}`);
+
+  // Lista de tabelas que contêm dados do usuário e usam 'user_id'
+  const tablesWithUserId = [
+    'oracle_messages',
+    'oracle_memory',
+    'xp_events',
+    'work_sessions',
+    'finance_transactions',
+    'tasks'
+  ];
+
+  try {
+    const deletePromises = tablesWithUserId.map(table => {
+      console.log(`   -> Deletando da tabela ${table}...`);
+      return supabaseClient
+        .from(table)
+        .delete()
+        .eq('user_id', userId);
+    });
+    
+    console.log(`   -> Deletando da tabela profiles...`);
+    deletePromises.push(
+      supabaseClient
+        .from('profiles')
+        .delete()
+        .eq('id', userId)
+    );
+        
+    const results = await Promise.all(deletePromises);
+
+    const hadError = results.some(r => r.error);
+    if (hadError) console.warn('⚠️ Alguns dados podem não ter sido removidos da nuvem.');
+
+    console.log('✅ Exclusão de dados na nuvem concluída.');
+    return !hadError;
+
+  } catch (error) {
+    console.error('❌ Erro catastrófico durante a exclusão de dados:', error);
+    return false;
+  }
+}
 // ===========================================
 // ORÁCULO - PROCESSADOR DE AÇÕES
 // ===========================================
@@ -1023,6 +1129,7 @@ window.SupabaseService = {
   getOracleMemories,
   processOracleActions,
   
+  deleteAllUserData,
   // Sync
   syncLocalToCloud,
   syncCloudToLocal,

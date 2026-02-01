@@ -1,0 +1,13 @@
+REGRA: Nunca confundir user.name com user.workplace.
+REGRA: Antes de salvar uma resposta, confirme qual campo está sendo perguntado.
+REGRA: Se a resposta parecer não combinar com a pergunta, peça confirmação.
+
+CAMPOS:
+user.name = nome da pessoa
+user.workplace = local/empresa onde trabalha
+user.role = cargo/atividade
+
+FLUXO:
+Perguntar nome -> salvar em user.name
+Perguntar trabalho -> salvar em user.workplace
+Perguntar cargo -> salvar em user.role

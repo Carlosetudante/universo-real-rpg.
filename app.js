@@ -157,9 +157,11 @@ function createStars(color = '#ffffff') {
   currentStarColor = color;
   starsContainer.style.setProperty('--star-color', color);
   
-  // Cria mais estrelas para um céu mais rico
-  const baseCount = Math.floor(window.innerWidth * window.innerHeight / 8000);
-  const starCount = Math.min(150, Math.max(60, baseCount));
+  // Cria mais estrelas para um céu mais rico, com otimização para mobile
+  const isMobile = window.innerWidth <= 900;
+  const density = isMobile ? 15000 : 8000; // Menos estrelas em telas menores
+  const baseCount = Math.floor(window.innerWidth * window.innerHeight / density);
+  const starCount = isMobile ? Math.min(70, Math.max(40, baseCount)) : Math.min(150, Math.max(60, baseCount));
   
   for (let i = 0; i < starCount; i++) {
     const star = document.createElement('div');
@@ -1463,6 +1465,55 @@ function restoreBackup() {
     }
   } catch (e) {
     showToast('❌ Erro ao ler backup.');
+  }
+}
+
+async function resetAccount() {
+  if (!isLoggedIn || !gameState) {
+    showToast('⚠️ Você não está logado.');
+    return;
+  }
+
+  const confirmation = prompt('🚨 ATENÇÃO! 🚨\n\nIsso apagará TODOS os seus dados (perfil, tarefas, finanças, etc.) permanentemente, tanto neste dispositivo quanto na nuvem.\n\nPara confirmar, digite "DELETAR":');
+
+  if (confirmation !== 'DELETAR') {
+    showToast('❌ Ação cancelada.');
+    return;
+  }
+
+  try {
+    showToast('🗑️ Resetando sua conta... Por favor, aguarde.', 5000);
+
+    // Se estiver usando Supabase, deleta os dados da nuvem
+    if (useSupabase()) {
+      console.log('☁️ Deletando dados da nuvem...');
+      const success = await SupabaseService.deleteAllUserData();
+      if (!success) {
+        // Mesmo que falhe na nuvem, continua o reset local para deslogar o usuário
+        showToast('⚠️ Falha ao resetar dados na nuvem, mas continuando reset local.');
+      } else {
+        console.log('✅ Dados da nuvem deletados.');
+      }
+    }
+
+    // Deleta os dados locais
+    const username = getSession();
+    let users = getUsers();
+    if (users[username]) {
+      delete users[username];
+      setUsers(users);
+    }
+    
+    localStorage.removeItem(`ur_backup_${username}`);
+    clearSession();
+    isLoggedIn = false;
+    gameState = null;
+
+    showToast('✅ Conta resetada com sucesso! Você será redirecionado.', 3000);
+
+    setTimeout(() => window.location.reload(), 3000);
+  } catch (error) {
+    showToast(`❌ Erro ao resetar a conta: ${error.message}`);
   }
 }
 
@@ -3130,6 +3181,13 @@ function renderWorkTab() {
   }
 }
 
+// Estado do modo de entrada (Produção ou Horas)
+window.workEntryMode = 'production';
+window.setWorkEntryMode = function(mode) {
+  window.workEntryMode = mode;
+  renderWorkSingularity();
+};
+
 function renderWorkSingularity() {
   if (!elements.workSingularityContainer) return;
   
@@ -3137,6 +3195,10 @@ function renderWorkSingularity() {
   const def = JOB_TYPES[type];
   const configValue = gameState.job.config ? (gameState.job.config.rate || 0) : 0;
   const today = new Date().toISOString().split('T')[0];
+  
+  // Determina o modo atual
+  const entryMode = window.workEntryMode || 'production';
+  const isTimeMode = entryMode === 'time';
   
   let currentWeek = Math.ceil(new Date().getDate() / 7);
   if (currentWeek > 4) currentWeek = 4; // Limita a 4 semanas conforme solicitado
@@ -3157,6 +3219,12 @@ function renderWorkSingularity() {
         </div>
       </div>
 
+      <!-- Seletor de Tipo de Registro -->
+      <div style="display:flex; background:rgba(255,255,255,0.05); padding:4px; border-radius:8px; margin-bottom:15px; gap: 5px;">
+        <button class="btn ghost" onclick="setWorkEntryMode('production')" style="flex:1; font-size:12px; ${!isTimeMode ? 'background:var(--accent); color:#000; font-weight:bold;' : 'opacity:0.7;'}">${def.label}</button>
+        <button class="btn ghost" onclick="setWorkEntryMode('time')" style="flex:1; font-size:12px; ${isTimeMode ? 'background:var(--accent); color:#000; font-weight:bold;' : 'opacity:0.7;'}">⏱️ Horas</button>
+      </div>
+
       <!-- Formulário de Registro -->
       <div class="form-row" style="margin-bottom: 15px;">
         <div style="flex: 1;">
@@ -3175,8 +3243,8 @@ function renderWorkSingularity() {
       </div>
       <div class="form-row" style="margin-bottom: 15px;">
         <div style="flex: 1;">
-          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">${def.inputLabel}</label>
-          <input type="number" id="workInput" placeholder="0" style="font-size: 1.2rem; font-weight: bold;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">${isTimeMode ? 'Horas Trabalhadas' : def.inputLabel}</label>
+          <input type="number" id="workInput" placeholder="${isTimeMode ? 'Ex: 8.5' : '0'}" style="font-size: 1.2rem; font-weight: bold;">
         </div>
       </div>
       <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px;">
@@ -3229,7 +3297,8 @@ window.addWorkRecord = function() {
     return;
   }
 
-  const type = gameState.job.type;
+  const entryMode = window.workEntryMode || 'production';
+  const type = entryMode === 'time' ? 'time_tracking' : gameState.job.type;
   const rate = gameState.job.config.rate || 0;
   let financialValue = 0;
   let desc = '';
@@ -3237,7 +3306,15 @@ window.addWorkRecord = function() {
   const week = weekInput ? weekInput.value : null;
 
   // Lógica de Singularidade
-  if (type === 'pizzaria') {
+  if (type === 'time_tracking') {
+    // Se for freelancer, calcula valor por hora. Se não, é apenas registro de tempo (0 financeiro)
+    if (gameState.job.type === 'freelancer') {
+        financialValue = val * rate;
+        desc = `Freelance: ${val}h`;
+    } else {
+        desc = `Jornada: ${val}h`;
+    }
+  } else if (type === 'pizzaria') {
     financialValue = val * rate;
     desc = `Produção: ${val} massas`;
   } else if (type === 'vendedor') {
@@ -3266,6 +3343,7 @@ window.addWorkRecord = function() {
     inputVal: val,
     financialVal: loggedFinancialValue,
     type: type,
+    duration: type === 'time_tracking' ? val * 3600000 : 0, // Converte horas para ms se for tempo
     isUnpaid: isUnpaid,
     week: week
   });
@@ -4118,6 +4196,8 @@ if (elements.configGroupsBtn) elements.configGroupsBtn.addEventListener('click',
 if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener('click', closeGroupConfig);
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
+if (elements.resetAccountBtn) elements.resetAccountBtn.addEventListener('click', resetAccount);
+
 // ========================================
 // SISTEMA DE LINGUAGEM NATURAL (NLU) 2.0
 // Detecta intenções e extrai dados de forma mais robusta
@@ -4126,6 +4206,15 @@ if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpe
 const OracleNLU = {
   // Mapa de intenções e padrões
   intents: {
+    'finance.goal': {
+      patterns: [
+        /(?:cria|criar|crair|definir|nova|estabelecer|fazer|montar)\s+(?:uma\s+)?meta\s+(?:financeira|de\s+economia|de\s+poupança|de\s+grana)/i,
+        /(?:quero|preciso|vamos|bora)\s+(?:juntar|guardar|economizar|fazer|criar|crair|ter)\s+(?:uma\s+)?(?:meta|reserva|poupança)/i,
+        /(?:objetivo|alvo)\s+financeiro/i,
+        /(?:preciso|quero)\s+de\s+(?:uma\s+)?meta/i
+      ],
+      extract: () => ({})
+    },
     'task.create': {
       patterns: [
         /(?:cria|criar|adiciona|adicionar|nova|novo|faz|fazer|coloca|colocar|preciso|quero|tenho que|vou)\s+(?:uma?\s+)?(?:tarefa|task|missão|lembrete|reminder)?:?\s*(.+)/i,
@@ -4172,12 +4261,20 @@ const OracleNLU = {
     
     'finance.expense': {
       patterns: [
+        // Padrões que capturam valor e descrição (opcional)
         /(?:gastei|paguei|comprei|perdi|saiu|foi)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:r?\$?\s*)?(?:reais?)?\s*(?:hoje|ontem|amanhã)?\s*(?:em|no|na|com|de|pra|para)?\s*(.+)?/i,
         /(?:coloca|adiciona|registra|bota|põe)\s+(?:uma?\s+)?(?:saída|gasto|despesa)\s+(?:de\s+)?(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com|de)?\s*(.+)?/i,
         /(?:tive\s+(?:um\s+)?(?:gasto|despesa)\s+de)\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:em|no|na|com)?\s*(.+)?/i,
-        /(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i
+        /(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s+(?:de\s+)?(?:gasto|despesa|saída)\s*(?:em|no|na|com)?\s*(.+)?/i,
+        // Novo padrão: apenas a intenção de gastar
+        /^(gastei|paguei|comprei|registra[r]?\s+(?:um\s+)?gasto)$/i
       ],
       extract: (text, match) => {
+        // Se o match não tem o grupo de captura para o valor (padrão novo)
+        if (match.length <= 2 || !match[1] || isNaN(parseFloat(match[1]?.replace(',', '.')))) {
+          return { amount: null, description: null, type: 'expense' };
+        }
+
         const amount = parseFloat(match[1].replace(',', '.'));
         let description = match[2]?.trim() || null;
         
@@ -4272,6 +4369,48 @@ const OracleNLU = {
       extract: () => ({})
     },
     
+    // NOVOS INTENTS DE UTILIDADE (INTELIGÊNCIA LÓGICA)
+    'utility.calc': {
+      patterns: [
+        /(?:quanto\s+[eé]|calcule|calcula|conta)\s+([\d.,]+)\s*(\+|mais|\-|menos|\*|x|vezes|\/|dividido\s+por)\s*([\d.,]+)/i
+      ],
+      extract: (text, match) => {
+        return {
+          n1: parseFloat(match[1].replace(',', '.')),
+          op: match[2].toLowerCase(),
+          n2: parseFloat(match[3].replace(',', '.'))
+        };
+      }
+    },
+    
+    'utility.decision': {
+      patterns: [
+        /(?:escolha|escolhe|decida|decide|qual|o que)\s+(?:você\s+)?(?:prefere|escolhe|sugere)?\s*(?:entre\s+)?(.+?)\s+(?:ou|e)\s+(.+)/i,
+        /(?:joga|jogar|lança|lançar)\s+(?:uma\s+)?moeda|cara\s+(?:ou|e)\s+coroa/i,
+        /(?:joga|jogar|rola|rolar)\s+(?:um\s+)?dado(?: de (\d+)\s*lados?)?/i
+      ],
+      extract: (text, match) => {
+        if (text.match(/moeda|cara.*coroa/i)) return { type: 'coin' };
+        if (text.match(/dado/i)) return { type: 'dice', sides: match[1] || 6 };
+        return { type: 'choice', options: [match[1], match[2]] };
+      }
+    },
+
+    'utility.date': {
+      patterns: [
+        /(?:que\s+)?(?:horas?|dia|data)\s+(?:são|é|tem)\s*(?:agora|hoje)?/i,
+        /(?:em\s+)?que\s+(?:dia|ano|mês)\s+(?:estamos|é\s+hoje)/i
+      ],
+      extract: () => ({})
+    },
+
+    'system.clear': {
+      patterns: [
+        /(?:limpar?|limpa|apagar?|apaga)\s+(?:o\s+)?(?:chat|conversa|mensagens|histórico)/i
+      ],
+      extract: () => ({})
+    },
+
     'memory.save': {
       patterns: [
         /(?:lembr[ae]|lembrar|guarda|guardar|anota|anotar|salva|salvar|sab[ei]a?)(?:-se)?(?:\s+que)?\s+(?:eu\s+)?(.+)/i,
@@ -4337,6 +4476,16 @@ const OracleNLU = {
   
   // Detecta a intenção do usuário
   detectIntent(text) {
+    const mem = OracleMemory.get();
+    const lowerText = text.toLowerCase().trim();
+
+    // Check for aliases first
+    if (mem.aliases && mem.aliases[lowerText]) {
+        const canonicalCommand = mem.aliases[lowerText];
+        console.log(`Oracle: Alias detected! "${text}" -> "${canonicalCommand}"`);
+        text = canonicalCommand; // Replace the text with the canonical command
+    }
+
     const cleanText = text.toLowerCase().trim();
     
     for (const [intentName, intent] of Object.entries(this.intents)) {
@@ -4486,13 +4635,20 @@ const OracleMemory = {
       interests: [],
       dislikes: []
     },
-    customResponses: {}
+    customResponses: {},
+    aliases: {}
   },
   
   get() {
     try {
       const stored = JSON.parse(localStorage.getItem(this.key));
-      return { ...this.defaultMemory, ...stored, profile: { ...this.defaultMemory.profile, ...(stored?.profile || {}) } };
+      const merged = { 
+        ...this.defaultMemory, 
+        ...stored, 
+        profile: { ...this.defaultMemory.profile, ...(stored?.profile || {}) },
+        aliases: { ...this.defaultMemory.aliases, ...(stored?.aliases || {}) }
+      };
+      return merged;
     } catch {
       return { ...this.defaultMemory };
     }
@@ -5207,10 +5363,113 @@ const OracleSpeech = {
   }
 };
 
+// ========================================
+// SISTEMA DE ONBOARDING (PERGAMINHO)
+// ========================================
+const OracleOnboarding = {
+  data: null,
+  markdown: null,
+  txt: null,
+  activeMode: 'json', // Padrão: validação estrita via JSON
+
+  async init() {
+    try {
+      // Carrega JSON de regras
+      const response = await fetch('pergaminho-onboarding.json');
+      if (response.ok) {
+        this.data = await response.json();
+        console.log('📜 Pergaminho de Onboarding (JSON) carregado.');
+      }
+      
+      // Carrega Markdown de documentação/regras
+      const mdResponse = await fetch('pergaminho-onboarding.md');
+      if (mdResponse.ok) {
+        this.markdown = await mdResponse.text();
+        console.log('📜 Pergaminho de Onboarding (MD) carregado.');
+      }
+      
+      // Carrega TXT de regras simples
+      const txtResponse = await fetch('pergaminho-onboarding.txt');
+      if (txtResponse.ok) {
+        this.txt = await txtResponse.text();
+        console.log('📜 Pergaminho de Onboarding (TXT) carregado.');
+      }
+    } catch (e) {
+      // Silencioso se não existir, segue sem validação estrita
+    }
+  },
+
+  setRuleMode(mode) {
+    if (['json', 'markdown', 'txt'].includes(mode)) {
+      this.activeMode = mode;
+      return `🔄 Modo de regras alterado para: <strong>${mode.toUpperCase()}</strong>`;
+    }
+    return "⚠️ Modo inválido. Use: json, markdown ou txt.";
+  },
+
+  getRulesText() {
+    switch(this.activeMode) {
+      case 'markdown': return this.markdown || "Regras Markdown não carregadas.";
+      case 'txt': return this.txt || "Regras TXT não carregadas.";
+      case 'json': return this.data ? JSON.stringify(this.data, null, 2) : "Regras JSON não carregadas.";
+      default: return "Modo desconhecido.";
+    }
+  },
+
+  validateInput(field, input) {
+    if (this.activeMode !== 'json') return { valid: true };
+    if (!this.data) return { valid: true };
+
+    // Mapeia campos internos do OracleChat para chaves do JSON
+    const fieldMap = {
+      'name': 'user.name',
+      'occupation': 'user.role',
+      'workplace': 'user.workplace',
+      'city': 'user.city'
+    };
+    
+    const key = fieldMap[field];
+    if (!key) return { valid: true };
+
+    const rule = this.data.onboarding_flow?.find(r => r.key === key);
+    if (!rule) return { valid: true };
+
+    const lowerInput = input.toLowerCase();
+
+    // Validação baseada nos exemplos ruins do JSON
+    if (rule.examples_bad) {
+      for (const bad of rule.examples_bad) {
+        if (lowerInput.includes(bad.toLowerCase())) {
+           const msg = this.data.confirmation_policy?.when_mismatch || `Hmm, isso não parece responder à pergunta: "${rule.question}"`;
+           return { valid: false, message: msg };
+        }
+      }
+    }
+
+    return { valid: true };
+  }
+};
+
 // Sistema Principal do Oráculo
 const OracleChat = {
   personality: 'assistant',
   pendingAction: null, // Guarda ação pendente aguardando resposta do usuário
+  // Wrappers para funções globais (evita TypeError quando chamadas como this.xxx())
+  getTasksList() { return typeof getTasksList === 'function' ? getTasksList() : "Função getTasksList não disponível."; },
+  // Compatibilidade: algumas partes do código podem chamar getTaskList (singular)
+  getTaskList() { return typeof getTasksList === 'function' ? getTasksList() : "Função getTasksList não disponível."; },
+  getFinanceSummary() { return typeof getFinanceSummary === 'function' ? getFinanceSummary() : "Função getFinanceSummary não disponível."; },
+  getStatusInfo() { return typeof getStatusInfo === 'function' ? getStatusInfo() : "Função getStatusInfo não disponível."; },
+  createFinancialGoal() { return typeof createFinancialGoal === 'function' ? createFinancialGoal() : "Função createFinancialGoal não disponível."; },
+  getSuccessMessage() { return typeof getSuccessMessage === 'function' ? getSuccessMessage() : "Pronto!"; },
+  addExpense(value, desc) { return typeof addExpense === 'function' ? addExpense(value, desc) : "Função addExpense não disponível."; },
+  addIncome(value, desc) { return typeof addIncome === 'function' ? addIncome(value, desc) : "Função addIncome não disponível."; },
+  addBotMessage(text, actions) { return typeof addBotMessage === 'function' ? addBotMessage(text, actions) : null; },
+  // Compatibilidade com nomes antigos/typos
+  addMessages(text, actions) { return typeof addBotMessage === 'function' ? addBotMessage(text, actions) : null; },
+  addMessage(text, actions) { return this.addMessages(text, actions); },
+  completeTask(taskName) { return typeof completeTask === 'function' ? completeTask(taskName) : `Não encontrei tarefa: ${taskName}`; },
+  createTask(text) { return typeof createTask === 'function' ? createTask(text) : `Não consegui criar tarefa: ${text}`; },
   
   init() {
     this.personality = gameState?.oraclePersonality || 'assistant';
@@ -5219,6 +5478,7 @@ const OracleChat = {
     OracleMemory.updateMemoryDisplay();
     VoiceRecognition.init();
     OracleSpeech.init();
+    OracleOnboarding.init(); // Carrega as regras do pergaminho
   },
   
   setupListeners() {
@@ -5340,15 +5600,15 @@ const OracleChat = {
     
     this.addBotMessage(response, [
       { text: '💬 Bora conversar', action: () => { 
-        this.addUserMessage('bora conversar');
+        addUserMessage('bora conversar');
         const resp = this.startConversationMode();
-        this.addBotMessage(resp);
+        addBotMessage(resp);
       }},
       { text: '🗑️ Limpar memória', action: () => {
         if (confirm('Tem certeza que quer apagar tudo que sei sobre você?')) {
           localStorage.removeItem(OracleMemory.key);
           OracleMemory.updateMemoryDisplay();
-          this.addBotMessage('🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊');
+          addBotMessage('🗑️ Memória limpa! Vamos começar do zero. Qual é o seu nome? 😊');
           OracleMemory.setProfile('conversationMode', true);
           OracleMemory.setProfile('lastQuestion', 'name');
         }
@@ -5397,12 +5657,12 @@ const OracleChat = {
       }},
       { text: '🗑️ Limpar Scripts', action: () => {
         if (scripts.length === 0) {
-          this.addBotMessage('Não há scripts para limpar! 📭');
+          addBotMessage('Não há scripts para limpar! 📭');
           return;
         }
         if (confirm(`Deseja remover todos os ${scripts.length} scripts carregados?`)) {
           OracleScript.clearAll();
-          this.addBotMessage('🗑️ Todos os scripts foram removidos!');
+          addBotMessage('🗑️ Todos os scripts foram removidos!');
         }
       }},
       { text: '❌ Fechar', action: () => {} }
@@ -5413,6 +5673,13 @@ const OracleChat = {
   handleScriptUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // Suporte a PDF
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      this.processPdfUpload(file);
+      event.target.value = ''; // Limpa o input para permitir re-upload
+      return;
+    }
     
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -5437,10 +5704,10 @@ const OracleChat = {
           }
         }
         
-        this.addBotMessage(response);
+        addBotMessage(response);
         OracleMemory.updateMemoryDisplay();
       } else {
-        this.addBotMessage(`❌ Erro ao processar script: ${result.error}`);
+        addBotMessage(`❌ Erro ao processar script: ${result.error}`);
       }
       
       // Limpa o input para permitir recarregar o mesmo arquivo
@@ -5450,6 +5717,51 @@ const OracleChat = {
     reader.readAsText(file);
   },
   
+  // Processa upload de PDF
+  async processPdfUpload(file) {
+    // Verifica se a biblioteca PDF.js está disponível
+    if (typeof pdfjsLib === 'undefined') {
+      addBotMessage(`⚠️ <strong>Biblioteca PDF não detectada!</strong><br>Para eu ler o arquivo <em>${file.name}</em>, você precisa adicionar o PDF.js no seu <code>index.html</code>.<br><br>Ou se preferir, crie um script <code>.json</code> com as informações principais!`);
+      return;
+    }
+
+    addBotMessage(`📖 Abrindo <strong>${file.name}</strong>...<br><em>Estudando o conteúdo (isso pode levar alguns segundos)...</em>`);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      
+      let fullText = '';
+      // Limite de segurança para não travar o navegador com arquivos gigantes
+      const maxPages = 50; 
+      const pagesToRead = Math.min(pdf.numPages, maxPages);
+      
+      if (pdf.numPages > maxPages) {
+        addBotMessage(`⚠️ O arquivo é muito grande (${pdf.numPages} páginas). Vou ler apenas as primeiras ${maxPages} páginas para não sobrecarregar sua memória.`);
+      }
+
+      for (let i = 1; i <= pagesToRead; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const strings = content.items.map(item => item.str);
+        fullText += strings.join(' ') + '\n';
+      }
+
+      // Envia o texto extraído para o processador de scripts
+      const result = OracleScript.processScriptFile(fullText, file.name);
+      
+      if (result.success) {
+        addBotMessage(`✅ <strong>Leitura concluída!</strong><br>Absorvi ${result.summary.facts} novos conhecimentos deste PDF.`);
+      } else {
+        addBotMessage(`❌ Não consegui extrair informações úteis deste PDF.`);
+      }
+    } catch (e) {
+      console.error(e);
+      addBotMessage(`❌ Erro ao ler PDF: ${e.message}`);
+    }
+  },
+
   toggle() {
     const modal = document.getElementById('chatModal');
     if (!modal) return;
@@ -5468,6 +5780,40 @@ const OracleChat = {
     }
   },
   
+  // Verifica se hoje é aniversário do usuário
+  isBirthday() {
+    const birthday = OracleMemory.getProfile('aniversario');
+    if (!birthday) return false;
+
+    const today = new Date();
+    const currentDay = today.getDate();
+    const currentMonth = today.getMonth() + 1;
+
+    const cleanBirthday = birthday.toLowerCase().trim();
+    let targetDay, targetMonth;
+
+    if (cleanBirthday.includes('/')) {
+      const parts = cleanBirthday.split('/');
+      targetDay = parseInt(parts[0]);
+      targetMonth = parseInt(parts[1]);
+    } else if (cleanBirthday.includes(' de ')) {
+      const parts = cleanBirthday.split(' de ');
+      targetDay = parseInt(parts[0]);
+      const months = {
+        'janeiro': 1, 'fevereiro': 2, 'março': 3, 'marco': 3, 'abril': 4, 'maio': 5, 'junho': 6,
+        'julho': 7, 'agosto': 8, 'setembro': 9, 'outubro': 10, 'novembro': 11, 'dezembro': 12
+      };
+      for (const [name, num] of Object.entries(months)) {
+        if (parts[1] && parts[1].includes(name)) {
+          targetMonth = num;
+          break;
+        }
+      }
+    }
+
+    return targetDay === currentDay && targetMonth === currentMonth;
+  },
+
   showWelcome() {
     const p = ORACLE_PERSONALITIES_V2[this.personality];
     
@@ -5478,6 +5824,18 @@ const OracleChat = {
     
     this.updateAvatar(p.emoji);
     
+    // Verifica Aniversário
+    if (this.isBirthday()) {
+      const bdayMessage = `🎉🎂 <strong>FELIZ ANIVERSÁRIO, ${name.toUpperCase()}!</strong> 🎂🎉<br><br>` +
+                          `Que seu novo ciclo seja repleto de conquistas, XP e level ups! 🥳<br>` +
+                          `Preparei uma festa virtual pra você! 🎈`;
+      addBotMessage(bdayMessage);
+      playSound('achievement');
+      triggerConfetti();
+      setTimeout(() => triggerConfetti(), 1000);
+      return;
+    }
+    
     // Saudação personalizada baseada no gênero
     let greeting = p.greeting(name);
     if (gender === 'male' && this.personality === 'friend') {
@@ -5486,16 +5844,16 @@ const OracleChat = {
       greeting = `Oi, ${name}! Tudo bem, linda? 💖 Conta comigo pra o que precisar!`;
     }
     
-    this.addBotMessage(greeting);
+    addBotMessage(greeting);
     
     // Se não conhece o nome ainda, pergunta
     if (!memorizedName && !gameState?.name) {
       setTimeout(() => {
-        this.addBotMessage("A propósito, como posso te chamar? 🤔");
+        addBotMessage("A propósito, como posso te chamar? 🤔");
       }, 1000);
     } else {
       setTimeout(() => {
-        this.addBotMessage(this.getTimeGreeting());
+        addBotMessage(this.getTimeGreeting());
       }, 800);
     }
   },
@@ -5582,20 +5940,20 @@ const OracleChat = {
     const text = input.value.trim();
     if (!text) return;
     
-    this.addUserMessage(text);
+    addUserMessage(text);
     input.value = '';
     
     // Mostra "pensando"
-    this.showThinking();
+    showThinking();
     
     // Processa com delay para parecer natural
     setTimeout(() => {
-      this.removeThinking();
+      removeThinking();
       const response = this.generateResponse(text);
       if (typeof response === 'string') {
-        this.addBotMessage(response);
+        addBotMessage(response);
       } else if (response.message) {
-        this.addBotMessage(response.message, response.actions);
+        addBotMessage(response.message, response.actions);
       }
     }, 600 + Math.random() * 400);
   },
@@ -5722,6 +6080,52 @@ const OracleChat = {
       if (pendingResult) return pendingResult;
     }
     
+    // Comando explícito para sair do modo conversa (virar assistente)
+    if (lowerInput.match(/^(parar conversa|modo assistente|chega de papo|virar assistente|focar|sem papo|sair do modo conversa)/i)) {
+        return this.stopConversationMode();
+    }
+    
+    // 0.05. VERIFICAÇÃO DE AMBIGUIDADE (Meta vs Tarefa)
+    const isAmbiguousMeta = lowerInput.match(/\b(meta)\b/i) && !lowerInput.match(/financeira|dinheiro|grana|economia|juntar|guardar|poupar|reserva|reais|r\$/i);
+
+    if (isAmbiguousMeta && !this.pendingAction) {
+        const originalInputForAction = input; // Captura para o escopo da ação
+        this.pendingAction = { type: 'clarify_meta', originalInput: originalInputForAction };
+        return {
+            message: `Quando você diz "meta", quer criar uma <strong>meta financeira</strong> (para juntar dinheiro) ou uma <strong>tarefa</strong>?`,
+            actions: [
+                { text: '💰 Meta Financeira', action: () => {
+                    this.pendingAction = null;
+                    const response = this.createFinancialGoal();
+                    addBotMessage(response.message, response.actions);
+                }},
+                { text: '📝 Tarefa', action: () => {
+                    this.pendingAction = null;
+                    const taskText = originalInputForAction.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
+                    const response = createTask(taskText);
+                    addBotMessage(response);
+                }}
+            ]
+        };
+    }
+
+    // 0.1. DETECÇÃO DE INTENÇÕES PRIORITÁRIAS (Comandos diretos)
+    // Isso evita que comandos como "minhas tarefas" sejam interpretados como respostas de conversa
+    const nluResult = OracleNLU.detectIntent(input);
+    const isPriorityIntent = nluResult.intent !== 'unknown' && 
+                             nluResult.confidence > 0.8 && 
+                             !['memory.save'].includes(nluResult.intent);
+
+    if (isPriorityIntent) {
+      const intentResponse = this.executeIntent(nluResult);
+      if (intentResponse) return intentResponse;
+    }
+    
+    // 0.5. MODO CONVERSA (Prioridade sobre detecção automática)
+    // Se o Oráculo fez uma pergunta específica, a resposta deve ser processada nesse contexto
+    const conversationResult = this.handleConversationResponses(lowerInput);
+    if (conversationResult) return conversationResult;
+    
     // 1. DETECÇÃO AUTOMÁTICA de informações pessoais (sempre roda primeiro)
     const autoLearnResult = this.autoLearnFromInput(cleanedInput, lowerInput);
     if (autoLearnResult) return autoLearnResult;
@@ -5734,8 +6138,7 @@ const OracleChat = {
     const financeEducationResult = this.handleFinanceEducation(lowerInput);
     if (financeEducationResult) return financeEducationResult;
     
-    // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE
-    const nluResult = OracleNLU.detectIntent(input);
+    // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE (Restante)
     if (nluResult.intent !== 'unknown' && nluResult.confidence > 0.5) {
       const intentResponse = this.executeIntent(nluResult);
       if (intentResponse) return intentResponse;
@@ -5826,11 +6229,11 @@ const OracleChat = {
           const newUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}&seed=${Date.now()}`;
           const img = document.querySelector('.oracle-generated-image');
           if (img) img.src = newUrl;
-          this.addBotMessage('🎨 Nova versão gerada! Atualizando imagem...');
+          addBotMessage('🎨 Nova versão gerada! Atualizando imagem...');
         }},
         { text: '💾 Salvar', action: () => {
           window.open(finalUrl, '_blank');
-          this.addBotMessage('✅ Abrindo imagem em nova aba para você salvar!');
+          addBotMessage('✅ Abrindo imagem em nova aba para você salvar!');
         }}
       ]
     };
@@ -5846,7 +6249,7 @@ const OracleChat = {
     }
     
     // Metas financeiras
-    if (lowerInput.match(/meta\s+financeira|objetivo\s+financeiro|criar\s+meta|definir\s+meta/i)) {
+    if (lowerInput.match(/meta\s+financeira|objetivo\s+financeiro|criar\s+meta|definir\s+meta|quero\s+(?:ter|fazer|criar|montar)\s+(?:uma\s+)?(?:reserva|poupança|economia)/i)) {
       return this.createFinancialGoal();
     }
     
@@ -5885,8 +6288,8 @@ const OracleChat = {
           • <strong>20%</strong> para poupança e investimentos<br><br>
           📊 Quer que eu analise seus gastos para ver como você está?`,
         actions: [
-          { text: '📊 Analisar meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Analisar meus gastos', action: () => addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -5896,8 +6299,8 @@ const OracleChat = {
           💡 Não espere sobrar dinheiro. Separe antes de gastar!<br><br>
           "Não é sobre quanto você ganha, mas quanto você guarda." - Warren Buffett`,
         actions: [
-          { text: '📈 Como investir?', action: () => this.addBotMessage(this.teachFinance('investimento')) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📈 Como investir?', action: () => addBotMessage(this.teachFinance('investimento')) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -5908,8 +6311,8 @@ const OracleChat = {
           3. <strong>Investimento automático</strong> mensal em fundos ou Tesouro<br><br>
           🧠 Assim você não precisa de força de vontade - acontece sozinho!`,
         actions: [
-          { text: '🎯 Criar meta', action: () => this.addBotMessage(this.createFinancialGoal()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '🎯 Criar meta', action: () => addBotMessage(this.createFinancialGoal()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -5919,8 +6322,8 @@ const OracleChat = {
           Se depois de 24h você ainda quiser, ok, compre. Mas na maioria das vezes, o impulso passa.<br><br>
           💡 Isso evita gastos por emoção e economiza centenas por mês!`,
         actions: [
-          { text: '📊 Ver meus gastos', action: () => this.addBotMessage(this.analyzeSpending()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Ver meus gastos', action: () => addBotMessage(this.analyzeSpending()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -5931,8 +6334,8 @@ const OracleChat = {
           Onde deixar? <strong>Tesouro Selic</strong> ou <strong>CDB com liquidez diária</strong>.<br><br>
           ⚠️ Nunca invista em renda variável sem ter esse colchão!`,
         actions: [
-          { text: '🎯 Calcular minha reserva', action: () => this.addBotMessage(this.calculateEmergencyFund()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '🎯 Calcular minha reserva', action: () => addBotMessage(this.calculateEmergencyFund()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       },
       {
@@ -5944,8 +6347,8 @@ const OracleChat = {
           • Empréstimo pessoal (100%+ ao ano!)<br><br>
           Se já está endividado: <strong>NEGOCIE!</strong> Bancos preferem receber com desconto do que não receber.`,
         actions: [
-          { text: '📊 Diagnóstico financeiro', action: () => this.addBotMessage(this.getFinancialDiagnosis()) },
-          { text: '💡 Mais dicas', action: () => this.addBotMessage(this.getFinancialTip()) }
+          { text: '📊 Diagnóstico financeiro', action: () => addBotMessage(this.getFinancialDiagnosis()) },
+          { text: '💡 Mais dicas', action: () => addBotMessage(this.getFinancialTip()) }
         ]
       }
     ];
@@ -6034,17 +6437,17 @@ const OracleChat = {
       message: `<strong>${lesson.title}</strong><br><br>${lesson.content}`,
       actions: [
         { text: '📚 Outro tema', action: () => {
-          this.addBotMessage({
+          addBotMessage({
             message: `O que você quer aprender, ${name}?`,
             actions: [
-              { text: '📈 Investimentos', action: () => this.addBotMessage(this.teachFinance('investimento')) },
-              { text: '🏛️ Tesouro Direto', action: () => this.addBotMessage(this.teachFinance('tesouro')) },
-              { text: '📊 Ações', action: () => this.addBotMessage(this.teachFinance('acoes')) },
-              { text: '🔢 Juros Compostos', action: () => this.addBotMessage(this.teachFinance('juros')) }
+              { text: '📈 Investimentos', action: () => addBotMessage(this.teachFinance('investimento')) },
+              { text: '🏛️ Tesouro Direto', action: () => addBotMessage(this.teachFinance('tesouro')) },
+              { text: '📊 Ações', action: () => addBotMessage(this.teachFinance('acoes')) },
+              { text: '🔢 Juros Compostos', action: () => addBotMessage(this.teachFinance('juros')) }
             ]
           });
         }},
-        { text: '💡 Dicas práticas', action: () => this.addBotMessage(this.getFinancialTip()) }
+        { text: '💡 Dicas práticas', action: () => addBotMessage(this.getFinancialTip()) }
       ]
     };
   },
@@ -6052,15 +6455,19 @@ const OracleChat = {
   createFinancialGoal() {
     const name = OracleMemory.getProfile('name') || 'amigo';
     
-    this.pendingAction = { type: 'financial_goal_name' };
+    this.pendingAction = null; // Limpa ação anterior
     
     return {
-      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Qual é o seu objetivo? (Ex: "Comprar um carro", "Reserva de emergência", "Viajar")`,
+      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Gostaria de falar suas receitas e contas para somarmos e criar sua meta juntos?`,
       actions: [
-        { text: '🚗 Carro', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Comprar um carro' }; this.addBotMessage('Quanto você precisa para o carro? (Ex: 50000)'); }},
-        { text: '🏠 Casa', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Entrada da casa' }; this.addBotMessage('Quanto você precisa para a entrada? (Ex: 100000)'); }},
-        { text: '✈️ Viagem', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Viagem dos sonhos' }; this.addBotMessage('Quanto você precisa para a viagem? (Ex: 15000)'); }},
-        { text: '🛡️ Reserva', action: () => { this.pendingAction = { type: 'financial_goal_value', name: 'Reserva de emergência' }; this.addBotMessage('Quanto você quer ter de reserva? (Ex: 30000)'); }}
+        { text: '🧮 Sim, calcular juntos', action: () => { 
+            this.pendingAction = { type: 'guided_goal_income' }; 
+            addBotMessage('Ótimo! Para começar, qual é a sua **renda mensal média** (salário + extras)?'); 
+        }},
+        { text: '📝 Não, já tenho o valor', action: () => { 
+            this.pendingAction = { type: 'financial_goal_name' }; 
+            addBotMessage('Entendi! Qual é o nome do seu objetivo? (Ex: "Comprar um carro", "Reserva")'); 
+        }}
       ]
     };
   },
@@ -6202,6 +6609,55 @@ const OracleChat = {
       }`;
   },
   
+  calculateSavings(lowerInput) {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    
+    // Tenta extrair um valor do input se houver (ex: "para juntar 5000")
+    const match = lowerInput.match(/(?:r\$\s*)?(\d+(?:[.,]\d{1,2})?)/);
+    let targetValue = 0;
+    let isSystemGoal = false;
+    
+    if (match) {
+      targetValue = parseFloat(match[1].replace(',', '.'));
+    } else {
+      // Se não tem valor no input, usa a meta definida
+      targetValue = gameState.financialGoal || 0;
+      isSystemGoal = true;
+    }
+    
+    if (targetValue <= 0) {
+      return `${name}, para eu calcular, preciso saber qual é sua meta! 🎯<br><br>
+        Diga algo como: "quanto guardar para juntar 5000" ou defina uma meta financeira na aba de Finanças.`;
+    }
+    
+    // Se for a meta do sistema, considera o que já tem guardado (saldo atual)
+    let currentBalance = 0;
+    if (isSystemGoal) {
+       const finances = gameState.finances || [];
+       const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+       const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+       currentBalance = Math.max(0, income - expenses);
+    }
+    
+    const remaining = Math.max(0, targetValue - currentBalance);
+    
+    if (remaining === 0 && isSystemGoal) {
+      return `🎉 ${name}, você já atingiu sua meta de R$ ${targetValue.toLocaleString('pt-BR')}! Parabéns!`;
+    }
+    
+    // Cálculo para 1 ano (12 meses)
+    const months = 12;
+    const monthly = remaining / months;
+    const weekly = remaining / 52;
+    
+    return `<strong>💰 Plano para atingir R$ ${targetValue.toLocaleString('pt-BR')} em 1 ano:</strong><br><br>
+      ${isSystemGoal ? `Saldo atual: R$ ${currentBalance.toLocaleString('pt-BR')}<br>Faltam: R$ ${remaining.toLocaleString('pt-BR')}<br><br>` : ''}
+      Para chegar lá em 12 meses, você precisa guardar:<br>
+      🗓️ <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> por mês<br>
+      📅 <strong>R$ ${weekly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong> por semana<br><br>
+      💡 <em>Dica: Configure uma transferência automática desse valor no dia do seu pagamento!</em>`;
+  },
+
   // Executa a intenção detectada pelo NLU
   executeIntent(nluResult) {
     const { intent, data } = nluResult;
@@ -6222,6 +6678,12 @@ const OracleChat = {
         return this.completeTask(data.taskName);
         
       case 'finance.expense':
+        // Se o NLU não extraiu um valor, pergunta primeiro
+        if (data.amount === null) {
+          this.pendingAction = { type: 'expense_amount' };
+          return `Ok, ${treatment}! 💸 Qual foi o valor do gasto?`;
+        }
+
         if (data.amount) {
           if (data.description) {
             return this.addExpense(data.amount, data.description);
@@ -6282,6 +6744,58 @@ const OracleChat = {
       case 'task.list':
         return this.getTasksList();
         
+      case 'finance.goal':
+        return this.createFinancialGoal();
+
+      // HANDLERS DOS NOVOS INTENTS
+      case 'utility.calc':
+        const { n1, op, n2 } = data;
+        let res = 0;
+        let opSymbol = '';
+        if (['+', 'mais'].includes(op)) { res = n1 + n2; opSymbol = '+'; }
+        else if (['-', 'menos'].includes(op)) { res = n1 - n2; opSymbol = '-'; }
+        else if (['*', 'x', 'vezes'].includes(op)) { res = n1 * n2; opSymbol = '×'; }
+        else if (['/', 'dividido por'].includes(op)) { res = n1 / n2; opSymbol = '÷'; }
+        
+        const formattedRes = Number.isInteger(res) ? res : parseFloat(res.toFixed(2));
+        return `🔢 A conta é: <strong>${n1} ${opSymbol} ${n2} = ${formattedRes}</strong>`;
+
+      case 'utility.decision':
+        if (data.type === 'coin') {
+          const result = Math.random() < 0.5 ? 'Cara 👑' : 'Coroa 🦅';
+          return `🪙 Joguei a moeda e deu... <strong>${result}</strong>!`;
+        }
+        if (data.type === 'dice') {
+          const sides = parseInt(data.sides) || 6;
+          const result = Math.floor(Math.random() * sides) + 1;
+          return `🎲 Rolei um D${sides} e caiu: <strong>${result}</strong>!`;
+        }
+        if (data.type === 'choice') {
+          const choice = data.options[Math.floor(Math.random() * data.options.length)].trim();
+          const phrases = [
+            `🤔 Hmmm... eu escolheria <strong>${choice}</strong>!`,
+            `Entre esses, prefiro <strong>${choice}</strong>! ✨`,
+            `🎲 O destino diz: <strong>${choice}</strong>!`
+          ];
+          return phrases[Math.floor(Math.random() * phrases.length)];
+        }
+        return null;
+
+      case 'utility.date':
+        const now = new Date();
+        const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const date = now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        return `📅 Hoje é <strong>${date}</strong>.<br>⌚ Agora são <strong>${time}</strong>.`;
+
+      case 'system.clear':
+        const messages = document.getElementById('chatMessages');
+        if (messages) {
+          messages.innerHTML = '';
+          this.showWelcome();
+          return null;
+        }
+        return "Não consegui limpar o chat.";
+
       case 'memory.save':
         if (data.type === 'relationship' && data.key && data.value) {
           // Salva relacionamento de forma estruturada
@@ -6398,19 +6912,19 @@ const OracleChat = {
     const task = {
       id: Date.now(),
       text: data.title,
-      done: false,
+      completed: false,
       createdAt: new Date().toISOString(),
       dueDate: data.dueDate,
       dueTime: data.dueTime,
       xpReward: data.xpReward || 20
     };
-    
+
     gameState.dailyTasks.push(task);
     saveGame(true);
-    
+
     // Atualiza a lista de tarefas na UI
-    if (typeof updateTasksUI === 'function') updateTasksUI();
-    
+    if (typeof renderDailyTasks === 'function') renderDailyTasks();
+
     // Monta resposta
     let response = `✅ Tarefa criada: <strong>"${data.title}"</strong>`;
     
@@ -6442,6 +6956,96 @@ const OracleChat = {
     }
     
     switch(action.type) {
+      case 'learn_unknown':
+        let definition = lowerInput;
+        // Remove prefixos comuns de definição para limpar o comando
+        definition = definition.replace(/^(isso )?(significa|quer dizer|é|e|querer dizer)\s+/i, '').trim();
+        
+        const unknownPhrase = action.originalInput;
+        
+        // Salva o alias na memória
+        const mem = OracleMemory.get();
+        if (!mem.aliases) mem.aliases = {};
+        mem.aliases[unknownPhrase] = definition;
+        OracleMemory.save(mem);
+        
+        this.pendingAction = null;
+        
+        // Executa o comando aprendido para confirmar e mostrar que funcionou
+        setTimeout(() => {
+             const response = this.generateResponse(definition);
+             if (typeof response === 'string') {
+                addBotMessage(response);
+             } else if (response && response.message) {
+                addBotMessage(response.message, response.actions);
+             }
+        }, 1000);
+
+        return `Entendi! 🧠 Aprendi que "<strong>${unknownPhrase}</strong>" significa "<strong>${definition}</strong>".<br>Vou tentar fazer isso agora...`;
+
+      case 'learn_alias':
+        const newCommand = input.trim();
+        const originalCommand = action.originalInput;
+
+        // Check if the new command is something the Oracle understands
+        const nluResult = OracleNLU.detectIntent(newCommand);
+
+        if (nluResult.intent === 'unknown') {
+            this.pendingAction = { type: 'learn_alias', originalInput: originalCommand }; // Keep pending
+            return `Acho que também não entendi o comando "<strong>${newCommand}</strong>". 😕 Tente um comando que você sabe que eu entendo, como "criar tarefa" ou "meu status".`;
+        }
+
+        // If the new command is valid, save the alias
+        const mem2 = OracleMemory.get();
+        if (!mem2.aliases) mem2.aliases = {};
+        mem2.aliases[originalCommand.toLowerCase()] = newCommand;
+        OracleMemory.save(mem2);
+
+        this.pendingAction = null;
+
+        // Confirm and execute the new command
+        addBotMessage(`✅ Entendido! Da próxima vez que você disser "<strong>${originalCommand}</strong>", vou entender como "<strong>${newCommand}</strong>".<br><br>Agora, executando o comando...`);
+        
+        setTimeout(() => {
+            const response = this.generateResponse(newCommand);
+            if (typeof response === 'string') {
+                addBotMessage(response);
+            } else if (response.message) {
+                addBotMessage(response.message, response.actions);
+            }
+        }, 500);
+
+        return null; // Don't return anything, the response is handled asynchronously
+      case 'clarify_meta': // NEW CASE for ambiguity
+        if (lowerInput.includes('financeira')) {
+            this.pendingAction = null;
+            return this.createFinancialGoal();
+        } else if (lowerInput.includes('tarefa')) {
+            this.pendingAction = null;
+            const taskText = action.originalInput.replace(/^(criar|fazer|nova|minha)\s+/i, '').trim();
+            return createTask(taskText);
+        } else {
+            this.pendingAction = null; // Cancel if the response is not clear
+            return "Não entendi. Por favor, escolha entre 'Meta Financeira' ou 'Tarefa'.";
+        }
+        break;
+
+      case 'expense_amount': // NEW CASE
+        const expenseValue = parseMoney(lowerInput);
+        if (isNaN(expenseValue) || expenseValue <= 0) {
+          return "Por favor, digite um valor válido para o gasto (ex: 50 ou 12,50).";
+        }
+        this.pendingAction = { type: 'expense_description', value: expenseValue };
+        return {
+          message: `Ok, R$ ${expenseValue.toFixed(2)}. E qual o nome que deve ser colocado?`,
+          actions: [
+            { text: '🍔 Alimentação', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Alimentação')); } },
+            { text: '🚗 Transporte', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Transporte')); } },
+            { text: '🎮 Lazer', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Lazer')); } },
+            { text: '🛒 Compras', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Compras')); } }
+          ]
+        };
+
       case 'expense_description':
         // Usuário está dando a descrição para o gasto
         let desc = input.trim();
@@ -6451,7 +7055,7 @@ const OracleChat = {
         
         this.pendingAction = null;
         desc = desc.charAt(0).toUpperCase() + desc.slice(1);
-        return this.addExpense(action.value, desc);
+        return addExpense(action.value, desc);
         
       case 'expense_category':
         // Usuário escolhendo categoria
@@ -6459,7 +7063,7 @@ const OracleChat = {
         const chosenCat = categories.find(c => lowerInput.includes(c)) || 'outros';
         
         this.pendingAction = null;
-        return this.addExpenseWithCategory(action.value, action.description, chosenCat);
+        return addExpenseWithCategory(action.value, action.description, chosenCat);
         
       case 'income_description':
         // Usuário dando descrição para receita
@@ -6470,7 +7074,7 @@ const OracleChat = {
         
         this.pendingAction = null;
         incDesc = incDesc.charAt(0).toUpperCase() + incDesc.slice(1);
-        return this.addIncome(action.value, incDesc);
+        return addIncome(action.value, incDesc);
         
       case 'task_name':
         // Usuário dando nome para tarefa
@@ -6480,13 +7084,110 @@ const OracleChat = {
         }
         
         this.pendingAction = null;
-        return this.createTask(taskName);
+        return createTask(taskName);
         
+      case 'financial_goal_name':
+        let goalName = input.trim();
+        if (goalName.length < 2) {
+          return "Nome muito curto. Qual é o objetivo? (Ex: Viagem, Carro)";
+        }
+        this.pendingAction = { type: 'financial_goal_value', name: goalName };
+        return `Legal! E de quanto você precisa para "${goalName}"? (Digite o valor, ex: 5000)`;
+
+      case 'financial_goal_value':
+        const val = parseMoney(lowerInput);
+        if (isNaN(val) || val <= 0) {
+           return "Valor inválido. Digite um número (ex: 1000).";
+        }
+        this.pendingAction = null;
+        if (gameState) {
+            gameState.financialGoal = val;
+            saveGame();
+            updateUI();
+            return `🎯 Meta definida para <strong>${action.name}</strong>: R$ ${val.toLocaleString('pt-BR')}! 🚀`;
+        }
+        return "Erro ao salvar meta.";
+
+      case 'guided_goal_income':
+        const income = parseMoney(lowerInput);
+        if (isNaN(income) || income <= 0) return "Por favor, digite um valor válido para sua renda (ex: 3000).";
+
+        // Analisa o histórico de finanças
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const recentExpenses = (gameState.finances || [])
+          .filter(f => f.type === 'expense' && new Date(f.date) >= thirtyDaysAgo);
+        
+        // Se tiver mais de 5 gastos nos últimos 30 dias, usa como base
+        if (recentExpenses.length >= 5) {
+          const totalRecentExpenses = recentExpenses.reduce((sum, e) => sum + e.value, 0);
+          const estimatedMonthlyExpenses = totalRecentExpenses; // Simplesmente soma os gastos dos últimos 30 dias
+          
+          const balance = income - estimatedMonthlyExpenses;
+
+          if (balance <= 0) {
+            this.pendingAction = null;
+            return `Analisei seus gastos e eles somam R$ ${estimatedMonthlyExpenses.toLocaleString('pt-BR')} no último mês. Com sua renda de R$ ${income.toLocaleString('pt-BR')}, parece não sobrar muito. 📉\n\nMinha dica: Vamos focar em **reduzir gastos** primeiro?`;
+          }
+
+          const suggestedMonthly = Math.floor(balance * 0.5);
+          const oneYearTotal = suggestedMonthly * 12;
+
+          this.pendingAction = { type: 'guided_goal_confirm', monthly: suggestedMonthly, total: oneYearTotal };
+          
+          return `Analisei seus gastos e eles somam R$ ${estimatedMonthlyExpenses.toLocaleString('pt-BR')} no último mês. 🧐\n\n` +
+                 `Com sua renda de R$ ${income.toLocaleString('pt-BR')}, sobra aproximadamente **R$ ${balance.toLocaleString('pt-BR')}**.\n\n` +
+                 `Se você guardar **R$ ${suggestedMonthly.toLocaleString('pt-BR')}** por mês (metade da sobra), em 1 ano terá **R$ ${oneYearTotal.toLocaleString('pt-BR')}**!\n\n` +
+                 `Podemos definir essa meta de **R$ ${oneYearTotal.toLocaleString('pt-BR')}**?`;
+        } else {
+          // Se não tem dados suficientes, pergunta ao usuário
+          this.pendingAction = { type: 'guided_goal_expenses', income: income };
+          return `Certo, renda de R$ ${income.toLocaleString('pt-BR')}. 💰\nComo não tenho muitos dados sobre seus gastos, qual é o total aproximado das suas **contas e despesas mensais**?`;
+        }
+
+      case 'guided_goal_expenses':
+        const expenses = parseMoney(lowerInput);
+        if (isNaN(expenses) || expenses < 0) return "Por favor, digite um valor válido para suas despesas.";
+        
+        const incomeVal = action.income;
+        const balance = incomeVal - expenses;
+        
+        if (balance <= 0) {
+            this.pendingAction = null;
+            return `Poxa, suas despesas (R$ ${expenses}) parecem cobrir toda sua renda (R$ ${incomeVal}). 📉\n\nMinha dica: Vamos focar em **reduzir gastos** primeiro? Posso analisar suas finanças se você disser "analisar gastos".`;
+        }
+
+        // Sugere guardar 50% do que sobra
+        const suggestedMonthly = Math.floor(balance * 0.5); 
+        const oneYearTotal = suggestedMonthly * 12;
+        
+        this.pendingAction = { type: 'guided_goal_confirm', monthly: suggestedMonthly, total: oneYearTotal };
+        
+        return `📊 **Análise:**\n` +
+               `• Sobra mensalmente: R$ ${balance.toLocaleString('pt-BR')}\n\n` +
+               `Se você guardar **R$ ${suggestedMonthly.toLocaleString('pt-BR')}** por mês (metade da sobra), em 1 ano terá **R$ ${oneYearTotal.toLocaleString('pt-BR')}**!\n\n` +
+               `Podemos definir essa meta de **R$ ${oneYearTotal.toLocaleString('pt-BR')}**?`;
+
+      case 'guided_goal_confirm':
+        if (lowerInput.match(/^(sim|s|yes|claro|pode|bora|isso|confirma|ok|tá|ta)$/i)) {
+            if (gameState) {
+                gameState.financialGoal = action.total;
+                saveGame();
+                updateUI();
+            }
+            this.pendingAction = null;
+            return `🎉 **Meta Definida!**\n\nSeu objetivo: **R$ ${action.total.toLocaleString('pt-BR')}**.\nFoco em guardar R$ ${action.monthly.toLocaleString('pt-BR')} todo mês. Estou torcendo por você! 🚀`;
+        } else {
+            this.pendingAction = { type: 'financial_goal_value', name: 'Meta Personalizada' };
+            return "Entendi! Então qual valor total você quer definir para sua meta?";
+        }
+
       case 'savings_confirm':
         // Confirmar ação de poupança
         if (lowerInput.match(/^(sim|s|yes|y|claro|pode|bora|isso|confirma)$/i)) {
           this.pendingAction = null;
-          return this.addSavings(action.value);
+          return addSavings(action.value);
         } else if (lowerInput.match(/^(não|nao|n|no|cancela)$/i)) {
           this.pendingAction = null;
           return `Ok, ${treatment}! Cancelado. 😊`;
@@ -6615,21 +7316,33 @@ const OracleChat = {
     const isPolite = OracleMemory.getProfile('isPolite');
     const politeResponse = isPolite ? ' 😊' : '';
     
+    // COMANDOS DE SISTEMA DE REGRAS
+    if (lowerInput.match(/^usar regras (json|markdown|txt)/i)) {
+      const match = lowerInput.match(/^usar regras (json|markdown|txt)/i);
+      return OracleOnboarding.setRuleMode(match[1].toLowerCase());
+    }
+    
+    if (lowerInput.match(/^(ver|mostrar) regras/i)) {
+      const rules = OracleOnboarding.getRulesText();
+      const displayRules = rules.length > 500 ? rules.substring(0, 500) + '...' : rules;
+      return `📜 <strong>Regras Atuais (${OracleOnboarding.activeMode.toUpperCase()}):</strong><br><br><pre style="font-size:10px; white-space:pre-wrap; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">${displayRules}</pre>`;
+    }
+    
     // CRIAR TAREFA
     if (lowerInput.match(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i)) {
       const taskText = originalInput.replace(/^(criar?|adicionar?|nova?) ?(tarefa|task|missão)/i, '').trim();
       
       if (taskText && taskText.length > 2) {
-        return this.createTask(taskText);
+        return createTask(taskText);
       } else {
         // Pergunta interativa
         this.pendingAction = { type: 'task_name' };
         return {
           message: `Claro, ${treatment}! Qual tarefa você quer criar? 📝`,
           actions: [
-            { text: '📚 Estudar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Estudar')); } },
-            { text: '🏃 Exercitar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Fazer exercícios')); } },
-            { text: '🧹 Organizar', action: () => { this.pendingAction = null; this.addBotMessage(this.createTask('Organizar ambiente')); } }
+            { text: '📚 Estudar', action: () => { this.pendingAction = null; addBotMessage(createTask('Estudar')); } },
+            { text: '🏃 Exercitar', action: () => { this.pendingAction = null; addBotMessage(createTask('Fazer exercícios')); } },
+            { text: '🧹 Organizar', action: () => { this.pendingAction = null; addBotMessage(createTask('Organizar ambiente')); } }
           ]
         };
       }
@@ -6670,15 +7383,15 @@ const OracleChat = {
           return {
             message: `Beleza, ${treatment}! 💸 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de saída.${politeResponse}<br><br>Qual nome devo colocar nessa despesa?`,
             actions: [
-              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Alimentação')); } },
-              { text: '🚗 Transporte', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Transporte')); } },
-              { text: '🎮 Lazer', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Lazer')); } },
-              { text: '🛒 Compras', action: () => { this.pendingAction = null; this.addBotMessage(this.addExpense(value, 'Compras')); } }
+              { text: '🍔 Alimentação', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Alimentação')); } },
+              { text: '🚗 Transporte', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Transporte')); } },
+              { text: '🎮 Lazer', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Lazer')); } },
+              { text: '🛒 Compras', action: () => { this.pendingAction = null; addBotMessage(addExpense(value, 'Compras')); } }
             ]
           };
         }
         
-        return this.addExpense(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+        return addExpense(value, desc.charAt(0).toUpperCase() + desc.slice(1));
       }
     }
     
@@ -6711,15 +7424,15 @@ const OracleChat = {
           return {
             message: `Show, ${treatment}! 💰 Vou registrar <strong>R$ ${value.toFixed(2)}</strong> de entrada.${politeResponse}<br><br>De onde veio essa grana?`,
             actions: [
-              { text: '💼 Salário', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Salário')); } },
-              { text: '💻 Freelance', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Freelance')); } },
-              { text: '🎁 Presente', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Presente')); } },
-              { text: '📈 Investimento', action: () => { this.pendingAction = null; this.addBotMessage(this.addIncome(value, 'Investimento')); } }
+              { text: '💼 Salário', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Salário')); } },
+              { text: '💻 Freelance', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Freelance')); } },
+              { text: '🎁 Presente', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Presente')); } },
+              { text: '📈 Investimento', action: () => { this.pendingAction = null; addBotMessage(addIncome(value, 'Investimento')); } }
             ]
           };
         }
         
-        return this.addIncome(value, desc.charAt(0).toUpperCase() + desc.slice(1));
+        return addIncome(value, desc.charAt(0).toUpperCase() + desc.slice(1));
       }
     }
     
@@ -6734,7 +7447,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.addSavings(value);
+        return addSavings(value);
       }
     }
     
@@ -6748,7 +7461,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.withdrawSavings(value);
+        return withdrawSavings(value);
       }
     }
     
@@ -6763,25 +7476,25 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const value = parseFloat(match[1].replace(',', '.'));
-        return this.setSavingsGoal(value);
+        return setSavingsGoal(value);
       }
     }
     
     // VER POUPANÇA/ECONOMIAS
     if (lowerInput.match(/(?:quanto\s+)?(?:tenho|tem)\s+(?:na|de)\s+(?:poupança|economia|reserva|guardado)|(?:minha|ver)\s+(?:poupança|economia|reserva)/i)) {
-      return this.getSavingsStatus();
+      return getSavingsStatus();
     }
     
     // COMPLETAR TAREFA
     if (lowerInput.match(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i)) {
       const taskName = originalInput.replace(/^(completar?|concluir?|finalizar?|feito?) ?(tarefa)?/i, '').trim();
-      return this.completeTask(taskName);
+      return completeTask(taskName);
     }
     
     // DELETAR TAREFA
     if (lowerInput.match(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i)) {
       const taskName = originalInput.replace(/(?:deletar?|deleta|remover?|remove|apagar?|apaga|excluir?|exclui)\s+(?:a\s+)?tarefa/i, '').trim();
-      return this.deleteTask(taskName);
+      return deleteTask(taskName);
     }
     
     // INICIAR/PARAR TRABALHO
@@ -6844,14 +7557,14 @@ const OracleChat = {
       if (match) {
         const oldName = match[1].trim();
         const newName = match[2].trim();
-        return this.renameExpense(oldName, newName);
+        return renameExpense(oldName, newName);
       }
     }
     
     // VER GASTOS / LISTAR DESPESAS (para poder escolher qual renomear)
     if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:meus?\s+)?(?:gastos?|despesas?|saídas?)/i) ||
         lowerInput.match(/(?:meus?\s+)?(?:gastos?|despesas?|saídas?)\s+(?:recentes?)?/i)) {
-      return this.listExpenses();
+      return listExpenses();
     }
     
     // DELETAR/REMOVER GASTO
@@ -6864,7 +7577,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const name = match[1].trim();
-        return this.deleteExpense(name);
+        return deleteExpense(name);
       }
     }
     
@@ -6878,14 +7591,14 @@ const OracleChat = {
       if (match) {
         const oldName = match[1].trim();
         const newName = match[2].trim();
-        return this.renameIncome(oldName, newName);
+        return renameIncome(oldName, newName);
       }
     }
     
     // VER RECEITAS / LISTAR ENTRADAS
     if (lowerInput.match(/(?:ver|mostrar?|mostra|listar?|lista|quais?)\s+(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)/i) ||
         lowerInput.match(/(?:minhas?\s+)?(?:entradas?|receitas?|ganhos?)\s+(?:recentes?)?/i)) {
-      return this.listIncomes();
+      return listIncomes();
     }
     
     // DELETAR/REMOVER ENTRADA
@@ -6897,7 +7610,7 @@ const OracleChat = {
       const match = originalInput.match(pattern);
       if (match) {
         const name = match[1].trim();
-        return this.deleteIncome(name);
+        return deleteIncome(name);
       }
     }
     
@@ -7411,10 +8124,6 @@ const OracleChat = {
       return this.startConversationMode();
     }
     
-    // Respostas a perguntas do Oráculo (quando ele pergunta sobre o usuário)
-    const conversationResult = this.handleConversationResponses(lowerInput);
-    if (conversationResult) return conversationResult;
-    
     return null;
   },
   
@@ -7457,6 +8166,13 @@ const OracleChat = {
     return questions[topic];
   },
   
+  // Encerra o modo de conversa e volta a ser assistente
+  stopConversationMode() {
+    OracleMemory.setProfile('conversationMode', false);
+    OracleMemory.setProfile('lastQuestion', null);
+    return "Modo conversa encerrado. Estou pronto para ajudar como assistente! 💼";
+  },
+  
   // Processa respostas durante a conversa
   handleConversationResponses(lowerInput) {
     const profile = OracleMemory.get().profile || {};
@@ -7467,6 +8183,18 @@ const OracleChat = {
     
     // Se não está em modo conversa, ignora
     if (!profile.conversationMode) return null;
+
+    // Detecta mudança de contexto para comandos de assistente (ex: Finanças)
+    if (lowerInput.match(/^(finanças|financeiro|saldo|dinheiro|tarefas|tasks|trabalho|job|ajuda|help|status|xp|metas|objetivos|configurações|configuracoes)/i)) {
+        this.stopConversationMode(); // Sai do modo conversa silenciosamente
+        return null; // Permite que o generateResponse continue e processe o comando
+    }
+
+    // VALIDAÇÃO DO PERGAMINHO
+    const validation = OracleOnboarding.validateInput(lastQuestion, lowerInput);
+    if (!validation.valid) {
+      return validation.message;
+    }
     
     let learned = null;
     let nextQuestion = null;
@@ -7486,7 +8214,7 @@ const OracleChat = {
           userName = userName.split(/\s+/)[0];
           
           // Ignora palavras comuns que não são nomes
-          const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá', 'sim', 'não', 'nao', 'ok', 'tudo'];
+          const ignoreWords = ['eu', 'você', 'voce', 'aqui', 'hoje', 'bem', 'oi', 'ola', 'olá', 'sim', 'não', 'nao', 'ok', 'tudo', 'quais', 'qual', 'que', 'como'];
           if (userName.length >= 2 && !ignoreWords.includes(userName.toLowerCase())) {
             userName = userName.charAt(0).toUpperCase() + userName.slice(1).toLowerCase();
             OracleMemory.setProfile('name', userName);
@@ -7755,9 +8483,18 @@ const OracleChat = {
     const wisdomResponse = this.getContextualWisdom(input);
     if (wisdomResponse) return wisdomResponse;
     
-    return CHARISMATIC_RESPONSES.notUnderstood[
-      Math.floor(Math.random() * CHARISMATIC_RESPONSES.notUnderstood.length)
-    ] + `<br><br>Dica: Diz <strong>"ajuda"</strong> pra ver o que sei fazer! 💡`;
+    // Se não entendeu, pergunta e aprende
+    this.pendingAction = { type: 'learn_unknown', originalInput: input };
+    
+    return {
+      message: `Não entendi "<strong>${input}</strong>", ${treatment}. 😕<br><br>O que isso significa? Você pode me ensinar! (Ex: "significa criar tarefa estudar")`,
+      actions: [
+        { text: '❌ Deixa pra lá', action: () => { 
+          this.pendingAction = null; 
+          addBotMessage('Tudo bem! Se precisar de algo, estou aqui. 😊'); 
+        }}
+      ]
+    };
   },
   
   // Sistema de Sabedoria Contextual - Respostas inteligentes baseadas em contexto
@@ -7948,617 +8685,2071 @@ const OracleChat = {
     return null; // Não encontrou contexto - usa resposta padrão
   },
   
-  // Métodos auxiliares para NLU
-  getTasksList() {
-    if (!gameState) return "Não consegui acessar seus dados.";
-    
-    const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
-    const completed = (gameState.dailyTasks || []).filter(t => t.completed);
-    
-    if (pending.length === 0 && completed.length === 0) {
-      return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+  // ... (restante do código existente)
+};
+
+// ===========================================
+// MÓDULO BÍBLIA - ASSISTENTE BÍBLICO
+// ===========================================
+//
+// Objetivo: responder perguntas bíblicas por:
+// - Tópicos (ansiedade, medo, perdão...)
+// - Livros (resumo, temas, estrutura)
+// - Personagens (quem foi, chamada, papel)
+// - Referências (ex: "João 3:16", "Rm 8:28")
+// - Recursos: versículo do dia (referência), plano de leitura, sugestão de oração
+//
+// Observação: NÃO inclui texto literal de versículos (traduções são protegidas).
+// Em vez disso, devolve referência + ideia/paráfrase curta.
+//
+// Uso: BibleAssistant.reply("tô com ansiedade")
+// ===========================================
+
+const BibleAssistant = {
+  // -------------------------
+  // CONFIG
+  // -------------------------
+  config: {
+    maxRefsToShow: 7,
+    minFuzzyScore: 0.62, // quanto maior, mais "exigente"
+    enableDebug: false,
+    ui: {
+      titleIcon: "📖",
+      sectionIcon: "•",
+      warnIcon: "⚠️",
+      okIcon: "✅",
+      tipIcon: "💡",
+      prayIcon: "🙏",
+      bookIcon: "📚",
+      personIcon: "👤",
+      topicIcon: "🧭",
     }
-    
-    let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
-    
-    if (pending.length > 0) {
-      response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
-      pending.forEach(t => {
-        response += `• ${t.text}`;
-        if (t.dueDate) {
-          const date = new Date(t.dueDate + 'T00:00');
-          response += ` <small>(${date.toLocaleDateString('pt-BR')})</small>`;
-        }
-        response += `<br>`;
-      });
-      response += '<br>';
-    }
-    
-    if (completed.length > 0) {
-      response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
-      completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
-    }
-    
-    if (pending.length > 0) {
-      response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
-    }
-    
-    return response;
-  },
-  
-  getFinanceSummary() {
-    if (!gameState || !gameState.finances) {
-      return "📊 Você ainda não tem registros financeiros. Diz algo como <strong>gastei 50 no almoço</strong> para começar!";
-    }
-    
-    const finances = gameState.finances;
-    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
-    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
-    const balance = income - expenses;
-    
-    // Agrupa gastos por categoria
-    const categories = {};
-    finances.filter(f => f.type === 'expense').forEach(f => {
-      const cat = f.category || 'Outros';
-      categories[cat] = (categories[cat] || 0) + f.value;
-    });
-    
-    let response = `<strong>💰 Resumo Financeiro:</strong><br><br>`;
-    response += `📈 Entradas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>`;
-    response += `📉 Saídas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>`;
-    response += `💵 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br><br>`;
-    
-    if (Object.keys(categories).length > 0) {
-      response += `<strong>📊 Gastos por categoria:</strong><br>`;
-      const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
-      sortedCats.slice(0, 5).forEach(([cat, val]) => {
-        response += `• ${cat}: R$ ${val.toFixed(2)}<br>`;
-      });
-    }
-    
-    response += `<br>${balance >= 0 ? '✅ Suas finanças estão no verde!' : '⚠️ Atenção com os gastos!'}`;
-    
-    return response;
-  },
-  
-  getStatusInfo() {
-    if (!gameState) return "Não consegui acessar seus dados.";
-    
-    const name = OracleMemory.getProfile('name');
-    const treatment = name || 'Aventureiro';
-    
-    const level = gameState.level || 1;
-    const xp = gameState.xp || 0;
-    const pendingTasks = (gameState.dailyTasks || []).filter(t => !t.completed).length;
-    
-    // Calcula saldo financeiro
-    const finances = gameState.finances || [];
-    const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
-    const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
-    const balance = income - expenses;
-    
-    // Trabalho de hoje
-    const today = new Date().toISOString().split('T')[0];
-    const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
-    const todayProd = todayLogs.reduce((sum, l) => sum + (l.production || 0), 0);
-    const todayMoney = todayLogs.reduce((sum, l) => sum + (l.money || 0), 0);
-    
-    let response = `<strong>🎮 Status de ${treatment}:</strong><br><br>`;
-    response += `⭐ Nível: <strong>${level}</strong> | XP: <strong>${xp}/100</strong><br>`;
-    response += `📝 Tarefas pendentes: <strong>${pendingTasks}</strong><br>`;
-    response += `💰 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>`;
-    
-    if (todayProd > 0 || todayMoney > 0) {
-      response += `<br><strong>📊 Hoje:</strong><br>`;
-      response += `🍕 Produção: ${todayProd} massas<br>`;
-      response += `💵 Ganho: R$ ${todayMoney.toFixed(2)}<br>`;
-    }
-    
-    // Dica personalizada
-    if (pendingTasks > 3) {
-      response += `<br>💡 Você tem muitas tarefas! Foque nas mais importantes.`;
-    } else if (pendingTasks === 0) {
-      response += `<br>🎉 Sem tarefas pendentes! Que tal criar uma nova meta?`;
-    }
-    
-    return response;
-  },
-  
-  getSuccessMessage() {
-    return CHARISMATIC_RESPONSES.success[
-      Math.floor(Math.random() * CHARISMATIC_RESPONSES.success.length)
-    ];
-  },
-  
-  // Ações reais
-  createTask(text) {
-    if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
-    
-    if (!gameState.dailyTasks) gameState.dailyTasks = [];
-    
-    gameState.dailyTasks.push({
-      id: Date.now(),
-      text: text,
-      completed: false,
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderDailyTasks === 'function') renderDailyTasks();
-    
-    return this.getSuccessMessage() + `<br><br>📝 Tarefa criada: <strong>${text}</strong><br><br>Quando terminar, diz: <strong>completar ${text}</strong>`;
-  },
-  
-  completeTask(taskName) {
-    if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
-    
-    const task = gameState.dailyTasks.find(t => 
-      !t.completed && t.text.toLowerCase().includes(taskName.toLowerCase())
-    );
-    
-    if (task) {
-      task.completed = true;
-      task.completedAt = new Date().toISOString();
-      
-      // Dar XP
-      gameState.xp = (gameState.xp || 0) + 10;
-      if (gameState.xp >= 100) {
-        gameState.level = (gameState.level || 1) + 1;
-        gameState.xp -= 100;
-      }
-      
-      saveGame();
-      if (typeof renderDailyTasks === 'function') renderDailyTasks();
-      if (typeof updateUI === 'function') updateUI();
-      
-      return this.getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+10 XP 🎉`;
-    }
-    
-    return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
-  },
-  
-  addExpense(value, desc) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    // Detecta categoria automaticamente pela descrição
-    const category = this.detectCategory(desc);
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'expense',
-      category: category,
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    const name = OracleMemory.getProfile('name');
-    const gender = OracleMemory.getProfile('gender');
-    const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
-    
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
-  },
-  
-  addExpenseWithCategory(value, desc, category) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'expense',
-      category: category.charAt(0).toUpperCase() + category.slice(1),
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    return this.getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>`;
-  },
-  
-  // RENOMEAR GASTO
-  renameExpense(oldName, newName) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const expenses = gameState.finances.filter(t => t.type === 'expense');
-    
-    // Busca por nome parcial (case insensitive)
-    const found = expenses.filter(e => 
-      e.desc.toLowerCase().includes(oldName.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhum gasto com o nome "<strong>${oldName}</strong>".<br><br>` +
-             `💡 Dica: Diga "<strong>ver meus gastos</strong>" para listar todos os seus gastos.`;
-    }
-    
-    if (found.length === 1) {
-      // Apenas um gasto encontrado - renomeia direto
-      const expense = found[0];
-      const oldDesc = expense.desc;
-      expense.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-      
-      // Recalcula categoria se necessário
-      expense.category = this.detectCategory(expense.desc);
-      
-      saveGame();
-      if (typeof renderFinances === 'function') renderFinances();
-      
-      return `✅ Gasto renomeado com sucesso!<br><br>` +
-             `📝 De: <strong>${oldDesc}</strong><br>` +
-             `📝 Para: <strong>${expense.desc}</strong><br>` +
-             `<small>Categoria: ${expense.category}</small>`;
-    }
-    
-    // Múltiplos gastos encontrados - mostra opções
-    this.pendingAction = { type: 'rename_expense_select', newName: newName, matches: found };
-    
-    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${oldName}</strong>".<br>Qual você quer renomear?<br><br>`;
-    
-    const actions = found.slice(0, 5).map((e, i) => ({
-      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-        e.category = this.detectCategory(e.desc);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado com sucesso!`);
-      }
-    }));
-    
-    return { message: response, actions: actions };
-  },
-  
-  // LISTAR GASTOS
-  listExpenses() {
-    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
-    
-    const expenses = gameState.finances
-      .filter(t => t.type === 'expense')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 10); // Últimos 10
-    
-    if (expenses.length === 0) {
-      return "📊 Você ainda não registrou nenhum gasto.<br><br>💡 Dica: Diga \"<strong>gastei 50 no almoço</strong>\" para registrar.";
-    }
-    
-    let response = `📊 <strong>Seus últimos gastos:</strong><br><br>`;
-    
-    expenses.forEach((e, i) => {
-      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
-    });
-    
-    response += `<br>💡 Para renomear: "<strong>renomear gasto X para Y</strong>"<br>`;
-    response += `💡 Para deletar: "<strong>deletar gasto X</strong>"`;
-    
-    return response;
-  },
-  
-  // DELETAR GASTO
-  deleteExpense(name) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const expenses = gameState.finances.filter(t => t.type === 'expense');
-    
-    // Busca por nome parcial
-    const found = expenses.filter(e => 
-      e.desc.toLowerCase().includes(name.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhum gasto com o nome "<strong>${name}</strong>".`;
-    }
-    
-    if (found.length === 1) {
-      const expense = found[0];
-      
-      // Pede confirmação
-      this.pendingAction = { type: 'confirm_delete_expense', expense: expense };
-      
-      return {
-        message: `⚠️ Tem certeza que quer deletar o gasto "<strong>${expense.desc}</strong>" de R$ ${expense.value.toFixed(2)}?`,
-        actions: [
-          { 
-            text: '✅ Sim, deletar', 
-            action: () => {
-              gameState.finances = gameState.finances.filter(f => f.id !== expense.id);
-              saveGame();
-              if (typeof renderFinances === 'function') renderFinances();
-              this.pendingAction = null;
-              this.addBotMessage(`🗑️ Gasto "<strong>${expense.desc}</strong>" deletado!`);
-            }
-          },
-          { 
-            text: '❌ Não, cancelar', 
-            action: () => {
-              this.pendingAction = null;
-              this.addBotMessage('Ok, cancelado! 👍');
-            }
-          }
-        ]
-      };
-    }
-    
-    // Múltiplos encontrados
-    this.pendingAction = { type: 'delete_expense_select', matches: found };
-    
-    let response = `🔍 Encontrei ${found.length} gastos com "<strong>${name}</strong>".<br>Qual você quer deletar?<br><br>`;
-    
-    const actions = found.slice(0, 5).map(e => ({
-      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`🗑️ Gasto "<strong>${e.desc}</strong>" deletado!`);
-      }
-    }));
-    
-    return { message: response, actions: actions };
-  },
-  
-  // Detecta categoria automaticamente
-  detectCategory(desc) {
-    const lower = desc.toLowerCase();
-    
-    const categories = {
-      'Alimentação': ['almoço', 'jantar', 'café', 'lanche', 'comida', 'restaurante', 'pizza', 'hamburguer', 'sushi', 'mercado', 'supermercado', 'feira', 'padaria', 'açougue', 'ifood', 'rappi', 'delivery'],
-      'Transporte': ['uber', '99', 'taxi', 'gasolina', 'combustível', 'estacionamento', 'pedágio', 'ônibus', 'metrô', 'passagem', 'carro', 'moto', 'bicicleta'],
-      'Lazer': ['cinema', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'parque', 'viagem', 'passeio', 'diversão'],
-      'Saúde': ['farmácia', 'remédio', 'médico', 'consulta', 'exame', 'hospital', 'dentista', 'academia', 'suplemento', 'vitamina'],
-      'Educação': ['curso', 'livro', 'escola', 'faculdade', 'mensalidade', 'material', 'apostila', 'aula'],
-      'Moradia': ['aluguel', 'condomínio', 'luz', 'água', 'gás', 'internet', 'telefone', 'celular', 'conta'],
-      'Compras': ['roupa', 'sapato', 'tênis', 'shopping', 'loja', 'presente', 'eletrônico', 'celular']
-    };
-    
-    for (const [cat, keywords] of Object.entries(categories)) {
-      if (keywords.some(kw => lower.includes(kw))) {
-        return cat;
-      }
-    }
-    
-    return 'Outros';
-  },
-  
-  addIncome(value, desc) {
-    if (!gameState) return "Erro ao registrar. Tente pela interface.";
-    
-    if (!gameState.finances) gameState.finances = [];
-    
-    gameState.finances.push({
-      id: Date.now(),
-      desc: desc,
-      value: value,
-      type: 'income',
-      category: 'Extra',
-      date: new Date().toISOString()
-    });
-    
-    saveGame();
-    if (typeof renderFinances === 'function') renderFinances();
-    
-    return this.getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}`;
-  },
-  
-  // RENOMEAR RECEITA/ENTRADA
-  renameIncome(oldName, newName) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const incomes = gameState.finances.filter(t => t.type === 'income');
-    
-    const found = incomes.filter(e => 
-      e.desc.toLowerCase().includes(oldName.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${oldName}</strong>".<br><br>` +
-             `💡 Dica: Diga "<strong>ver minhas entradas</strong>" para listar.`;
-    }
-    
-    if (found.length === 1) {
-      const income = found[0];
-      const oldDesc = income.desc;
-      income.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-      
-      saveGame();
-      if (typeof renderFinances === 'function') renderFinances();
-      
-      return `✅ Entrada renomeada!<br><br>` +
-             `📝 De: <strong>${oldDesc}</strong><br>` +
-             `📝 Para: <strong>${income.desc}</strong>`;
-    }
-    
-    // Múltiplos encontrados
-    this.pendingAction = { type: 'rename_income_select', newName: newName, matches: found };
-    
-    const actions = found.slice(0, 5).map(e => ({
-      text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado!`);
-      }
-    }));
-    
-    return { message: `🔍 Encontrei ${found.length} entradas. Qual renomear?`, actions: actions };
-  },
-  
-  // LISTAR RECEITAS/ENTRADAS
-  listIncomes() {
-    if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
-    
-    const incomes = gameState.finances
-      .filter(t => t.type === 'income')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 10);
-    
-    if (incomes.length === 0) {
-      return "📊 Você ainda não registrou nenhuma entrada.<br><br>💡 Dica: Diga \"<strong>recebi 1000 de salário</strong>\" para registrar.";
-    }
-    
-    let response = `📊 <strong>Suas últimas entradas:</strong><br><br>`;
-    
-    incomes.forEach((e, i) => {
-      const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-      response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
-    });
-    
-    response += `<br>💡 Para renomear: "<strong>renomear entrada X para Y</strong>"`;
-    
-    return response;
-  },
-  
-  // DELETAR RECEITA/ENTRADA
-  deleteIncome(name) {
-    if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
-    
-    const incomes = gameState.finances.filter(t => t.type === 'income');
-    
-    const found = incomes.filter(e => 
-      e.desc.toLowerCase().includes(name.toLowerCase())
-    );
-    
-    if (found.length === 0) {
-      return `❌ Não encontrei nenhuma entrada com o nome "<strong>${name}</strong>".`;
-    }
-    
-    if (found.length === 1) {
-      const income = found[0];
-      
-      this.pendingAction = { type: 'confirm_delete_income', income: income };
-      
-      return {
-        message: `⚠️ Deletar entrada "<strong>${income.desc}</strong>" de R$ ${income.value.toFixed(2)}?`,
-        actions: [
-          { 
-            text: '✅ Sim, deletar', 
-            action: () => {
-              gameState.finances = gameState.finances.filter(f => f.id !== income.id);
-              saveGame();
-              if (typeof renderFinances === 'function') renderFinances();
-              this.pendingAction = null;
-              this.addBotMessage(`🗑️ Entrada "<strong>${income.desc}</strong>" deletada!`);
-            }
-          },
-          { 
-            text: '❌ Cancelar', 
-            action: () => {
-              this.pendingAction = null;
-              this.addBotMessage('Ok, cancelado! 👍');
-            }
-          }
-        ]
-      };
-    }
-    
-    // Múltiplos encontrados
-    const actions = found.slice(0, 5).map(e => ({
-      text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
-      action: () => {
-        gameState.finances = gameState.finances.filter(f => f.id !== e.id);
-        saveGame();
-        if (typeof renderFinances === 'function') renderFinances();
-        this.pendingAction = null;
-        this.addBotMessage(`🗑️ Entrada "<strong>${e.desc}</strong>" deletada!`);
-      }
-    }));
-    
-    return { message: `🔍 Encontrei ${found.length} entradas. Qual deletar?`, actions: actions };
   },
 
-  // UI Methods
-  addUserMessage(text) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message user';
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+  // -------------------------
+  // SINÔNIMOS / GATILHOS
+  // (ajuda a mapear o que a pessoa escreve para um tópico)
+  // -------------------------
+  synonyms: {
+    ansiedade: ["ansioso", "preocupação", "preocupado", "aflição", "apreensão", "angústia", "stress", "estresse"],
+    medo: ["pavor", "terror", "insegurança", "ameaça", "assustado", "medroso", "ansiedade social"],
+    amor: ["amar", "carinho", "afeição", "relacionamento", "casamento", "compaixão"],
+    dinheiro: ["finanças", "rico", "pobre", "dívida", "ganância", "avareza", "prosperidade"],
+    tristeza: ["depressão", "desânimo", "choro", "luto", "dor", "vazio", "coração partido"],
+    proposito: ["propósito", "vocação", "chamado", "sentido", "missão", "direção", "plano"],
+    perdao: ["perdão", "culpa", "arrependimento", "restauração", "reconciliação"],
+    fe: ["fé", "crer", "dúvida", "confiança", "incredulidade", "graca", "graça", "misericordia", "misericórdia"],
+    esperanca: ["esperança", "futuro", "promessa", "desesperança"],
+    paz: ["calma", "tranquilidade", "descanso", "shlom", "shalom", "serenidade"],
+    sabedoria: ["decisão", "discernimento", "conselho", "prudência", "inteligência"],
+    gratidao: ["gratidão", "agradecer", "louvar", "reconhecer"],
+    familia: ["pais", "filhos", "mãe", "pai", "lar", "casamento", "esposa", "marido"],
+    trabalho: ["emprego", "carreira", "profissão", "produtividade", "preguiça"],
+    amizade: ["amigo", "amizades", "companheiro", "relacionamentos"],
+    cura: ["doença", "enfermidade", "saúde", "dor", "medicina"],
+    tentacao: ["tentação", "vício", "pecado", "fraqueza", "queda"],
+    paciencia: ["paciência", "esperar", "pressa", "irritação", "raiva"],
+    orgulho: ["orgulho", "vaidade", "arrogância", "humildade"],
+    raiva: ["ira", "ódio", "ressentimento", "vingança"],
+    injustica: ["injustiça", "opressão", "sofrimento", "perseguição"],
+    solidao: ["solidão", "sozinho", "abandono", "rejeição"],
+    casamento: ["casamento", "namoro", "noivado", "conflito", "briga", "divórcio"],
+    "novos mandamentos": ["mandamento novo", "novo mandamento", "amar uns aos outros", "amar ao próximo", "mandamentos de jesus"],
   },
-  
-  addBotMessage(text, actions = null) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message bot';
-    div.innerHTML = text;
-    
-    if (actions && actions.length > 0) {
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'oracle-action-btns';
-      
-      actions.forEach(action => {
-        const btn = document.createElement('button');
-        btn.className = 'oracle-action-btn';
-        btn.textContent = action.text;
-        btn.addEventListener('click', () => {
-          action.action();
-          actionsDiv.remove();
-        });
-        actionsDiv.appendChild(btn);
-      });
-      
-      div.appendChild(actionsDiv);
+
+  // -------------------------
+  // BASE DE CONHECIMENTO POR TÓPICOS
+  // refs: referências
+  // summary: ideia geral (sem citação literal)
+  // practice: prática sugerida (oração/ação)
+  // -------------------------
+  topicMap: {
+    ansiedade: {
+      refs: ["Filipenses 4:6-7", "1 Pedro 5:7", "Mateus 6:25-34", "Salmos 94:19", "Salmos 55:22"],
+      summary: "Deus convida você a trocar a ansiedade por oração, entrega e confiança. A paz vem como guarda do coração e da mente.",
+      practice: [
+        "Transforme preocupação em oração objetiva (o que você quer pedir?).",
+        "Anote 3 coisas fora do seu controle e entregue a Deus conscientemente.",
+        "Respire fundo e repita: 'Eu confio no cuidado de Deus hoje.'"
+      ]
+    },
+    medo: {
+      refs: ["Isaías 41:10", "Salmos 23:4", "2 Timóteo 1:7", "Salmos 27:1", "Josué 1:9"],
+      summary: "O medo perde força quando você lembra quem está com você. Coragem bíblica não é ausência de medo, é fé em meio a ele.",
+      practice: [
+        "Nomeie o medo (o que exatamente você teme?).",
+        "Ore pedindo força e clareza para dar o próximo passo pequeno.",
+        "Evite decisões grandes no pico do medo; primeiro acalme o coração."
+      ]
+    },
+    amor: {
+      refs: ["1 Coríntios 13:4-7", "João 3:16", "1 João 4:8", "Romanos 8:38-39", "Provérbios 10:12"],
+      summary: "O amor bíblico é atitude: paciente, bondoso, firme, que perdoa e busca o bem do outro.",
+      practice: [
+        "Escolha uma ação concreta de amor hoje (mensagem, ajuda, perdão).",
+        "Evite revidar no impulso; responda com mansidão.",
+        "Ore por alguém difícil (isso muda você por dentro)."
+      ]
+    },
+    dinheiro: {
+      refs: ["Hebreus 13:5", "1 Timóteo 6:10", "Provérbios 22:7", "Mateus 6:24", "Eclesiastes 5:10", "Provérbios 21:5"],
+      summary: "Dinheiro é ferramenta, não senhor. Contentamento, prudência e generosidade protegem o coração.",
+      practice: [
+        "Faça um plano simples: renda, gastos fixos, dívidas, prioridade do mês.",
+        "Evite compras emocionais: espere 24h antes de decidir.",
+        "Separe um valor (mesmo pequeno) para generosidade."
+      ]
+    },
+    tristeza: {
+      refs: ["Salmos 34:18", "Mateus 5:4", "Apocalipse 21:4", "Salmos 147:3", "João 16:22"],
+      summary: "Deus se aproxima do coração quebrado. A tristeza não é o fim da história; há consolo e esperança.",
+      practice: [
+        "Fale com Deus sem filtro (lamento é bíblico).",
+        "Procure uma pessoa de confiança; isolamento piora.",
+        "Durma e coma minimamente bem: corpo e alma se afetam."
+      ]
+    },
+    proposito: {
+      refs: ["Jeremias 29:11", "Efésios 2:10", "Romanos 8:28", "Provérbios 19:21", "Eclesiastes 3:1"],
+      summary: "Propósito não é só 'grande missão'; é fidelidade diária, passos guiados por Deus e boas obras preparadas.",
+      practice: [
+        "Pergunte: 'Que bem eu posso fazer hoje, com o que tenho agora?'",
+        "Escreva 1 dom + 1 dor + 1 oportunidade → uma direção possível.",
+        "Peça sabedoria para o próximo passo, não para o mapa inteiro."
+      ]
+    },
+    perdao: {
+      refs: ["1 João 1:9", "Mateus 6:14-15", "Efésios 4:32", "Colossenses 3:13", "Miqueias 7:18"],
+      summary: "Perdão não é negar a dor, é soltar a dívida moral e deixar Deus tratar justiça e cura.",
+      practice: [
+        "Confesse a Deus o que te feriu e o que você sente de verdade.",
+        "Decida não alimentar vingança (perdão é um processo).",
+        "Se for seguro, estabeleça limites saudáveis."
+      ]
+    },
+    fe: {
+      refs: ["Hebreus 11:1", "Marcos 11:22-24", "Romanos 10:17", "Tiago 2:14-26", "2 Coríntios 5:7", "Marcos 9:24"],
+      summary: "Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva gera frutos, não só discurso.",
+      practice: [
+        "Leia um trecho curto e aplique 1 coisa prática hoje.",
+        "Ore: 'Senhor, eu creio; ajuda minha incredulidade.'",
+        "Aproxime-se de uma comunidade/irmãos na fé."
+      ]
+    },
+    esperanca: {
+      refs: ["Romanos 15:13", "Isaías 40:31", "Lamentações 3:21-23", "Salmos 39:7", "1 Pedro 1:3"],
+      summary: "Esperança bíblica não é otimismo vazio: é certeza de que Deus é fiel e renova suas misericórdias.",
+      practice: [
+        "Troque 'nunca vai mudar' por 'um dia de cada vez'.",
+        "Liste 3 evidências de cuidado de Deus no passado.",
+        "Faça uma oração curta de esperança pela manhã."
+      ]
+    },
+    paz: {
+      refs: ["João 14:27", "Filipenses 4:7", "Isaías 26:3", "Mateus 5:9", "Salmos 29:11"],
+      summary: "A paz de Cristo não depende do caos externo; ela vem da confiança e do foco em Deus.",
+      practice: [
+        "Diminua estímulos por 15 min (silêncio).",
+        "Ore e entregue o que te agita.",
+        "Faça a próxima coisa certa, sem antecipar o amanhã."
+      ]
+    },
+    sabedoria: {
+      refs: ["Tiago 1:5", "Provérbios 1:7", "Provérbios 3:13-18", "Colossenses 2:2-3", "Provérbios 11:14"],
+      summary: "Sabedoria começa no temor do Senhor e cresce com conselho, prudência e discernimento.",
+      practice: [
+        "Peça sabedoria específica (não genérica).",
+        "Consulte alguém maduro antes de decisão grande.",
+        "Pergunte: isso me aproxima de Deus ou só do ego?"
+      ]
+    },
+    gratidao: {
+      refs: ["1 Tessalonicenses 5:18", "Salmos 107:1", "Colossenses 3:17", "Salmos 118:24", "Filipenses 4:4"],
+      summary: "Gratidão reposiciona o coração: você passa a enxergar o bem mesmo em tempos difíceis.",
+      practice: [
+        "Anote 3 motivos reais de gratidão agora.",
+        "Agradeça uma pessoa diretamente.",
+        "Louvor em voz baixa muda o clima interno."
+      ]
+    },
+
+    // Tópicos novos (bem úteis)
+    tentacao: {
+      refs: ["1 Coríntios 10:13", "Tiago 1:13-15", "Mateus 26:41", "Salmos 119:9-11"],
+      summary: "Tentação é real, mas Deus dá escape. Vigilância, oração e Palavra fortalecem.",
+      practice: [
+        "Identifique gatilhos (horário, lugar, emoção).",
+        "Corte o caminho do pecado antes da queda.",
+        "Peça ajuda (prestação de contas) se for vício recorrente."
+      ]
+    },
+    raiva: {
+      refs: ["Efésios 4:26-27", "Provérbios 15:1", "Tiago 1:19-20", "Romanos 12:19"],
+      summary: "Raiva pode virar pecado quando domina. A Bíblia ensina mansidão, autocontrole e justiça nas mãos de Deus.",
+      practice: [
+        "Espere 10 minutos antes de responder.",
+        "Fale firme sem ferir (verdade com amor).",
+        "Entregue a vingança a Deus."
+      ]
+    },
+    solidao: {
+      refs: ["Salmos 68:6", "Hebreus 13:5", "Mateus 28:20", "Salmos 23:1-4"],
+      summary: "Deus não abandona. Ele também cria família espiritual e laços reais para sustentar você.",
+      practice: [
+        "Procure um grupo/comunidade (não caminhe só).",
+        "Mande mensagem para 1 pessoa hoje.",
+        "Ore pedindo conexões saudáveis."
+      ]
+    },
+    paciencia: {
+      refs: ["Gálatas 5:22-23", "Romanos 5:3-5", "Tiago 1:2-4", "Salmos 37:7"],
+      summary: "Paciência é fruto do Espírito e é forjada em processo, não em atalhos.",
+      practice: [
+        "Troque pressa por consistência.",
+        "Aceite o 'processo' como parte do crescimento.",
+        "Faça pequenas escolhas certas repetidas."
+      ]
+    },
+    casamento: {
+      refs: ["Efésios 5:25-33", "1 Coríntios 13:4-7", "Colossenses 3:13-14", "Provérbios 15:1"],
+      summary: "Relacionamento saudável exige amor sacrificial, perdão, conversa honesta e mansidão.",
+      practice: [
+        "Ouça para entender, não para vencer.",
+        "Peça perdão rápido, sem justificar demais.",
+        "Conversem sobre expectativas e limites."
+      ]
     }
-    
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-    playSound('click');
-    
-    // Se estiver em modo conversa, fala a resposta
-    if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
-      // Remove emojis e tags HTML para falar
-      const cleanText = text.replace(/<[^>]*>/g, '').replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F300}-\u{1F5FF}]/gu, '').trim();
-      if (cleanText) {
-        OracleSpeech.speak(cleanText);
+    ,
+    "novos mandamentos": {
+      refs: ["João 13:34-35", "João 15:12", "1 João 4:7-8"],
+      summary: "O 'mandamento novo' de Jesus resume-se em amar: amar a Deus e amar ao próximo com dedicação prática. Esse amor é a marca dos seus discípulos.",
+      practice: [
+        "Pratique um ato concreto de amor hoje (ouvir, perdoar, ajudar).",
+        "Peça perdão onde for necessário e ofereça perdão quando possível.",
+        "Sirva alguém sem esperar reconhecimento; observe como isso muda seu coração."
+      ]
+    }
+  },
+
+  // -------------------------
+  // LIVROS (resumo + temas + como ler)
+  // (Você pode adicionar o resto depois; estrutura já pronta)
+  // -------------------------
+  bookMap: {
+    "gênesis": {
+      title: "Gênesis (O Início)",
+      summary: "Origens: criação, queda, dilúvio, patriarcas (Abraão, Isaque, Jacó, José). Base do plano redentor.",
+      themes: ["Criação e propósito", "Pecado e promessa", "Aliança", "Fé e providência"],
+      readTip: "Leia em blocos: 1–11 (origens) e 12–50 (patriarcas)."
+    },
+    "êxodo": {
+      title: "Êxodo (A Saída)",
+      summary: "Libertação do Egito, aliança no Sinai, Lei, tabernáculo e presença de Deus com o povo.",
+      themes: ["Libertação", "Aliança", "Santidade", "Adoração"],
+      readTip: "Repare no padrão: clamor → libertação → identidade → lei → presença."
+    },
+    "levítico": {
+      title: "Levítico (Santidade)",
+      summary: "Leis de pureza, sacrifícios e sacerdócio. Ensina que Deus é santo e aproximação exige reverência.",
+      themes: ["Santidade", "Sacrifício", "Pureza", "Adoração"],
+      readTip: "Leia com o foco: o que isso revela sobre Deus e sobre a seriedade do pecado?"
+    },
+    "números": {
+      title: "Números (A Jornada)",
+      summary: "Peregrinação no deserto. Rebeldia, disciplina e fidelidade de Deus apesar da infidelidade humana.",
+      themes: ["Deserto", "Obediência", "Liderança", "Consequências"],
+      readTip: "Observe o contraste: fidelidade de Deus vs. instabilidade do povo."
+    },
+    "deuteronômio": {
+      title: "Deuteronômio (A Lei Relembrada)",
+      summary: "Discursos finais de Moisés: aliança, obediência, amor a Deus e preparação para Canaã.",
+      themes: ["Aliança", "Obediência", "Amor a Deus", "Memória"],
+      readTip: "Leia como 'renovação de compromisso' e princípios para a vida."
+    },
+    "salmos": {
+      title: "Salmos (Louvor e Lamento)",
+      summary: "Orações e cânticos: alegria, dor, arrependimento, esperança e adoração.",
+      themes: ["Adoração", "Lamento", "Confiança", "Reino de Deus"],
+      readTip: "Use como oração: transforme o salmo em palavras suas."
+    },
+    "provérbios": {
+      title: "Provérbios (Sabedoria Prática)",
+      summary: "Sabedoria para decisões, palavras, trabalho, relacionamentos e caráter.",
+      themes: ["Temor do Senhor", "Prudência", "Disciplina", "Palavras"],
+      readTip: "Leia 1 capítulo por dia (31 capítulos)."
+    },
+    "mateus": {
+      title: "Mateus",
+      summary: "Jesus como Rei-Messias prometido. Ênfase no Reino e cumprimento das profecias.",
+      themes: ["Reino dos céus", "Cumprimento profético", "Discipulado"],
+      readTip: "Destaque o Sermão do Monte (caps. 5–7)."
+    },
+    "marcos": {
+      title: "Marcos",
+      summary: "Evangelho rápido e objetivo: ações e autoridade de Jesus como Servo.",
+      themes: ["Autoridade de Jesus", "Serviço", "Fé prática"],
+      readTip: "Perceba o ritmo: milagres → confronto → cruz → ressurreição."
+    },
+    "lucas": {
+      title: "Lucas",
+      summary: "Jesus como Salvador compassivo, com atenção aos excluídos e detalhes históricos.",
+      themes: ["Compaixão", "Salvação", "Alegria", "Espírito Santo"],
+      readTip: "Observe as parábolas exclusivas (Bom Samaritano, Filho Pródigo)."
+    },
+    "joão": {
+      title: "João",
+      summary: "Ênfase na divindade de Jesus e nos sinais para crer. Linguagem profunda e pastoral.",
+      themes: ["Eu Sou", "Sinais", "Vida eterna", "Amor"],
+      readTip: "Leia devagar e medite nos discursos (caps. 13–17)."
+    },
+    "atos": {
+      title: "Atos dos Apóstolos",
+      summary: "Nascimento e expansão da Igreja pelo Espírito Santo; Pedro e Paulo em missão.",
+      themes: ["Espírito Santo", "Missão", "Igreja", "Coragem"],
+      readTip: "Anote: onde o Evangelho chegou e o que mudou nas pessoas."
+    },
+    "romanos": {
+      title: "Romanos",
+      summary: "Explica o evangelho: pecado, graça, fé, justificação e vida no Espírito.",
+      themes: ["Justificação", "Graça", "Santificação", "Vida no Espírito"],
+      readTip: "Leia em partes: 1–3 (problema), 4–8 (solução), 9–11 (Israel), 12–16 (prática)."
+    },
+    "apocalipse": {
+      title: "Apocalipse (Revelação)",
+      summary: "Visões sobre conflito espiritual, perseverança e vitória final de Cristo.",
+      themes: ["Perseverança", "Justiça", "Esperança", "Reino final"],
+      readTip: "Leia com foco: consolo e esperança para a igreja perseguida."
+    }
+    ,
+    "1 coríntios": {
+      title: "1 Coríntios",
+      summary: "Carta de Paulo tratando divisões, moral, dons espirituais e a importância do amor sacrificial.",
+      themes: ["Comunidade", "Dons espirituais", "Amor", "Ressurreição"],
+      readTip: "Observe como a igreja prática precisa de ensino e amor mútuo."
+    },
+    "2 coríntios": {
+      title: "2 Coríntios",
+      summary: "Paulo defende seu ministério, fala de perdão, reconciliação e o conforto em meio ao sofrimento.",
+      themes: ["Ministério", "Sofrimento", "Reconciliação", "Generosidade"],
+      readTip: "Leia buscando entender a relação entre poder humano e graça de Deus."
+    },
+    "gálatas": {
+      title: "Gálatas",
+      summary: "Enfatiza a justificação pela fé, liberdade cristã e o perigo do legalismo.",
+      themes: ["Graça", "Liberdade", "Justificação", "Fruto do Espírito"],
+      readTip: "Preste atenção aos contrastes entre lei e graça."
+    },
+    "efésios": {
+      title: "Efésios",
+      summary: "Carta sobre a identidade em Cristo, unidade da igreja e instruções para vida familiar e comunitária.",
+      themes: ["Identidade", "Unidade", "Espiritualidade prática"],
+      readTip: "Leia devagar; há muita teologia prática aplicada à comunidade."
+    },
+    "filipenses": {
+      title: "Filipenses",
+      summary: "Carta de alegria e encorajamento: viver em humildade, alegria e foco em Cristo.",
+      themes: ["Alegria", "Humildade", "Chamado em Cristo"],
+      readTip: "Ótima para devoção: destaque versos de encorajamento."
+    },
+    "colossenses": {
+      title: "Colossenses",
+      summary: "Afirma a supremacia de Cristo e adverte contra filosofias que desviam da verdade do evangelho.",
+      themes: ["Supremacia de Cristo", "Doutrina", "Vida prática"],
+      readTip: "Observe como a teologia molda a conduta cristã."
+    },
+    "1 tessalonicenses": {
+      title: "1 Tessalonicenses",
+      summary: "Incentivo pastoral sobre fé, amor e esperança, com ensinamentos sobre a volta de Cristo.",
+      themes: ["Esperança", "Segurança" ,"Retorno de Cristo"],
+      readTip: "Leia para fortalecer esperança e vigilância cristã."
+    },
+    "2 tessalonicenses": {
+      title: "2 Tessalonicenses",
+      summary: "Complementa o ensino sobre a volta de Cristo e exorta à estabilidade e trabalho responsável.",
+      themes: ["Escatologia", "Perseverança", "Trabalho"],
+      readTip: "Útil para entender sinais e postura cristã diante de crises."
+    },
+    "1 timóteo": {
+      title: "1 Timóteo",
+      summary: "Instruções pastorais sobre liderança, culto e vida de igreja dirigidas a Timóteo.",
+      themes: ["Liderança", "Doutrina", "Disciplina"],
+      readTip: "Leia como manual prático para liderança e cuidado pastoral."
+    },
+    "2 timóteo": {
+      title: "2 Timóteo",
+      summary: "Últimas palavras de Paulo: perseverança, fidelidade às Escrituras e coragem no ministério.",
+      themes: ["Fidelidade", "Perseverança", "Escrituras"],
+      readTip: "Leia como encorajamento para ministério fiel mesmo em sofrimento."
+    },
+    "tito": {
+      title: "Tito",
+      summary: "Instruções práticas para organização de igrejas e ensino saudável em Creta.",
+      themes: ["Ordem eclesiástica", "Ensino", "Caráter"],
+      readTip: "Foque em como a doutrina molda a vida da comunidade."
+    },
+    "filemom": {
+      title: "Filemom",
+      summary: "Carta breve pedindo reconciliação entre Filemom e seu escravo irmão, mostrando poder transformador do evangelho.",
+      themes: ["Reconciliação", "Graça", "Relações pessoais"],
+      readTip: "Leia como exemplo prático de aplicação do evangelho em relações humanas."
+    },
+    "hebreus": {
+      title: "Hebreus",
+      summary: "Profunda exposição de Cristo como sumo sacerdote e superioridade da nova aliança sobre a antiga.",
+      themes: ["Cristologia", "Sacerdócio", "Perseverança"],
+      readTip: "Leia devagar; há tipologia e argumentos teológicos densos."
+    },
+    "tiago": {
+      title: "Tiago",
+      summary: "Foco em fé prática: fé que se demonstra em obras, sabedoria e controle da língua.",
+      themes: ["Sabedoria prática", "Ética", "Fé em ação"],
+      readTip: "Aplicável ao dia a dia; destaque instruções práticas."
+    },
+    "1 pedro": {
+      title: "1 Pedro",
+      summary: "Carta de encorajamento aos sofrimentos, chamada à santidade e esperança viva em Cristo.",
+      themes: ["Sofrimento", "Santidade", "Esperança"],
+      readTip: "Leia com foco em identidade e esperança no sofrimento."
+    },
+    "2 pedro": {
+      title: "2 Pedro",
+      summary: "Adverte contra falsos mestres e lembra da certeza da volta de Cristo.",
+      themes: ["Falsos mestres", "Escatologia", "Crescimento"],
+      readTip: "Útil para discernimento doutrinário."
+    },
+    "1 joão": {
+      title: "1 João",
+      summary: "Carta sobre amor, verdade e comunhão; reafirma que o critério da fé é o amor prático.",
+      themes: ["Amor", "Verdade", "Comunhão"],
+      readTip: "Leia para fortalecer vida relacional e discernimento."
+    },
+    "2 joão": {
+      title: "2 João",
+      summary: "Breve carta enfatizando amor e vigilância contra enganadores.",
+      themes: ["Amor", "Vigilância", "Evangelho"],
+      readTip: "Curta e direta; útil para advertência pastoral."
+    },
+    "3 joão": {
+      title: "3 João",
+      summary: "Carta sobre hospitalidade, apoio a missionários e cuidado com líderes fiéis.",
+      themes: ["Hospitalidade", "Suporte missionário", "Integridade"],
+      readTip: "Leia para exemplos práticos de apoio ao ministério."
+    },
+    "judas": {
+      title: "Judas",
+      summary: "Breve admoestação contra impostores que corrompem a fé; exorta a perseverar na verdade.",
+      themes: ["Contenção doutrinária", "Perseverança", "Santidade"],
+      readTip: "Leia para fortalecer vigilância doutrinária."
+    }
+  },
+
+  // -------------------------
+  // PERSONAGENS
+  // -------------------------
+  characterMap: {
+    "jesus": {
+      who: "Jesus Cristo, o Filho de Deus, é a figura central da fé cristã e da Bíblia.",
+      call: "Sua missão foi revelada desde o nascimento: 'Ele salvará o seu povo dos seus pecados' (Mateus 1:21). Ele não foi chamado, Ele é o chamado.",
+      role: "Ele é o Messias prometido, o Salvador da humanidade, o Cordeiro de Deus que tira o pecado do mundo. Através de Sua vida, morte e ressurreição, Ele oferece reconciliação entre Deus e os homens."
+    },
+    "mateus": {
+      who: "Mateus (Levi) foi um dos 12 apóstolos e tradicionalmente considerado autor do Evangelho de Mateus.",
+      call: "Chamado enquanto era cobrador de impostos; largou tudo para seguir Jesus (Mt 9:9).",
+      role: "Escreve com foco em leitores judeus, enfatizando Jesus como Messias e Rei."
+    },
+    "pedro": {
+      who: "Simão Pedro, pescador da Galileia, tornou-se liderança apostólica na igreja primitiva.",
+      call: "Chamado por Jesus no trabalho; 'pescador de homens' (Mt 4:19).",
+      role: "Pregou no Pentecostes e ajudou a abrir portas para judeus e gentios."
+    },
+    "paulo": {
+      who: "Paulo de Tarso (Saulo) foi fariseu e perseguidor; convertido, virou grande missionário aos gentios.",
+      call: "Encontro com Cristo no caminho de Damasco (At 9).",
+      role: "Plantou igrejas e escreveu cartas fundamentais do NT."
+    },
+    "davi": {
+      who: "Rei de Israel; pastor que se tornou líder. Figura central na linhagem messiânica.",
+      call: "Ungido por Samuel ainda jovem (1Sm 16).",
+      role: "Unificou Israel, escreveu muitos salmos e apontou para o reinado de Cristo."
+    },
+    "moisés": {
+      who: "Libertador e legislador; liderou Israel na saída do Egito.",
+      call: "Chamado na sarça ardente (Êx 3).",
+      role: "Mediador da aliança no Sinai; conduziu o povo no deserto."
+    },
+    "joão": {
+      who: "Apóstolo, conhecido como 'discípulo amado'.",
+      call: "Chamado ainda jovem, deixou as redes para seguir Jesus.",
+      role: "Escreveu Evangelho de João, cartas e Apocalipse; ênfase em amor e verdade."
+    },
+
+    // extras (muito úteis)
+    "abraão": {
+      who: "Patriarca da fé; recebeu promessas e alianças que moldam toda a história bíblica.",
+      call: "Chamado a sair da sua terra e confiar na promessa (Gn 12).",
+      role: "Exemplo de fé e obediência; pai de muitas nações."
+    },
+    "josé": {
+      who: "Filho de Jacó; vendido pelos irmãos, tornou-se governador no Egito.",
+      call: "Vida guiada por providência mesmo em sofrimento (Gn 37–50).",
+      role: "Deus transformou mal em bem para salvar muitos."
+    },
+    "ester": {
+      who: "Rainha judia na Pérsia; corajosa em defender seu povo.",
+      call: "Assumiu risco para interceder diante do rei.",
+      role: "Exemplo de coragem, identidade e providência."
+    },
+    "daniel": {
+      who: "Exilado fiel na Babilônia; conhecido por integridade e oração.",
+      call: "Permaneceu firme sob pressão cultural.",
+      role: "Mostra fidelidade e soberania de Deus sobre reinos."
+    },
+    "maria": {
+      who: "Maria, mãe de Jesus, jovem de fé que respondeu ao chamado com submissão e confiança.",
+      call: "Chamado extraordinário ao papel de mãe do Messias; respondeu com 'faça-se em mim segundo a tua palavra' (Lucas).",
+      role: "Presente nos momentos de alegria e dor; exemplo de fé, serviço e perseverança diante do sofrimento."
+    }
+  },
+
+  // -------------------------
+  // ALIAS DE LIVROS (abreviações e variações comuns)
+  // (serve pra reconhecer "jo", "joao", "1jo", "rm", etc.)
+  // -------------------------
+  bookAliases: {
+    "gênesis": ["genesis", "gn", "ge"],
+    "êxodo": ["exodo", "ex", "êx"],
+    "levítico": ["levitico", "lv", "lev"],
+    "números": ["numeros", "nm", "num"],
+    "deuteronômio": ["deuteronomio", "dt", "deut"],
+    "salmos": ["salmo", "sl", "sal", "ps", "psalm"],
+    "provérbios": ["proverbios", "pv", "prov"],
+    "mateus": ["mt", "mat"],
+    "marcos": ["mc", "mr", "marc"],
+    "lucas": ["lc", "lk"],
+    "joão": ["joao", "jo", "jn"],
+    "atos": ["at", "acts"],
+    "romanos": ["rm", "rom"],
+    "1 coríntios": ["1 corintios", "1 cor", "1cor", "1corintios"],
+    "2 coríntios": ["2 corintios", "2 cor", "2cor", "2corintios"],
+    "gálatas": ["galatas", "gl"],
+    "efésios": ["efesios", "ef"],
+    "filipenses": ["filipenses", "flp", "fp"],
+    "colossenses": ["colossenses", "cl"],
+    "1 tessalonicenses": ["1 tessalonicenses", "1 tess", "1th"],
+    "2 tessalonicenses": ["2 tessalonicenses", "2 tess", "2th"],
+    "1 timóteo": ["1 timoteo", "1 tim", "1tm"],
+    "2 timóteo": ["2 timoteo", "2 tim", "2tm"],
+    "tito": ["tito"],
+    "filemom": ["filemom", "flm"],
+    "hebreus": ["hebreus", "hb"],
+    "tiago": ["tiago", "tg"],
+    "1 pedro": ["1 pedro", "1 pe", "1ptr"],
+    "2 pedro": ["2 pedro", "2 pe", "2ptr"],
+    "1 joão": ["1 joao", "1 jo", "1jn"],
+    "2 joão": ["2 joao", "2 jo", "2jn"],
+    "3 joão": ["3 joao", "3 jo", "3jn"],
+    "judas": ["judas", "jude"],
+    "apocalipse": ["apoc", "ap", "rev", "revelacao", "revelação"],
+  },
+
+  // -------------------------
+  // UTIL: normalização de texto
+  // -------------------------
+  normalize(text = "") {
+    return String(text)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .replace(/[^\w\s:]/g, " ")       // remove pontuação (exceto :)
+      .replace(/\s+/g, " ")
+      .trim();
+  },
+
+  // -------------------------
+  // UTIL: debug
+  // -------------------------
+  debug(...args) {
+    if (this.config.enableDebug) console.log("[BibleAssistant]", ...args);
+  },
+
+  // -------------------------
+  // UTIL: fuzzy score simples (Jaccard + prefix bônus)
+  // -------------------------
+  fuzzyScore(a, b) {
+    a = this.normalize(a);
+    b = this.normalize(b);
+    if (!a || !b) return 0;
+
+    if (a === b) return 1;
+
+    const aWords = new Set(a.split(" "));
+    const bWords = new Set(b.split(" "));
+    let inter = 0;
+    for (const w of aWords) if (bWords.has(w)) inter++;
+
+    const union = aWords.size + bWords.size - inter;
+    const jacc = union ? inter / union : 0;
+
+    // bônus se um começa com o outro (bom pra "jo" -> "joao")
+    const prefixBonus =
+      (a.startsWith(b) || b.startsWith(a)) ? 0.15 : 0;
+
+    return Math.min(1, jacc + prefixBonus);
+  },
+
+  // -------------------------
+  // UTIL: encontra chave por aliases
+  // -------------------------
+  resolveBookName(input) {
+    const t = this.normalize(input);
+
+    // 1) Match direto pelo nome principal
+    for (const main of Object.keys(this.bookMap)) {
+      if (this.normalize(main) === t) return main;
+    }
+
+    // 2) Match por alias
+    for (const [main, aliases] of Object.entries(this.bookAliases)) {
+      for (const al of aliases) {
+        if (this.normalize(al) === t) return main;
       }
     }
+
+    // 3) Fuzzy match (aproximação)
+    let best = { name: null, score: 0 };
+    for (const main of Object.keys(this.bookMap)) {
+      const score = this.fuzzyScore(t, main);
+      if (score > best.score) best = { name: main, score };
+    }
+    if (best.score >= this.config.minFuzzyScore) return best.name;
+
+    return null;
   },
-  
-  addSystemMessage(text) {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message system';
-    div.innerHTML = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+
+  // -------------------------
+  // UTIL: resolve tópico via sinônimos
+  // -------------------------
+  resolveTopic(input) {
+    const t = this.normalize(input);
+
+    // 1) Se o texto já contém a chave exata do tópico
+    for (const topic of Object.keys(this.topicMap)) {
+      if (t.includes(this.normalize(topic))) return topic;
+    }
+
+    // 2) Se contém algum sinônimo
+    for (const [topic, syns] of Object.entries(this.synonyms)) {
+      for (const s of syns) {
+        if (t.includes(this.normalize(s))) return topic;
+      }
+    }
+
+    // 3) fuzzy contra chaves de tópico
+    let best = { topic: null, score: 0 };
+    for (const topic of Object.keys(this.topicMap)) {
+      const score = this.fuzzyScore(t, topic);
+      if (score > best.score) best = { topic, score };
+    }
+    if (best.score >= this.config.minFuzzyScore) return best.topic;
+
+    return null;
   },
-  
-  showThinking() {
-    const messages = document.getElementById('chatMessages');
-    if (!messages) return;
-    
-    const div = document.createElement('div');
-    div.className = 'chat-message thinking';
-    div.id = 'oracleThinking';
-    div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+
+  // -------------------------
+  // UTIL: resolve personagem
+  // -------------------------
+  resolveCharacter(input) {
+    const t = this.normalize(input);
+
+    // match direto
+    for (const name of Object.keys(this.characterMap)) {
+      if (t.includes(this.normalize(name))) return name;
+    }
+
+    // fuzzy
+    let best = { name: null, score: 0 };
+    for (const name of Object.keys(this.characterMap)) {
+      const score = this.fuzzyScore(t, name);
+      if (score > best.score) best = { name, score };
+    }
+    if (best.score >= this.config.minFuzzyScore) return best.name;
+
+    return null;
   },
-  
-  removeThinking() {
-    const thinking = document.getElementById('oracleThinking');
-    if (thinking) thinking.remove();
+
+  // -------------------------
+  // MAPA DE NOMES EM HEBRAICO (forma, translit, significado)
+  // Priorize entradas aqui para intenções 'hebrew_name'
+  // -------------------------
+  hebrewNames: {
+    "joao": { heb: "יוֹחָנָן", translit: "Yôḥānān (Yohanan)", meaning: "YHWH foi gracioso" },
+    "joao batista": { heb: "יוֹחָנָן הַמַּטְבִּיל", translit: "Yôḥānān ha-Matbil", meaning: "João, o que batiza (o que imerge)" },
+    "joao apóstolo": { heb: "יוֹחָנָן", translit: "Yôḥānān (Yohanan)", meaning: "YHWH foi gracioso" },
+    "jesus": { heb: "יֵשׁוּעַ", translit: "Yeshua", meaning: "Salvação / o Senhor salva" },
+    "paulo": { heb: "שָׁאוּל", translit: "Sha'ul (Saul)", meaning: "Pedido/oração (Saul) — Paulo é forma latina" },
+    "pedro": { heb: "שִׁמְעוֹן", translit: "Shim'on (Simão)", meaning: "Ouvir / ouvinte" },
+    "maria": { heb: "מִרְיָם", translit: "Miryam", meaning: "Possivelmente 'amada' ou ligado a 'amar' (origem incerta)" }
+  },
+
+  // -------------------------
+  // DETECTA INTENÇÃO 'hebrew_name'
+  // Retorna { intent: 'hebrew_name', entity: 'joao' } ou null
+  // -------------------------
+  detectHebrewNameIntent(raw) {
+    if (!raw) return null;
+    const r = String(raw).trim();
+
+    // Padrões fortes
+    const patterns = [
+      /nome hebraico de\s+(.+)$/i,
+      /qual (?:é|e) o nome (?:em )?hebraico de\s+(.+)$/i,
+      /qual o nome de\s+(.+) em hebraico/i,
+      /escreva em hebraico\s+(.+)$/i,
+      /como escreve em hebraico\s+(.+)$/i
+    ];
+
+    for (const p of patterns) {
+      const m = r.match(p);
+      if (m && m[1]) {
+        // limpa instruções extras que users frequentemente adicionam
+        let ent = m[1].trim().replace(/[?.!]/g, "");
+        // remove frases como "escreva em hebraico" ou "escreva em hebraico e significado"
+        ent = ent.replace(/,?\s*escreva.*$/i, "");
+        ent = ent.replace(/,?\s*escreva em hebraico.*$/i, "");
+        // remove conteúdo entre parênteses e textos adicionais após vírgula
+        ent = ent.replace(/\(.*?\)/g, "").replace(/,.*$/g, "");
+        ent = ent.replace(/\s+$/g, "").trim();
+        return { intent: 'hebrew_name', entity: ent };
+      }
+    }
+
+    return null;
+  },
+
+  // -------------------------
+  // FORMATAÇÃO: resposta para intent = hebrew_name
+  // Regras aplicadas: desambiguação para 'João', bloqueio de Maria->Jesus
+  // -------------------------
+  formatHebrewName(rawEntity) {
+    if (!rawEntity) return this.formatNotFound('Sobre qual pessoa você quer o nome em hebraico? Ex: "João Batista".');
+
+    // limpa ruído comum (ex: "escreva em hebraico", parênteses, vírgulas)
+    let entity = String(rawEntity || '').replace(/,?\s*escreva.*$/i, '');
+    entity = entity.replace(/\(.*?\)/g, '').replace(/,.*$/g, '').trim();
+    const norm = this.normalize(entity);
+
+    // Desambiguação apenas se o usuário escreveu somente 'joao' sem contexto
+    if (norm === 'joao') {
+      return this.formatNotFound('Você quer "João Batista" ou "João apóstolo"? Escreva o suficiente para diferenciar (ex: "João Batista").');
+    }
+
+    // Garantia: se perguntar por 'maria', não roteie para Jesus
+    if (norm.includes('maria')) {
+      // normaliza para 'maria' exato
+      const key = 'maria';
+      const h = this.hebrewNames[key];
+      const bio = this.characterMap['maria'] || null;
+      const who = bio ? bio.who : 'Maria, conhecida na tradição cristã como mãe de Jesus, figura de fé e serviço.';
+      return `
+        <div>
+          <h3>${this.config.ui.personIcon} ${this.escapeHtml(this.titleCase(key))} — Nome em hebraico</h3>
+          <p><strong>Hebraico:</strong> ${this.escapeHtml(h.heb)} <small>(${this.escapeHtml(h.translit)})</small></p>
+          <p><strong>Significado:</strong> ${this.escapeHtml(h.meaning)}</p>
+          <p><strong>Caminhada:</strong> ${this.escapeHtml(who)}</p>
+        </div>
+      `;
+    }
+
+    // Tenta mapear por chave direta (comparando versões normalizadas das chaves)
+    let foundKey = null;
+    for (const k of Object.keys(this.hebrewNames)) {
+      if (this.normalize(k) === norm) { foundKey = k; break; }
+    }
+
+    // Se ainda não achou, tenta personagem exato (normalized)
+    if (!foundKey) {
+      for (const k of Object.keys(this.characterMap)) {
+        if (this.normalize(k) === norm) { foundKey = k; break; }
+      }
+    }
+
+    // fallback: fuzzy match against hebrewNames keys
+    if (!foundKey) {
+      let best = { k: null, score: 0 };
+      for (const k of Object.keys(this.hebrewNames)) {
+        const s = this.fuzzyScore(norm, this.normalize(k));
+        if (s > best.score) best = { k, score: s };
+      }
+      if (best.score >= 0.6) foundKey = best.k;
+    }
+
+    if (!foundKey) return this.formatNotFound(`Não encontrei o nome hebraico para "${rawEntity}". Tente escrever o nome completo (ex: "João Batista").`);
+
+    // Monta resposta
+    const h = this.hebrewNames[foundKey] || null;
+    const bio = this.characterMap[foundKey] || null;
+    const who = bio ? (bio.who + ' ' + (bio.call || '') + ' ' + (bio.role || '')) : '';
+
+    return `
+      <div>
+        <h3>${this.config.ui.personIcon} ${this.escapeHtml(this.titleCase(foundKey))} — Nome em hebraico</h3>
+        ${h ? `<p><strong>Hebraico:</strong> ${this.escapeHtml(h.heb)} <small>(${this.escapeHtml(h.translit)})</small></p>
+               <p><strong>Significado:</strong> ${this.escapeHtml(h.meaning)}</p>` : ''}
+        ${who ? `<p><strong>Caminhada (resumo):</strong> ${this.escapeHtml(who)}</p>` : `<p><em>Biografia não disponível; peça por "quem foi ${this.titleCase(foundKey)}" para mais detalhes.</em></p>`}
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // PARSER de referência bíblica
+  // Ex: "joao 3:16", "Rm 8:28", "1jo 1:9", "1 joao 4:8"
+  // Retorna: { book, chapter, verseStart, verseEnd, raw } ou null
+  // -------------------------
+  parseReference(input) {
+    const raw = String(input || "");
+    const t = this.normalize(raw);
+
+    // padrões:
+    // 1) "1 joao 4:8" / "1joao 4:8" / "1 jo 4:8"
+    // 2) "joao 3:16-18"
+    // 3) "rm 8:28"
+    const refRegex = /^(\d{1}\s*)?([a-z\u00C0-\u017F]+)\s+(\d{1,3})\s*:\s*(\d{1,3})(?:\s*-\s*(\d{1,3}))?$/i;
+    const m = t.match(refRegex);
+    if (!m) return null;
+
+    const num = (m[1] || "").replace(/\s+/g, "").trim(); // "1"
+    const bookRaw = (m[2] || "").trim();
+    const chapter = parseInt(m[3], 10);
+    const verseStart = parseInt(m[4], 10);
+    const verseEnd = m[5] ? parseInt(m[5], 10) : null;
+
+    // tenta resolver livro com prefixo numérico (1 joão etc.)
+    // como seu bookMap não inclui "1 João", vamos manter "João" como livro base
+    // e colocar numPrefix no raw.
+    const bookName = this.resolveBookName(bookRaw);
+    if (!bookName) return null;
+
+    return {
+      raw,
+      numPrefix: num || null,
+      book: bookName,
+      chapter,
+      verseStart,
+      verseEnd
+    };
+  },
+
+  // -------------------------
+  // FORMATADORES (HTML)
+  // -------------------------
+  formatTopic(topicKey) {
+    const t = this.topicMap[topicKey];
+    if (!t) return this.formatNotFound(`Tópico "${topicKey}" não encontrado.`);
+
+    const refs = (t.refs || []).slice(0, this.config.maxRefsToShow);
+    const practices = (t.practice || []).slice(0, 4);
+
+    return `
+      <div>
+        <h3>${this.config.ui.topicIcon} Tema: ${this.escapeHtml(this.titleCase(topicKey))}</h3>
+        <p><strong>Resumo:</strong> ${this.escapeHtml(t.summary || "")}</p>
+
+        <p><strong>Referências:</strong><br>
+          ${refs.map(r => `• ${this.escapeHtml(r)}`).join("<br>")}
+        </p>
+
+        ${practices.length ? `
+          <p><strong>${this.config.ui.tipIcon} Práticas:</strong><br>
+            ${practices.map(p => `• ${this.escapeHtml(p)}`).join("<br>")}
+          </p>
+        ` : ""}
+
+        ${this.formatPrayerSuggestion(topicKey)}
+      </div>
+    `;
+  },
+
+  formatBook(bookKey) {
+    const b = this.bookMap[bookKey];
+    if (!b) return this.formatNotFound(`Livro "${bookKey}" não encontrado.`);
+
+    const themes = (b.themes || []).slice(0, 8);
+
+    return `
+      <div>
+        <h3>${this.config.ui.bookIcon} ${this.escapeHtml(b.title || this.titleCase(bookKey))}</h3>
+        <p>${this.escapeHtml(b.summary || "")}</p>
+
+        ${themes.length ? `
+          <p><strong>Temas:</strong><br>
+            ${themes.map(x => `• ${this.escapeHtml(x)}`).join("<br>")}
+          </p>
+        ` : ""}
+
+        ${b.readTip ? `<p><strong>${this.config.ui.tipIcon} Como ler:</strong> ${this.escapeHtml(b.readTip)}</p>` : ""}
+      </div>
+    `;
+  },
+
+  async formatCharacter(nameKey) {
+    const c = this.characterMap[nameKey];
+    if (!c) return this.formatNotFound(`Personagem "${nameKey}" não encontrado.`);
+
+    // Tenta enriquecer com memórias do usuário (se o Supabase estiver configurado)
+    let extra = '';
+    try {
+      if (typeof searchOracleMemory === 'function') {
+        const mems = await searchOracleMemory(nameKey);
+        if (mems && mems.length) {
+          extra = '<p><strong>Memórias relacionadas:</strong><br>' + mems.map(m => `• ${this.escapeHtml(m.fact)} <small>(${this.escapeHtml(m.title)})</small>`).join('<br>') + '</p>';
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao buscar memórias:', e);
+    }
+
+    return `
+      <div>
+        <h3>${this.config.ui.personIcon} Personagem: ${this.escapeHtml(this.titleCase(nameKey))}</h3>
+        <p><strong>Quem foi:</strong> ${this.escapeHtml(c.who || "")}</p>
+        <p><strong>Chamado:</strong> ${this.escapeHtml(c.call || "")}</p>
+        <p><strong>Papel:</strong> ${this.escapeHtml(c.role || "")}</p>
+        ${extra}
+        <p><em>Dica:</em> Pergunte mais: "me conte mais sobre ${this.titleCase(nameKey)}" ou salve uma memória dizendo: "lembre que ${this.titleCase(nameKey)} foi..."</p>
+      </div>
+    `;
+  },
+
+  formatReference(refObj) {
+    // Sem texto literal. Retorna referência formatada + dica do que fazer.
+    const prefix = refObj.numPrefix ? `${refObj.numPrefix} ` : "";
+    const range = refObj.verseEnd ? `${refObj.verseStart}-${refObj.verseEnd}` : `${refObj.verseStart}`;
+    const pretty = `${prefix}${this.titleCase(refObj.book)} ${refObj.chapter}:${range}`;
+
+    return `
+      <div>
+        <h3>${this.config.ui.okIcon} Referência detectada</h3>
+        <p><strong>${this.escapeHtml(pretty)}</strong></p>
+        <p>${this.config.ui.tipIcon} Dica: se você quiser, me diga o <em>tema</em> (ex: ansiedade, perdão, fé) e eu conecto essa referência com outras passagens relacionadas.</p>
+      </div>
+    `;
+  },
+
+  formatPrayerSuggestion(topicKey) {
+    const prayers = {
+      ansiedade: "Senhor, eu entrego minhas preocupações a Ti. Guarda meu coração com a Tua paz e me dá clareza para viver um passo de cada vez. Amém.",
+      medo: "Deus, fortalece meu coração. Ajuda-me a confiar na Tua presença e me dá coragem para fazer o que é certo. Amém.",
+      perdao: "Pai, cura meu coração e me ensina a perdoar como fui perdoado. Dá-me limites saudáveis e paz. Amém.",
+      tristeza: "Senhor, acolhe minha dor. Renova minha esperança e me sustenta hoje. Amém.",
+      fe: "Jesus, aumenta minha fé. Ajuda minha incredulidade e guia meus passos em obediência. Amém."
+    };
+    const p = prayers[topicKey];
+    if (!p) return "";
+    return `<p><strong>${this.config.ui.prayIcon} Oração sugerida:</strong> ${this.escapeHtml(p)}</p>`;
+  },
+
+  formatNotFound(message) {
+    return `
+      <div>
+        <h3>${this.config.ui.warnIcon} Não encontrei</h3>
+        <p>${this.escapeHtml(message || "Não consegui identificar sua pergunta.")}</p>
+        <p><strong>Você pode tentar assim:</strong><br>
+          • "tema ansiedade"<br>
+          • "resumo de romanos"<br>
+          • "quem foi paulo"<br>
+          • "joão 3:16"<br>
+          • "plano de leitura 7 dias"
+        </p>
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // FORMATAÇÃO: lista do que o assistente conhece
+  // Retorna HTML com tópicos, livros e instruções simples
+  // -------------------------
+  formatKnowledgeBase() {
+    const topics = Object.keys(this.topicMap || {}).map(t => `• ${this.escapeHtml(this.titleCase(t))}`).join("<br>");
+    const books = Object.keys(this.bookMap || {}).slice(0, 20).map(b => `• ${this.escapeHtml(this.titleCase(b))}`).join("<br>");
+
+    return `
+      <div>
+        <h3>${this.config.ui.okIcon} O que eu sei</h3>
+        <p><strong>Tópicos:</strong><br>${topics}</p>
+        <p><strong>Alguns livros:</strong><br>${books}</p>
+        <p>${this.config.ui.tipIcon} Peça por tema, livro, personagem ou referência (ex: "ansiedade", "Gênesis", "quem foi Jesus", "João 3:16").</p>
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // UTIL: escape HTML
+  // -------------------------
+  escapeHtml(str) {
+    return String(str || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  },
+
+  titleCase(str) {
+    return String(str || "")
+      .toLowerCase()
+      .split(" ")
+      .map(w => w ? w[0].toUpperCase() + w.slice(1) : w)
+      .join(" ");
+  },
+
+  // -------------------------
+  // FUNÇÕES EXTRAS
+  // -------------------------
+  getRandomTopic() {
+    const keys = Object.keys(this.topicMap);
+    return keys[Math.floor(Math.random() * keys.length)];
+  },
+
+  getVerseOfTheDayHint() {
+    // Sem web; apenas escolhe uma referência forte
+    const pool = [
+      "Salmos 23:1-4",
+      "Filipenses 4:6-7",
+      "Romanos 8:28",
+      "João 14:27",
+      "Isaías 41:10",
+      "Mateus 6:33",
+      "1 Pedro 5:7",
+      "2 Timóteo 1:7"
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  },
+
+  buildReadingPlan(days = 7) {
+    // Plano simples e muito útil (pode ajustar)
+    // Retorna referências (não texto)
+    const plans = {
+      3: [
+        { day: 1, title: "Começo com Jesus", refs: ["Marcos 1", "João 1"] },
+        { day: 2, title: "Coração e sabedoria", refs: ["Salmos 23", "Provérbios 3"] },
+        { day: 3, title: "Fé e vida nova", refs: ["Romanos 8", "Filipenses 4"] }
+      ],
+      7: [
+        { day: 1, title: "Jesus e o Reino", refs: ["Mateus 5–7"] },
+        { day: 2, title: "Descanso e confiança", refs: ["Salmos 23", "Salmos 91"] },
+        { day: 3, title: "Sabedoria prática", refs: ["Provérbios 1–3"] },
+        { day: 4, title: "Vida no Espírito", refs: ["Romanos 8"] },
+        { day: 5, title: "Paz e alegria", refs: ["Filipenses 4"] },
+        { day: 6, title: "Amor que transforma", refs: ["1 Coríntios 13", "1 João 4"] },
+        { day: 7, title: "Esperança e perseverança", refs: ["Isaías 40", "Lamentações 3:21-23"] }
+      ],
+      14: [
+        { day: 1, title: "Começo", refs: ["Marcos 1–2"] },
+        { day: 2, title: "Jesus em ação", refs: ["Marcos 3–4"] },
+        { day: 3, title: "Fé e poder", refs: ["Marcos 5–6"] },
+        { day: 4, title: "Identidade e missão", refs: ["Marcos 7–8"] },
+        { day: 5, title: "Cruz e discipulado", refs: ["Marcos 9–10"] },
+        { day: 6, title: "Entrega final", refs: ["Marcos 11–12"] },
+        { day: 7, title: "Paixão e ressurreição", refs: ["Marcos 13–16"] },
+        { day: 8, title: "Sabedoria", refs: ["Provérbios 3–4"] },
+        { day: 9, title: "Oração e lamento", refs: ["Salmos 23", "Salmos 42"] },
+        { day: 10, title: "Evangelho explicado", refs: ["Romanos 1–3"] },
+        { day: 11, title: "Graça e fé", refs: ["Romanos 4–5"] },
+        { day: 12, title: "Nova vida", refs: ["Romanos 6–8"] },
+        { day: 13, title: "Vida prática", refs: ["Romanos 12"] },
+        { day: 14, title: "Paz e alegria", refs: ["Filipenses 4", "João 14"] }
+      ]
+    };
+
+    const chosen = plans[days] || plans[7];
+    return `
+      <div>
+        <h3>${this.config.ui.bookIcon} Plano de Leitura: ${days} dias</h3>
+        ${chosen.map(d => `
+          <p><strong>Dia ${d.day} — ${this.escapeHtml(d.title)}:</strong><br>
+          ${d.refs.map(r => `• ${this.escapeHtml(r)}`).join("<br>")}
+          </p>
+        `).join("")}
+        <p>${this.config.ui.tipIcon} Dica: após ler, me diga “o que isso significa?” ou “aplica na minha vida como?”</p>
+      </div>
+    `;
+  },
+
+  // -------------------------
+  // DETECÇÃO DE INTENÇÃO + RESPOSTA
+  // -------------------------
+  async reply(userText = "") {
+    const raw = String(userText || "");
+    const t = this.normalize(raw);
+
+    if (!t) return this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').");
+
+    // Prioridade: detectar pedido explícito de "nome hebraico"
+    try {
+      const heb = this.detectHebrewNameIntent(raw);
+      if (heb && heb.intent === 'hebrew_name') {
+        return this.formatHebrewName(heb.entity);
+      }
+    } catch (e) {
+      this.debug('Erro ao detectar hebrew_name', e);
+    }
+
+    // 0) Detecta pedido de conhecimento
+    if (t.includes("o que voce sabe") || t.includes("o que vc sabe") || t.includes("seu conhecimento") || t.includes("lista de topicos")) {
+      return this.formatKnowledgeBase();
+    }
+
+    // 1) Detecta pedido de plano
+    if (t.includes("plano") || t.includes("leitura") || t.includes("devocional")) {
+      // tenta capturar número de dias
+      const m = t.match(/(\d{1,3})\s*(dias|dia)/);
+      const days = m ? Math.max(3, Math.min(30, parseInt(m[1], 10))) : 7;
+      // temos planos 3,7,14 — se vier outro número, cai no 7
+      const normalizedDays = [3,7,14].includes(days) ? days : 7;
+      return this.buildReadingPlan(normalizedDays);
+    }
+
+    // 2) Detecta "versículo do dia"
+    if (t.includes("versiculo do dia") || t.includes("versículo do dia") || t.includes("hoje me da um versiculo") || t.includes("me da um versiculo")) {
+      const ref = this.getVerseOfTheDayHint();
+      return `
+        <div>
+          <h3>${this.config.ui.okIcon} Sugestão de hoje</h3>
+          <p><strong>${this.escapeHtml(ref)}</strong></p>
+          <p>${this.config.ui.tipIcon} Quer que eu conecte esse versículo com um tema (ansiedade, fé, paz, propósito…)?</p>
+        </div>
+      `;
+    }
+
+    // 3) Detecta referência tipo "João 3:16"
+    const refObj = this.parseReference(raw);
+    if (refObj) return this.formatReference(refObj);
+
+    // 4) Detecta livro ("resumo de romanos")
+    if (t.includes("resumo") || t.includes("livro") || t.includes("sobre o livro") || t.includes("o que fala")) {
+      // tenta pegar última palavra importante como candidato
+      const parts = t.split(" ");
+      const tail = parts.slice(-3).join(" "); // tentativa
+      const book = this.resolveBookName(tail) || this.resolveBookName(parts[parts.length - 1]) || this.resolveBookName(t);
+      if (book) return this.formatBook(book);
+    } else {
+      // mesmo sem "resumo", pode ter digitado só o nome do livro
+      const maybeBook = this.resolveBookName(t);
+      if (maybeBook) return this.formatBook(maybeBook);
+    }
+
+    // 5) Detecta personagem
+    if (t.includes("quem foi") || t.includes("quem e") || t.includes("personagem") || t.includes("historia de")) {
+      const candidate = t.replace("quem foi", "").replace("quem e", "").replace("historia de", "").trim();
+      const ch = this.resolveCharacter(candidate) || this.resolveCharacter(t);
+      if (ch) return await this.formatCharacter(ch);
+    } else {
+      const maybeChar = this.resolveCharacter(t);
+      if (maybeChar) return await this.formatCharacter(maybeChar);
+    }
+
+    // 6) Detecta tópico (principal)
+    const topic = this.resolveTopic(t);
+    if (topic) return this.formatTopic(topic);
+
+    // 7) fallback: sugerir opções próximas
+    const suggestions = this.suggest(t);
+    if (suggestions.length) {
+      return `
+        <div>
+          <h3>${this.config.ui.warnIcon} Não identifiquei com certeza</h3>
+          <p>Talvez você quis dizer:</p>
+          <p>${suggestions.map(s => `• ${this.escapeHtml(s)}`).join("<br>")}</p>
+          <p>${this.config.ui.tipIcon} Exemplos: "ansiedade", "resumo de romanos", "quem foi davi", "joão 3:16"</p>
+        </div>
+      `;
+    }
+
+    return this.formatNotFound("Não consegui identificar o tema/livro/personagem/referência.");
+  },
+
+  // -------------------------
+  // SUGESTÕES (tópicos, livros, personagens)
+  // -------------------------
+  suggest(input) {
+    const t = this.normalize(input);
+    const bag = [];
+
+    for (const k of Object.keys(this.topicMap)) bag.push({ type: "Tema", key: k, score: this.fuzzyScore(t, k) });
+    for (const k of Object.keys(this.bookMap)) bag.push({ type: "Livro", key: k, score: this.fuzzyScore(t, k) });
+    for (const k of Object.keys(this.characterMap)) bag.push({ type: "Pessoa", key: k, score: this.fuzzyScore(t, k) });
+
+    bag.sort((a, b) => b.score - a.score);
+    const top = bag.filter(x => x.score >= 0.45).slice(0, 5);
+
+    return top.map(x => `${x.type}: ${this.titleCase(x.key)} (${Math.round(x.score * 100)}%)`);
   }
 };
+
+// Função para injetar a aba Bíblia na interface
+function injectBibleTab() {
+  const activateBibleTab = () => {
+    // Desativa todos os outros botões de navegação e abas de conteúdo
+    document.querySelectorAll('.nav-item, .mobile-drawer-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+    // Ativa todos os botões da Bíblia (desktop e mobile) e o conteúdo
+    document.querySelectorAll('[data-tab="bible"]').forEach(b => b.classList.add('active'));
+    const content = document.getElementById('tab-bible');
+    if (content) content.classList.add('active');
+
+    if (typeof closeDrawer === 'function') closeDrawer();
+  };
+
+  // 1. Injetar Botão na Navegação Desktop (Sidebar)
+  const desktopNav = document.querySelector('.cinema .app-nav');
+  if (desktopNav && !desktopNav.querySelector('[data-tab="bible"]')) {
+    const btn = document.createElement('button');
+    btn.className = 'nav-item';
+    btn.dataset.tab = 'bible';
+    btn.innerHTML = '<span class="nav-icon">✝️</span><span>Bíblia</span>';
+    btn.addEventListener('click', activateBibleTab);
+    desktopNav.appendChild(btn);
+  }
+
+  // 2. Injetar Botão no Drawer Mobile
+  const mobileDrawerItemContainer = document.querySelector('.mobile-drawer-item')?.parentElement;
+  if (mobileDrawerItemContainer && !mobileDrawerItemContainer.querySelector('[data-tab="bible"]')) {
+    const btn = document.createElement('button');
+    btn.className = 'mobile-drawer-item';
+    btn.dataset.tab = 'bible';
+    btn.innerHTML = '<span class="nav-icon" style="font-size: 1.5rem;">✝️</span><span>Bíblia</span>';
+    btn.addEventListener('click', activateBibleTab);
+    mobileDrawerItemContainer.appendChild(btn);
+  }
+
+  // 3. Injetar Conteúdo da Aba
+  const main = document.getElementById('gameScreen');
+  if (main && !document.getElementById('tab-bible')) {
+    const content = document.createElement('div');
+    content.id = 'tab-bible';
+    content.className = 'tab-content';
+    content.style.cssText = 'padding: 10px; height: 100%; overflow: hidden;';
+    
+    content.innerHTML = `
+      <div class="bible-interface" style="width: 100%; max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.95); border-radius: 16px; padding: 15px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 100%; max-height: 100%;">
+        <div class="bible-header" style="text-align: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; flex-shrink: 0;">
+          <h2 style="color: #ffdd57; margin: 0; font-family: serif; font-size: 1.4rem;">✝️ Assistente Bíblico</h2>
+          <p style="opacity: 0.7; font-size: 0.8rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
+        </div>
+        
+        <div id="bibleChatArea" style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+          <div class="chat-message bot" style="align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 85%; font-size: 0.95rem;">
+            Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Posso explicar sobre livros (ex: "Gênesis"), temas (ex: "ansiedade") ou dar um versículo do dia.
+          </div>
+        </div>
+
+        <div class="bible-input-area" style="display: flex; gap: 10px; position: relative; flex-shrink: 0;">
+          <input type="text" id="bibleInput" placeholder="Ex: Gênesis, Salmos..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white; font-size: 16px;">
+          <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">➤</button>
+        </div>
+        
+        <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 5px; flex-shrink: 0;">
+          <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">✝️ Jesus</button>
+          <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">🧠 O que você sabe?</button>
+          <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📅 Plano de Leitura</button>
+        </div>
+      </div>
+    `;
+    
+    main.appendChild(content);
+    
+    // Setup Listeners
+    const input = document.getElementById('bibleInput');
+    const btn = document.getElementById('bibleSendBtn');
+    const chat = document.getElementById('bibleChatArea');
+    
+    const sendMessage = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        
+        // User Message
+        const userDiv = document.createElement('div');
+        userDiv.className = 'chat-message user';
+        userDiv.style.cssText = 'align-self: flex-end; background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 12px 12px 0 12px; max-width: 80%;';
+        userDiv.textContent = text;
+        chat.appendChild(userDiv);
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Bot Thinking
+        const thinkingDiv = document.createElement('div');
+        thinkingDiv.className = 'chat-message bot thinking';
+        thinkingDiv.style.cssText = 'align-self: flex-start; opacity: 0.7; font-style: italic; margin-top: 5px;';
+        thinkingDiv.textContent = 'Buscando na palavra...';
+        chat.appendChild(thinkingDiv);
+        chat.scrollTop = chat.scrollHeight;
+        
+        // Bot Response (agora assíncrono)
+        try {
+          if (typeof saveOracleChatMessage === 'function') {
+            saveOracleChatMessage('user', text).catch(e => console.warn('Erro ao salvar mensagem do usuário:', e));
+          }
+        } catch (e) {
+          console.warn('saveOracleChatMessage não disponível', e);
+        }
+
+        // limpar o input somente após enfileirar/salvar a mensagem do usuário
+        try { input.value = ''; } catch(e) { /* ignore */ }
+
+        const response = await BibleAssistant.reply(text);
+        thinkingDiv.remove();
+        
+        const botDiv = document.createElement('div');
+        botDiv.className = 'chat-message bot';
+        botDiv.style.cssText = 'align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%; margin-top: 5px; line-height: 1.5;';
+        // Proteção anti-welcome: se a resposta for apenas a mensagem de boas-vindas, tente esclarecer
+        let finalResponse = response;
+        try {
+          if (String(finalResponse).includes('Sou seu assistente bíblico') && text) {
+            finalResponse = BibleAssistant.formatNotFound(`Parece que não entendi. Você quis dizer: "${BibleAssistant.escapeHtml(text)}"?`);
+          }
+        } catch (e) { /* ignore */ }
+
+        botDiv.innerHTML = finalResponse;
+        chat.appendChild(botDiv);
+        try {
+          if (typeof saveOracleChatMessage === 'function') {
+            saveOracleChatMessage('assistant', finalResponse).catch(e => console.warn('Erro ao salvar mensagem do assistente:', e));
+          }
+        } catch (e) {
+          console.warn('saveOracleChatMessage não disponível', e);
+        }
+        chat.scrollTop = chat.scrollHeight;
+    };
+    
+    btn.addEventListener('click', sendMessage);
+    input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+    
+    // Global helper for tags
+    window.askBible = (query) => {
+        const input = document.getElementById('bibleInput');
+        if(input) {
+            input.value = query;
+            document.getElementById('bibleSendBtn').click();
+        }
+    };
+    // sinaliza que a aba Bíblia e handlers estão prontos
+    try {
+      window.__BIBLE_READY__ = true;
+      document.dispatchEvent(new CustomEvent('bible:ready'));
+    } catch (e) {
+      console.warn('Não foi possível setar __BIBLE_READY__', e);
+    }
+  }
+}
+
+// Métodos auxiliares para NLU
+function getTasksList() {
+  if (!gameState) return "Não consegui acessar seus dados.";
+  
+  const pending = (gameState.dailyTasks || []).filter(t => !t.completed);
+  const completed = (gameState.dailyTasks || []).filter(t => t.completed);
+  
+  if (pending.length === 0 && completed.length === 0) {
+    return "📝 Você não tem tarefas no momento. Que tal criar uma? Diz: <strong>criar tarefa estudar</strong>";
+  }
+  
+  let response = `<strong>📋 Suas Tarefas:</strong><br><br>`;
+  
+  if (pending.length > 0) {
+    response += `<strong>⏳ Pendentes (${pending.length}):</strong><br>`;
+    pending.forEach(t => {
+      response += `• ${t.text}`;
+      if (t.dueDate) {
+        const date = new Date(t.dueDate + 'T00:00');
+        response += ` <small>(${date.toLocaleDateString('pt-BR')})</small>`;
+      }
+      response += `<br>`;
+    });
+    response += '<br>';
+  }
+  
+  if (completed.length > 0) {
+    response += `<strong>✅ Concluídas (${completed.length}):</strong><br>`;
+    completed.slice(-3).forEach(t => response += `• <s>${t.text}</s><br>`);
+  }
+  
+  if (pending.length > 0) {
+    response += `<br><em>Dica: Diga "completar [nome da tarefa]" para finalizar!</em>`;
+  }
+  
+  return response;
+}
+
+function getFinanceSummary() {
+  if (!gameState || !gameState.finances) {
+    return "📊 Você ainda não tem registros financeiros. Diz algo como <strong>gastei 50 no almoço</strong> para começar!";
+  }
+  
+  const finances = gameState.finances;
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const balance = income - expenses;
+  
+  // Agrupa gastos por categoria
+  const categories = {};
+  finances.filter(f => f.type === 'expense').forEach(f => {
+    const cat = f.category || 'Outros';
+    categories[cat] = (categories[cat] || 0) + f.value;
+  });
+  
+  let response = `<strong>💰 Resumo Financeiro:</strong><br><br>`;
+  response += `📈 Entradas: <strong style="color: #4CAF50">R$ ${income.toFixed(2)}</strong><br>`;
+  response += `📉 Saídas: <strong style="color: #f44336">R$ ${expenses.toFixed(2)}</strong><br>`;
+  response += `💵 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br><br>`;
+  
+  if (Object.keys(categories).length > 0) {
+    response += `<strong>📊 Gastos por categoria:</strong><br>`;
+    const sortedCats = Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    sortedCats.slice(0, 5).forEach(([cat, val]) => {
+      response += `• ${cat}: R$ ${val.toFixed(2)}<br>`;
+    });
+  }
+  
+  response += `<br>${balance >= 0 ? '✅ Suas finanças estão no verde!' : '⚠️ Atenção com os gastos!'}`;
+  
+  return response;
+}
+
+function getStatusInfo() {
+  if (!gameState) return "Não consegui acessar seus dados.";
+  
+  const name = OracleMemory.getProfile('name');
+  const treatment = name || 'Aventureiro';
+  
+  const level = gameState.level || 1;
+  const xp = gameState.xp || 0;
+  const pendingTasks = (gameState.dailyTasks || []).filter(t => !t.completed).length;
+  
+  // Calcula saldo financeiro
+  const finances = gameState.finances || [];
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const balance = income - expenses;
+  
+  // Trabalho de hoje
+  const today = new Date().toISOString().split('T')[0];
+  const todayLogs = (gameState.workLog || []).filter(l => l.date === today);
+  const todayProd = todayLogs.reduce((sum, l) => sum + (l.production || 0), 0);
+  const todayMoney = todayLogs.reduce((sum, l) => sum + (l.money || 0), 0);
+  
+  let response = `<strong>🎮 Status de ${treatment}:</strong><br><br>`;
+  response += `⭐ Nível: <strong>${level}</strong> | XP: <strong>${xp}/100</strong><br>`;
+  response += `📝 Tarefas pendentes: <strong>${pendingTasks}</strong><br>`;
+  response += `💰 Saldo: <strong style="color: ${balance >= 0 ? '#4CAF50' : '#f44336'}">R$ ${balance.toFixed(2)}</strong><br>`;
+  
+  if (todayProd > 0 || todayMoney > 0) {
+    response += `<br><strong>📊 Hoje:</strong><br>`;
+    response += `🍕 Produção: ${todayProd} massas<br>`;
+    response += `💵 Ganho: R$ ${todayMoney.toFixed(2)}<br>`;
+  }
+  
+  // Dica personalizada
+  if (pendingTasks > 3) {
+    response += `<br>💡 Você tem muitas tarefas! Foque nas mais importantes.`;
+  } else if (pendingTasks === 0) {
+    response += `<br>🎉 Sem tarefas pendentes! Que tal criar uma nova meta?`;
+  }
+  
+  return response;
+}
+
+function getSuccessMessage() {
+  return CHARISMATIC_RESPONSES.success[
+    Math.floor(Math.random() * CHARISMATIC_RESPONSES.success.length)
+  ];
+}
+
+// Helper para dar conselho sobre a meta financeira
+function getSavingsAdvice() {
+  const goal = gameState.financialGoal || 0;
+  if (goal <= 0) return ""; 
+
+  const finances = gameState.finances || [];
+  const income = finances.filter(f => f.type === 'income').reduce((sum, f) => sum + f.value, 0);
+  const expenses = finances.filter(f => f.type === 'expense').reduce((sum, f) => sum + f.value, 0);
+  const currentBalance = Math.max(0, income - expenses);
+  
+  const remaining = Math.max(0, goal - currentBalance);
+  
+  if (remaining === 0) return "<br><br>🎉 <strong>Meta atingida!</strong> Você já alcançou seu objetivo financeiro!";
+
+  // Cálculo para 1 ano (12 meses)
+  const months = 12;
+  const monthly = remaining / months;
+  
+  return `<br><br>🎯 <strong>Meta:</strong> Faltam R$ ${remaining.toLocaleString('pt-BR')}.<br>💡 Para atingir em 1 ano, guarde <strong>R$ ${monthly.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</strong>/mês.`;
+}
+
+// Ações reais
+function createTask(text) {
+  if (!gameState) return "Erro ao criar tarefa. Tente pela interface.";
+  
+  if (!gameState.dailyTasks) gameState.dailyTasks = [];
+  
+  gameState.dailyTasks.push({
+    id: Date.now(),
+    text: text,
+    completed: false,
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderDailyTasks === 'function') renderDailyTasks();
+  
+  return getSuccessMessage() + `<br><br>📝 Tarefa criada: <strong>${text}</strong><br><br>Quando terminar, diz: <strong>completar ${text}</strong>`;
+}
+
+function completeTask(taskName) {
+  if (!gameState || !gameState.dailyTasks) return "Não encontrei tarefas.";
+
+  // Se nenhum nome de tarefa for fornecido, pergunte qual completar.
+  if (!taskName) {
+    const pendingTasks = gameState.dailyTasks.filter(t => !t.completed);
+    if (pendingTasks.length === 0) {
+      return "Você não tem tarefas pendentes para completar! 🎉";
+    }
+    // Retorna um objeto para o OracleChat criar botões de ação
+    return {
+      message: "Qual tarefa você completou? ✅",
+      actions: pendingTasks.slice(0, 4).map(t => ({
+        text: t.text.substring(0, 25) + (t.text.length > 25 ? '...' : ''),
+        action: () => {
+          const response = completeTask(t.text);
+          if (typeof response === 'string') {
+            addBotMessage(response);
+          } else if (response && response.message) {
+            addBotMessage(response.message, response.actions);
+          }
+        }
+      }))
+    };
+  }
+
+  const lowerTaskName = taskName.toLowerCase();
+  const pendingTasks = gameState.dailyTasks.filter(t => !t.completed);
+
+  // 1. Tenta encontrar correspondência exata primeiro
+  let task = pendingTasks.find(t => t.text.toLowerCase() === lowerTaskName);
+
+  // 2. Se não houver correspondência exata, procura por correspondências parciais
+  if (!task) {
+    const matches = pendingTasks.filter(t => t.text.toLowerCase().includes(lowerTaskName));
+
+    if (matches.length === 1) {
+      task = matches[0];
+    } else if (matches.length > 1) {
+      // Múltiplas correspondências, pede esclarecimento
+      OracleChat.pendingAction = { type: 'clarify_complete_task', matches: matches };
+      return {
+        message: `Encontrei ${matches.length} tarefas com "${taskName}". Qual delas você completou?`,
+        actions: matches.slice(0, 4).map(t => ({
+          text: t.text.substring(0, 25) + (t.text.length > 25 ? '...' : ''),
+          action: () => {
+            OracleChat.pendingAction = null;
+            const response = completeTask(t.text);
+            if (typeof response === 'string') {
+              addBotMessage(response);
+            } else if (response && response.message) {
+              addBotMessage(response.message, response.actions);
+            }
+          }
+        }))
+      };
+    }
+  }
+
+  if (task) {
+    task.completed = true;
+    task.completedAt = new Date().toISOString();
+
+    // Dar XP
+    const xpReward = task.xpReward || 10;
+    gameState.xp = (gameState.xp || 0) + xpReward;
+    updateXpHistory(xpReward); // Adicionado para consistência
+
+    if (gameState.xp >= 100) {
+      gameState.level = (gameState.level || 1) + 1;
+      gameState.xp -= 100;
+      gameState.skillPoints = (gameState.skillPoints || 0) + 1;
+      showToast('🎉 Level UP! +1 Ponto de Atributo');
+      playSound('levelUp');
+      triggerLevelUpAnimation();
+    }
+
+    saveGame();
+    if (typeof renderDailyTasks === 'function') renderDailyTasks();
+    if (typeof updateUI === 'function') updateUI();
+
+    return getSuccessMessage() + `<br><br>✅ Tarefa "<strong>${task.text}</strong>" concluída!<br>+${xpReward} XP 🎉`;
+  }
+
+  return `Não encontrei uma tarefa pendente com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
+}
+
+function addExpense(value, desc) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  // Detecta categoria automaticamente pela descrição
+  const category = detectCategory(desc);
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'expense',
+    category: category,
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const name = OracleMemory.getProfile('name');
+  const gender = OracleMemory.getProfile('gender');
+  const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💸 Despesa registrada, ${treatment}!<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
+}
+
+function addExpenseWithCategory(value, desc, category) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'expense',
+    category: category.charAt(0).toUpperCase() + category.slice(1),
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💸 Despesa registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}<br><small>Categoria: ${category}</small>${advice}`;
+}
+
+// RENOMEAR GASTO
+function renameExpense(oldName, newName) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const expenses = gameState.finances.filter(t => t.type === 'expense');
+  
+  // Busca por nome parcial (case insensitive)
+  const found = expenses.filter(e => 
+    e.desc.toLowerCase().includes(oldName.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhum gasto com o nome "<strong>${oldName}</strong>".<br><br>` +
+           `💡 Dica: Diga "<strong>ver meus gastos</strong>" para listar todos os seus gastos.`;
+  }
+  
+  if (found.length === 1) {
+    // Apenas um gasto encontrado - renomeia direto
+    const expense = found[0];
+    const oldDesc = expense.desc;
+    expense.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+    
+    // Recalcula categoria se necessário
+    expense.category = detectCategory(expense.desc);
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return `✅ Gasto renomeado com sucesso!<br><br>` +
+           `📝 De: <strong>${oldDesc}</strong><br>` +
+           `📝 Para: <strong>${expense.desc}</strong><br>` +
+           `<small>Categoria: ${expense.category}</small>`;
+  }
+  
+  // Múltiplos gastos encontrados - mostra opções
+  OracleChat.pendingAction = { type: 'rename_expense_select', newName: newName, matches: found };
+  
+  let response = `🔍 Encontrei ${found.length} gastos com "<strong>${oldName}</strong>".<br>Qual você quer renomear?<br><br>`;
+  
+  const actions = found.slice(0, 5).map((e, i) => ({
+    text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      e.category = detectCategory(e.desc);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado com sucesso!`);
+    }
+  }));
+  
+  return { message: response, actions: actions };
+}
+
+// LISTAR GASTOS
+function listExpenses() {
+  if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+  
+  const expenses = gameState.finances
+    .filter(t => t.type === 'expense')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 10); // Últimos 10
+  
+  if (expenses.length === 0) {
+    return "📊 Você ainda não registrou nenhum gasto.<br><br>💡 Dica: Diga \"<strong>gastei 50 no almoço</strong>\" para registrar.";
+  }
+  
+  let response = `📊 <strong>Seus últimos gastos:</strong><br><br>`;
+  
+  expenses.forEach((e, i) => {
+    const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+  });
+  
+  response += `<br>💡 Para renomear: "<strong>renomear gasto X para Y</strong>"<br>`;
+  response += `💡 Para deletar: "<strong>deletar gasto X</strong>"`;
+  
+  return response;
+}
+
+// DELETAR GASTO
+function deleteExpense(name) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const expenses = gameState.finances.filter(t => t.type === 'expense');
+  
+  // Busca por nome parcial
+  const found = expenses.filter(e => 
+    e.desc.toLowerCase().includes(name.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhum gasto com o nome "<strong>${name}</strong>".`;
+  }
+  
+  if (found.length === 1) {
+    const expense = found[0];
+    
+    // Pede confirmação
+    OracleChat.pendingAction = { type: 'confirm_delete_expense', expense: expense };
+    
+    return {
+      message: `⚠️ Tem certeza que quer deletar o gasto "<strong>${expense.desc}</strong>" de R$ ${expense.value.toFixed(2)}?`,
+      actions: [
+        { 
+          text: '✅ Sim, deletar', 
+          action: () => {
+            gameState.finances = gameState.finances.filter(f => f.id !== expense.id);
+            saveGame();
+            if (typeof renderFinances === 'function') renderFinances();
+            OracleChat.pendingAction = null;
+            addBotMessage(`🗑️ Gasto "<strong>${expense.desc}</strong>" deletado!`);
+          }
+        },
+        { 
+          text: '❌ Não, cancelar', 
+          action: () => {
+            OracleChat.pendingAction = null;
+            addBotMessage('Ok, cancelado! 👍');
+          }
+        }
+      ]
+    };
+  }
+  
+  // Múltiplos encontrados
+  OracleChat.pendingAction = { type: 'delete_expense_select', matches: found };
+  
+  let response = `🔍 Encontrei ${found.length} gastos com "<strong>${name}</strong>".<br>Qual você quer deletar?<br><br>`;
+  
+  const actions = found.slice(0, 5).map(e => ({
+    text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`🗑️ Gasto "<strong>${e.desc}</strong>" deletado!`);
+    }
+  }));
+  
+  return { message: response, actions: actions };
+}
+
+// Detecta categoria automaticamente
+function detectCategory(desc) {
+  const lower = desc.toLowerCase();
+  
+  const categories = {
+    'Alimentação': ['almoço', 'jantar', 'café', 'lanche', 'comida', 'restaurante', 'pizza', 'hamburguer', 'sushi', 'mercado', 'supermercado', 'feira', 'padaria', 'açougue', 'ifood', 'rappi', 'delivery'],
+    'Transporte': ['uber', '99', 'taxi', 'gasolina', 'combustível', 'estacionamento', 'pedágio', 'ônibus', 'metrô', 'passagem', 'carro', 'moto', 'bicicleta'],
+    'Lazer': ['cinema', 'netflix', 'spotify', 'jogo', 'game', 'bar', 'balada', 'festa', 'show', 'teatro', 'parque', 'viagem', 'passeio', 'diversão'],
+    'Saúde': ['farmácia', 'remédio', 'médico', 'consulta', 'exame', 'hospital', 'dentista', 'academia', 'suplemento', 'vitamina'],
+    'Educação': ['curso', 'livro', 'escola', 'faculdade', 'mensalidade', 'material', 'apostila', 'aula'],
+    'Moradia': ['aluguel', 'condomínio', 'luz', 'água', 'gás', 'internet', 'telefone', 'celular', 'conta'],
+    'Compras': ['roupa', 'sapato', 'tênis', 'shopping', 'loja', 'presente', 'eletrônico', 'celular']
+  };
+  
+  for (const [cat, keywords] of Object.entries(categories)) {
+    if (keywords.some(kw => lower.includes(kw))) {
+      return cat;
+    }
+  }
+  
+  return 'Outros';
+}
+
+function addIncome(value, desc) {
+  if (!gameState) return "Erro ao registrar. Tente pela interface.";
+  
+  if (!gameState.finances) gameState.finances = [];
+  
+  gameState.finances.push({
+    id: Date.now(),
+    desc: desc,
+    value: value,
+    type: 'income',
+    category: 'Extra',
+    date: new Date().toISOString()
+  });
+  
+  saveGame();
+  if (typeof renderFinances === 'function') renderFinances();
+  
+  const advice = getSavingsAdvice();
+  return getSuccessMessage() + `<br><br>💰 Receita registrada:<br><strong>${desc}</strong>: R$ ${value.toFixed(2)}${advice}`;
+}
+
+// RENOMEAR RECEITA/ENTRADA
+function renameIncome(oldName, newName) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const incomes = gameState.finances.filter(t => t.type === 'income');
+  
+  const found = incomes.filter(e => 
+    e.desc.toLowerCase().includes(oldName.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhuma entrada com o nome "<strong>${oldName}</strong>".<br><br>` +
+           `💡 Dica: Diga "<strong>ver minhas entradas</strong>" para listar.`;
+  }
+  
+  if (found.length === 1) {
+    const income = found[0];
+    const oldDesc = income.desc;
+    income.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+    
+    saveGame();
+    if (typeof renderFinances === 'function') renderFinances();
+    
+    return `✅ Entrada renomeada!<br><br>` +
+           `📝 De: <strong>${oldDesc}</strong><br>` +
+           `📝 Para: <strong>${income.desc}</strong>`;
+  }
+  
+  // Múltiplos encontrados
+  OracleChat.pendingAction = { type: 'rename_income_select', newName: newName, matches: found };
+  
+  const actions = found.slice(0, 5).map(e => ({
+    text: `${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      e.desc = newName.charAt(0).toUpperCase() + newName.slice(1);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`✅ "<strong>${e.desc}</strong>" renomeado!`);
+    }
+  }));
+  
+  return { message: `🔍 Encontrei ${found.length} entradas. Qual renomear?`, actions: actions };
+}
+
+// LISTAR RECEITAS/ENTRADAS
+function listIncomes() {
+  if (!gameState || !gameState.finances) return "Você ainda não tem registros financeiros.";
+  
+  const incomes = gameState.finances
+    .filter(t => t.type === 'income')
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 10);
+  
+  if (incomes.length === 0) {
+    return "📊 Você ainda não registrou nenhuma entrada.<br><br>💡 Dica: Diga \"<strong>recebi 1000 de salário</strong>\" para registrar.";
+  }
+  
+  let response = `📊 <strong>Suas últimas entradas:</strong><br><br>`;
+  
+  incomes.forEach((e, i) => {
+    const date = new Date(e.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    response += `${i + 1}. <strong>${e.desc}</strong> - R$ ${e.value.toFixed(2)} <small>(${date})</small><br>`;
+  });
+  
+  response += `<br>💡 Para renomear: "<strong>renomear entrada X para Y</strong>"`;
+  
+  return response;
+}
+
+// DELETAR RECEITA/ENTRADA
+function deleteIncome(name) {
+  if (!gameState || !gameState.finances) return "Não encontrei seus registros financeiros.";
+  
+  const incomes = gameState.finances.filter(t => t.type === 'income');
+  
+  const found = incomes.filter(e => 
+    e.desc.toLowerCase().includes(name.toLowerCase())
+  );
+  
+  if (found.length === 0) {
+    return `❌ Não encontrei nenhuma entrada com o nome "<strong>${name}</strong>".`;
+  }
+  
+  if (found.length === 1) {
+    const income = found[0];
+    
+    OracleChat.pendingAction = { type: 'confirm_delete_income', income: income };
+    
+    return {
+      message: `⚠️ Deletar entrada "<strong>${income.desc}</strong>" de R$ ${income.value.toFixed(2)}?`,
+      actions: [
+        { 
+          text: '✅ Sim, deletar', 
+          action: () => {
+            gameState.finances = gameState.finances.filter(f => f.id !== income.id);
+            saveGame();
+            if (typeof renderFinances === 'function') renderFinances();
+            OracleChat.pendingAction = null;
+            addBotMessage(`🗑️ Entrada "<strong>${income.desc}</strong>" deletada!`);
+          }
+        },
+        { 
+          text: '❌ Cancelar', 
+          action: () => {
+            OracleChat.pendingAction = null;
+            addBotMessage('Ok, cancelado! 👍');
+          }
+        }
+      ]
+    };
+  }
+  
+  // Múltiplos encontrados
+  const actions = found.slice(0, 5).map(e => ({
+    text: `🗑️ ${e.desc} (R$ ${e.value.toFixed(2)})`,
+    action: () => {
+      gameState.finances = gameState.finances.filter(f => f.id !== e.id);
+      saveGame();
+      if (typeof renderFinances === 'function') renderFinances();
+      OracleChat.pendingAction = null;
+      addBotMessage(`🗑️ Entrada "<strong>${e.desc}</strong>" deletada!`);
+    }
+  }));
+  
+  return { message: `🔍 Encontrei ${found.length} entradas. Qual deletar?`, actions: actions };
+}
+
+// UI Methods
+function addUserMessage(text) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message user';
+  div.textContent = text;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function addBotMessage(text, actions = null) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message bot';
+  div.innerHTML = text;
+  
+  if (actions && actions.length > 0) {
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'oracle-action-btns';
+    
+    actions.forEach(action => {
+      const btn = document.createElement('button');
+      btn.className = 'oracle-action-btn';
+      btn.textContent = action.text;
+      btn.addEventListener('click', () => {
+        action.action();
+        actionsDiv.remove();
+      });
+      actionsDiv.appendChild(btn);
+    });
+    
+    div.appendChild(actionsDiv);
+  }
+  
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  playSound('click');
+  
+  // Se estiver em modo conversa, fala a resposta
+  if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
+    // Remove emojis e tags HTML para falar
+    const cleanText = text.replace(/<[^>]*>/g, '').replace(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F300}-\u{1F5FF}]/gu, '').trim();
+    if (cleanText) {
+      OracleSpeech.speak(cleanText);
+    }
+  }
+}
+
+function addSystemMessage(text) {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message system';
+  div.innerHTML = text;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function showThinking() {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  
+  const div = document.createElement('div');
+  div.className = 'chat-message thinking';
+  div.id = 'oracleThinking';
+  div.innerHTML = '<div class="thinking-dots"><span></span><span></span><span></span></div>';
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+// Utilitários de debug para verificar bindings e elementos do Oráculo
+function dumpOracleBindings() {
+  const ids = ['addTaskBtn','addFinanceBtn','editProfileBtn','oracleScriptBtn','oracleSettingsBtn','chatBtn','oracleQuickActions','chatModal','chatInput','sendMessageBtn'];
+  const results = {};
+  console.group('Dump Oracle Bindings');
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    console.log(id, !!el, el);
+    results[id] = !!el;
+  });
+  console.groupEnd();
+  return results;
+}
+
+function removeThinking() {
+  const thinking = document.getElementById('oracleThinking');
+  if (thinking) thinking.remove();
+}
 
 // Expõe globalmente para compatibilidade com onclick no HTML
 window.toggleChat = () => OracleChat.toggle();
@@ -8634,6 +10825,7 @@ document.getElementById('drawerUpdateBtn')?.addEventListener('click', () => { cl
 document.getElementById('drawerExportBtn')?.addEventListener('click', () => { closeDrawer(); elements.exportBtn?.click(); });
 document.getElementById('drawerImportBtn')?.addEventListener('click', () => { closeDrawer(); elements.importBtn?.click(); });
 document.getElementById('drawerLogoutBtn')?.addEventListener('click', () => { closeDrawer(); logout(); });
+document.getElementById('drawerResetBtn')?.addEventListener('click', () => { closeDrawer(); resetAccount(); });
 
 // --- Lógica do FAB (Botão Flutuante) ---
 if (elements.fabMainBtn) {
@@ -8773,8 +10965,19 @@ if (elements.editAura) {
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🎮 Universo Real carregado com sucesso!');
   
-  // Inicializa o Oráculo
-  setTimeout(() => OracleChat.init(), 500);
+  // Inicializa o Oráculo (com try/catch para capturar erros em tempo de execução)
+  setTimeout(() => {
+    try {
+      OracleChat.init();
+      console.log('✅ OracleChat.init executado com sucesso');
+    } catch (e) {
+      console.error('❌ Erro na inicialização do OracleChat:', e);
+      // Mostra uma mensagem na UI para facilitar debugging
+      const chatStatus = document.getElementById('oracleStatusText');
+      if (chatStatus) chatStatus.textContent = 'Erro ao inicializar Oráculo (ver console)';
+    }
+  }, 500);
+  setTimeout(() => injectBibleTab(), 600); // Injeta a aba Bíblia
   
   // Splash Screen Logic
   const splash = document.getElementById('splashScreen');
@@ -8794,16 +10997,7 @@ window.addEventListener('DOMContentLoaded', () => {
   };
 
   updateSplashGreeting();
-  setTimeout(hideSplash, 2000); // Exibe por 2s ao abrir
-
-  // Reaparecer ao voltar para a aba/app
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      updateSplashGreeting();
-      if (splash) splash.classList.remove('hidden');
-      setTimeout(hideSplash, 1500); // Exibe por 1.5s ao retornar
-    }
-  });
+  setTimeout(hideSplash, 100); // Reduzido para 0.1s para carregar mais rápido
 
   // Feedback Háptico Global para Botões
   document.body.addEventListener('click', (e) => {
@@ -9105,3 +11299,84 @@ window.checkAppVersion = async function() {
 
 // Função global para forçar atualização (pode ser chamada do console)
 window.forceUpdate = forceAppUpdate;
+
+// -------------------------------
+// Ingestão de PDF para o Oracle
+// Requer PDF.js (veja instruções no index.html)
+// -------------------------------
+async function ingestPdfToOracle(url, options = { chunkSize: 2000 }) {
+  if (typeof pdfjsLib === 'undefined') {
+    console.warn('PDF.js não encontrado. Adicione <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script> em index.html');
+    return { success: false, error: 'pdfjs missing' };
+  }
+
+  try {
+    const loadingTask = pdfjsLib.getDocument(url);
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(i => i.str).join(' ');
+      fullText += `\n\n--- Página ${p} ---\n\n` + pageText;
+    }
+
+    const chunkSize = options.chunkSize || 2000;
+    let chunksAdded = 0;
+    for (let i = 0; i < fullText.length; i += chunkSize) {
+      const chunk = fullText.slice(i, i + chunkSize).trim();
+      if (chunk) {
+        OracleMemory.learn(chunk, 'pdf');
+        chunksAdded++;
+      }
+    }
+
+    // Opcional: criar um script resumido no OracleScript
+    try {
+      const script = {
+        id: Date.now(),
+        filename: url.split('/').pop(),
+        loadedAt: new Date().toISOString(),
+        instructions: [],
+        facts: [fullText.slice(0, 2000)],
+        commands: [],
+        responses: {},
+        raw: fullText
+      };
+      const scripts = OracleScript.getScripts();
+      scripts.push(script);
+      OracleScript.saveScripts(scripts);
+    } catch (e) {
+      console.warn('Não foi possível salvar script resumido:', e);
+    }
+
+    OracleMemory.updateMemoryDisplay();
+    return { success: true, pages: pdf.numPages, chunks: chunksAdded };
+  } catch (e) {
+    console.error('Erro ingestando PDF:', e);
+    return { success: false, error: e.message || String(e) };
+  }
+}
+
+// Helper para chamar pela UI (ex: botão)
+window.ingestPdfToOracle = ingestPdfToOracle;
+
+// -------------------------------
+// Aliases globais de compatibilidade
+// Evita erros quando código externo/antigo chama nomes diferentes
+// Define apenas se não existir para não sobrescrever implementações atuais
+// -------------------------------
+try {
+  if (typeof window !== 'undefined') {
+    if (!window.getTasksList) window.getTasksList = (typeof getTasksList === 'function') ? getTasksList : () => "Função getTasksList não disponível.";
+    if (!window.getTaskList) window.getTaskList = window.getTasksList;
+
+    if (!window.addMessages) window.addMessages = (...args) => (typeof addBotMessage === 'function' ? addBotMessage(...args) : null);
+    if (!window.addMessage) window.addMessage = window.addMessages;
+
+    if (!window.generateResponse) window.generateResponse = (input) => (typeof OracleChat !== 'undefined' && typeof OracleChat.generateResponse === 'function') ? OracleChat.generateResponse.call(OracleChat, input) : null;
+  }
+} catch (e) {
+  console.warn('Erro ao definir aliases globais de compatibilidade:', e);
+}
