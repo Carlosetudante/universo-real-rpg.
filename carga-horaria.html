@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carga Horária - Universo Real</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071428">
+  
+  <!-- Configuração PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo.svg">
+
+  <!-- Supabase CDN -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <style>
+    :root {
+      --bg1: #071428;
+      --bg2: #0e2340;
+      --accent: #ffdd57;
+      --accent-hover: #ffb142;
+      --glass: rgba(255, 255, 255, 0.06);
+      --success: #4ade80;
+      --danger: #f87171;
+      --info: #60a5fa;
+      --warning: #fbbf24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, var(--bg1), var(--bg2));
+      color: #e6eef8;
+      min-height: 100vh;
+      padding: 16px;
+      padding-bottom: 100px;
+    }
+
+    /* Estrelas de fundo */
+    .stars {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .stars:after, .stars:before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(#fff 0.6px, transparent 0.6px);
+      background-size: 50px 50px;
+      opacity: .06;
+    }
+    .stars:before {
+      transform: scale(.6); opacity: .04;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    header h1 { 
+      font-size: 1.5rem; 
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    header small { 
+      color: #a0aec0; 
+      display: block;
+      margin-top: 4px;
+    }
+    .back-link {
+      text-decoration: none; 
+      color: var(--accent); 
+      font-weight: bold; 
+      font-size: 0.9rem;
+      padding: 8px 16px;
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      transition: all 0.2s;
+    }
+    .back-link:hover {
+      background: var(--accent);
+      color: var(--bg1);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Cards */
+    .card {
+      background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(255, 255, 255, .02));
+      border-radius: 12px;
+      padding: 16px 20px;
+      border: 1px solid rgba(255, 255, 255, .05);
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card small {
+      color: #a0aec0;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    /* Grid de resumo */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .summary-item {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .summary-item .icon {
+      font-size: 1.8rem;
+      margin-bottom: 6px;
+    }
+    .summary-item .label {
+      font-size: 0.75rem;
+      color: #a0aec0;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .summary-item .value {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    /* Grid de gráficos */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .chart-wrapper {
+      position: relative;
+      height: 250px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    /* Tabela de registros */
+    .table-container {
+      overflow-x: auto;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .table th, .table td {
+      padding: 10px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+    }
+    .table th {
+      font-weight: 600;
+      color: #a0aec0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .badge-time { background: rgba(96, 165, 250, 0.2); color: var(--info); }
+    .badge-production { background: rgba(74, 222, 128, 0.2); color: var(--success); }
+    .badge-unpaid { background: rgba(251, 191, 36, 0.2); color: var(--warning); }
+
+    /* Semanas */
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    .week-card {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      padding: 14px;
+      border-left: 3px solid var(--accent);
+    }
+    .week-card h3 {
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      color: var(--accent);
+    }
+    .week-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.85rem;
+    }
+    .week-stats span {
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Filtros */
+    .filters {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .filters select, .filters input {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e6eef8;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+    .filters select:focus, .filters input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      z-index: 9999;
+      display: none;
+    }
+
+    /* Responsivo */
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.2rem; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
+      .week-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stars"></div>
+  
+  <header>
+    <div>
+      <h1>⏱️ Carga Horária</h1>
+      <small>Controle detalhado de ponto e produção</small>
+    </div>
+    <a href="./index.html" class="back-link">← Voltar ao Jogo</a>
+  </header>
+
+  <div class="container">
+    <!-- Resumo Geral -->
+    <section class="card">
+      <h2>📊 Resumo do Mês</h2>
+      <small>Visão geral das suas horas trabalhadas e produção</small>
+      
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="icon">⏱️</div>
+          <div class="label">Horas Totais</div>
+          <div class="value" id="totalHours" style="color: var(--info);">0h 0m</div>
+        </div>
+        <div class="summary-item">
+          <div class="icon">📅</div>
+          <div class="label">Dias Trabalhados</div>
+          <div class="value" id="totalDays" style="color: var(--accent);">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="icon">🍕</div>
+          <div class="label">Total Produção</div>
+          <div class="value" id="totalProduction" style="color: var(--success);">0</div>
+        </div>
+        <div class="summary-item">
+          <div class="icon">💰</div>
+          <div class="label">Ganhos</div>
+          <div class="value" id="totalEarnings" style="color: var(--success);">R$ 0</div>
+        </div>
+        <div class="summary-item">
+          <div class="icon">📈</div>
+          <div class="label">Média/Dia</div>
+          <div class="value" id="avgPerDay" style="color: var(--warning);">0h</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gráficos -->
+    <div class="charts-grid">
+      <div class="card">
+        <h2>📈 Horas por Dia da Semana</h2>
+        <div class="chart-wrapper">
+          <canvas id="hoursWeekdayChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h2>📊 Produção por Semana</h2>
+        <div class="chart-wrapper">
+          <canvas id="productionWeekChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumo por Semana -->
+    <section class="card">
+      <h2>📆 Resumo por Semana</h2>
+      <small>Detalhamento semanal do mês atual</small>
+      <div class="week-grid" id="weekSummary">
+        <!-- Preenchido via JS -->
+      </div>
+    </section>
+
+    <!-- Histórico Detalhado -->
+    <section class="card">
+      <h2>📋 Histórico Detalhado</h2>
+      <small>Todos os registros de ponto e produção</small>
+      
+      <div class="filters">
+        <select id="filterMonth">
+          <option value="">Mês Atual</option>
+        </select>
+        <select id="filterType">
+          <option value="">Todos os Tipos</option>
+          <option value="time_tracking">Ponto</option>
+          <option value="production">Produção</option>
+        </select>
+      </div>
+
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Descrição</th>
+              <th>Duração/Qtd</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody id="historyTable">
+            <!-- Preenchido via JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // --- Sistema de Carga Horária ---
+    
+    let gameState = null;
+    let currentUser = null;
+    let hoursWeekdayChart = null;
+    let productionWeekChart = null;
+
+    // Tipos de trabalho
+    const JOB_TYPES = {
+      pizzaria: { label: 'Pizzaria', unit: 'massas', icon: '🍕' },
+      vendedor: { label: 'Vendedor', unit: 'vendas', icon: '🤝' },
+      motorista: { label: 'Motorista', unit: 'corridas', icon: '🚖' },
+      freelancer: { label: 'Freelancer', unit: 'projetos', icon: '💻' }
+    };
+
+    // Supabase config
+    const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
+    let supabaseClient = null;
+
+    async function init() {
+      // Tenta carregar do Supabase primeiro
+      if (typeof window.supabase !== 'undefined') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          
+          if (session && session.user) {
+            console.log('✅ Sessão Supabase encontrada');
+            currentUser = session.user.email;
+            
+            // Carrega perfil da nuvem
+            const { data: profile } = await supabaseClient
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (profile) {
+              // Extrai dados do inventory (onde guardamos dados extras)
+              const inventoryData = profile.inventory || {};
+              const extraData = typeof inventoryData === 'object' && !Array.isArray(inventoryData) 
+                ? inventoryData 
+                : { items: inventoryData };
+              
+              gameState = {
+                workLog: extraData.workLog || [],
+                job: extraData.job || { type: 'pizzaria', config: {} }
+              };
+              
+              // Também carrega work_sessions da tabela específica
+              const { data: workSessions } = await supabaseClient
+                .from('work_sessions')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .order('start_at', { ascending: false });
+              
+              if (workSessions && workSessions.length > 0) {
+                // Converte para formato local
+                const cloudWorkLog = workSessions.map(w => ({
+                  id: w.id,
+                  date: w.start_at?.split('T')[0],
+                  startTime: w.start_at,
+                  endTime: w.end_at,
+                  duration: w.total_seconds * 1000,
+                  production: 0,
+                  money: 0
+                }));
+                // Mescla com workLog existente
+                gameState.workLog = [...cloudWorkLog, ...gameState.workLog];
+              }
+              
+              console.log('📊 Dados carregados:', gameState.workLog.length, 'registros');
+            }
+          }
+        } catch (e) {
+          console.warn('Erro ao carregar do Supabase:', e);
+        }
+      }
+      
+      // Fallback: tenta localStorage
+      if (!currentUser) {
+        const session = localStorage.getItem('ur_session');
+        const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+
+        if (session && users[session]) {
+          currentUser = session;
+          gameState = users[session].character;
+          
+          if (!gameState.workLog) gameState.workLog = [];
+          if (!gameState.job) gameState.job = { type: 'pizzaria', config: {} };
+        } else {
+          gameState = { workLog: [], job: { type: 'pizzaria', config: {} } };
+          showToast('⚠️ Faça login no jogo para ver seus dados completos.');
+        }
+      }
+
+      setupFilters();
+      setupCharts();
+      updateUI();
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 3000);
+    }
+
+    function formatDuration(ms) {
+      if (!ms || ms < 0) return '0h 0m';
+      const hours = Math.floor(ms / 3600000);
+      const minutes = Math.floor((ms % 3600000) / 60000);
+      return `${hours}h ${minutes}m`;
+    }
+
+    function setupFilters() {
+      const filterMonth = document.getElementById('filterMonth');
+      const now = new Date();
+      
+      // Adiciona os últimos 6 meses
+      for (let i = 0; i < 6; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const option = document.createElement('option');
+        option.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        option.textContent = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        if (i === 0) option.selected = true;
+        filterMonth.appendChild(option);
+      }
+
+      filterMonth.addEventListener('change', updateUI);
+      document.getElementById('filterType').addEventListener('change', updateUI);
+    }
+
+    function getFilteredLogs() {
+      const filterMonth = document.getElementById('filterMonth').value;
+      const filterType = document.getElementById('filterType').value;
+      let logs = gameState.workLog || [];
+
+      // Filtro de mês
+      if (filterMonth) {
+        logs = logs.filter(l => l.date && l.date.startsWith(filterMonth));
+      } else {
+        // Mês atual por padrão
+        const now = new Date();
+        const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        logs = logs.filter(l => l.date && l.date.startsWith(currentMonth));
+      }
+
+      // Filtro de tipo
+      if (filterType) {
+        if (filterType === 'production') {
+          logs = logs.filter(l => l.type !== 'time_tracking');
+        } else {
+          logs = logs.filter(l => l.type === filterType);
+        }
+      }
+
+      return logs;
+    }
+
+    function updateUI() {
+      const logs = getFilteredLogs();
+      const jobType = gameState.job?.type || 'pizzaria';
+      const jobDef = JOB_TYPES[jobType];
+
+      // Separar logs
+      const timeLogs = logs.filter(l => l.type === 'time_tracking');
+      const prodLogs = logs.filter(l => l.type !== 'time_tracking');
+
+      // Calcular totais
+      let totalMs = 0;
+      timeLogs.forEach(l => totalMs += (l.duration || 0));
+
+      let totalProd = 0;
+      let totalEarnings = 0;
+      prodLogs.forEach(l => {
+        totalProd += (l.inputVal || 0);
+        if (!l.isUnpaid) totalEarnings += (l.financialVal || 0);
+      });
+
+      // Dias únicos trabalhados
+      const uniqueDays = new Set(logs.map(l => l.date)).size;
+      const avgMs = uniqueDays > 0 ? totalMs / uniqueDays : 0;
+
+      // Atualizar resumo
+      document.getElementById('totalHours').textContent = formatDuration(totalMs);
+      document.getElementById('totalDays').textContent = uniqueDays;
+      document.getElementById('totalProduction').textContent = `${totalProd} ${jobDef?.unit || 'unid'}`;
+      document.getElementById('totalEarnings').textContent = `R$ ${totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      document.getElementById('avgPerDay').textContent = formatDuration(avgMs);
+
+      updateWeekSummary(logs, jobDef);
+      updateHistoryTable(logs, jobDef);
+      updateCharts(logs, prodLogs);
+    }
+
+    function updateWeekSummary(logs, jobDef) {
+      const container = document.getElementById('weekSummary');
+      container.innerHTML = '';
+
+      // Agrupar por semana
+      const weeks = { 1: [], 2: [], 3: [], 4: [] };
+      
+      logs.forEach(l => {
+        const week = l.week || Math.ceil(new Date(l.date).getDate() / 7);
+        const weekNum = Math.min(week, 4);
+        if (weeks[weekNum]) weeks[weekNum].push(l);
+      });
+
+      Object.keys(weeks).forEach(weekNum => {
+        const weekLogs = weeks[weekNum];
+        if (weekLogs.length === 0) return;
+
+        const timeLogs = weekLogs.filter(l => l.type === 'time_tracking');
+        const prodLogs = weekLogs.filter(l => l.type !== 'time_tracking');
+
+        let totalMs = 0;
+        timeLogs.forEach(l => totalMs += (l.duration || 0));
+
+        let totalProd = 0;
+        let totalEarnings = 0;
+        prodLogs.forEach(l => {
+          totalProd += (l.inputVal || 0);
+          if (!l.isUnpaid) totalEarnings += (l.financialVal || 0);
+        });
+
+        const card = document.createElement('div');
+        card.className = 'week-card';
+        card.innerHTML = `
+          <h3>Semana ${weekNum}</h3>
+          <div class="week-stats">
+            <span><span>⏱️ Horas:</span> <strong>${formatDuration(totalMs)}</strong></span>
+            <span><span>${jobDef?.icon || '📦'} Produção:</span> <strong>${totalProd} ${jobDef?.unit || 'unid'}</strong></span>
+            <span><span>💰 Ganhos:</span> <strong style="color: var(--success)">R$ ${totalEarnings.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong></span>
+            <span><span>📅 Dias:</span> <strong>${new Set(weekLogs.map(l => l.date)).size}</strong></span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      if (container.children.length === 0) {
+        container.innerHTML = '<div style="opacity: 0.5; text-align: center; padding: 20px;">Nenhum registro neste período.</div>';
+      }
+    }
+
+    function updateHistoryTable(logs, jobDef) {
+      const tbody = document.getElementById('historyTable');
+      tbody.innerHTML = '';
+
+      if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; opacity: 0.5; padding: 20px;">Nenhum registro encontrado.</td></tr>';
+        return;
+      }
+
+      // Ordenar por data (mais recente primeiro)
+      const sorted = [...logs].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      sorted.forEach(log => {
+        const row = document.createElement('tr');
+        const date = new Date(log.date);
+        const dateStr = date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+
+        let type, description, durationQty, value;
+
+        if (log.type === 'time_tracking') {
+          type = '<span class="badge badge-time">Ponto</span>';
+          description = 'Jornada de trabalho';
+          durationQty = formatDuration(log.duration || 0);
+          value = '-';
+        } else {
+          const isProd = log.type === 'pizzaria' || log.type === 'production' || !log.type;
+          type = log.isUnpaid 
+            ? '<span class="badge badge-unpaid">Não Remunerado</span>' 
+            : '<span class="badge badge-production">Produção</span>';
+          description = `${jobDef?.icon || '📦'} ${log.inputVal || 0} ${jobDef?.unit || 'unid'}`;
+          durationQty = `${log.inputVal || 0} ${jobDef?.unit || 'unid'}`;
+          value = log.isUnpaid ? '-' : `R$ ${(log.financialVal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        }
+
+        row.innerHTML = `
+          <td>${dateStr}</td>
+          <td>${type}</td>
+          <td>${description}</td>
+          <td>${durationQty}</td>
+          <td style="color: var(--success); font-weight: 600;">${value}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function setupCharts() {
+      // Gráfico de Horas por Dia da Semana
+      const ctx1 = document.getElementById('hoursWeekdayChart');
+      hoursWeekdayChart = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
+          datasets: [{
+            label: 'Horas',
+            data: [0, 0, 0, 0, 0, 0, 0],
+            backgroundColor: 'rgba(96, 165, 250, 0.7)',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+            x: { ticks: { color: '#a0aec0' }, grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // Gráfico de Produção por Semana
+      const ctx2 = document.getElementById('productionWeekChart');
+      productionWeekChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'],
+          datasets: [{
+            label: 'Produção',
+            data: [0, 0, 0, 0],
+            backgroundColor: 'rgba(74, 222, 128, 0.7)',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, ticks: { color: '#a0aec0' }, grid: { color: 'rgba(255,255,255,0.1)' } },
+            x: { ticks: { color: '#a0aec0' }, grid: { display: false } }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function updateCharts(allLogs, prodLogs) {
+      // Horas por dia da semana
+      const weekdayHours = [0, 0, 0, 0, 0, 0, 0];
+      allLogs.filter(l => l.type === 'time_tracking').forEach(l => {
+        if (l.date) {
+          const dayIndex = new Date(l.date).getDay();
+          weekdayHours[dayIndex] += (l.duration || 0) / 3600000; // Converter para horas
+        }
+      });
+      
+      hoursWeekdayChart.data.datasets[0].data = weekdayHours.map(h => parseFloat(h.toFixed(1)));
+      hoursWeekdayChart.update();
+
+      // Produção por semana
+      const weeklyProd = [0, 0, 0, 0];
+      prodLogs.forEach(l => {
+        const week = l.week || Math.ceil(new Date(l.date).getDate() / 7);
+        const weekIdx = Math.min(week - 1, 3);
+        weeklyProd[weekIdx] += (l.inputVal || 0);
+      });
+
+      productionWeekChart.data.datasets[0].data = weeklyProd;
+      productionWeekChart.update();
+    }
+
+    // Iniciar
+    window.addEventListener('load', init);
+
+    // Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+  
+  <!-- Timer flutuante -->
+  <script src="workTimer.js"></script>
+</body>
+</html>

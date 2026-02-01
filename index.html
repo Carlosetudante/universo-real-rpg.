@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071428">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Universo Real — RPG de Desenvolvimento Pessoal</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo.svg">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Supabase Client (Auth + Database) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Splash Screen (Tela de Abertura) -->
+  <div id="splashScreen">
+    <div class="splash-content">
+      <img src="logo.svg" alt="Universo Real Logo" class="splash-logo">
+      <h1>Universo Real</h1>
+      <div id="splashGreeting" style="font-size: 1.2rem; opacity: 0.8; margin-bottom: 10px; font-weight: 500;">Carregando...</div>
+      <div class="loading-bar">
+        <div class="loading-progress"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stars"></div>
+  <div class="container">
+    <!-- Tela de Login/Registro -->
+    <div class="modal" id="authModal">
+      <div class="modal-content">
+        <h2 id="authTitle">🎮 Entrar no Universo Real</h2>
+        <div id="loginForm">
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Email</label>
+              <input type="email" id="loginUsername" placeholder="Digite seu email..." autocomplete="email">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="loginPassword" placeholder="Digite sua senha...">
+                <button type="button" class="toggle-password" data-target="loginPassword" title="Mostrar senha">👁️</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
+            <input type="checkbox" id="rememberUser" style="width: auto; cursor: pointer;">
+            <label for="rememberUser" style="margin:0; font-size: 13px; cursor: pointer; opacity: 0.8;">Lembrar meu email</label>
+          </div>
+          <div style="display:flex; gap:8px; margin-top: 20px;">
+            <button class="btn" id="loginBtn">Entrar</button>
+            <button class="ghost" id="showRegisterBtn">Criar Conta</button>
+            <button class="ghost" id="forgotPasswordBtn" style="font-size: 12px; padding: 8px;">Esqueci a Senha</button>
+          </div>
+        </div>
+        
+        <div id="registerForm" class="hidden">
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Email</label>
+              <input type="email" id="registerUsername" placeholder="Digite seu email..." autocomplete="email">
+              <div id="usernameCheckMsg" class="validation-msg"></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="registerPassword" placeholder="Crie uma senha...">
+                <button type="button" class="toggle-password" data-target="registerPassword" title="Mostrar senha">👁️</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Confirmar Senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="registerConfirmPassword" placeholder="Repita a senha...">
+                <button type="button" class="toggle-password" data-target="registerConfirmPassword" title="Mostrar senha">👁️</button>
+              </div>
+              <div id="passwordMatchMsg" class="validation-msg"></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Nome do Personagem</label>
+              <input type="text" id="registerName" placeholder="Nome do seu herói...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Classe</label>
+              <select id="registerRace">
+                <option value="Guerreiro">Guerreiro</option>
+                <option value="Sábio">Sábio</option>
+                <option value="Atleta">Atleta</option>
+                <option value="Artista">Artista</option>
+                <option value="Líder">Líder</option>
+                <option value="Equilibrado">Equilibrado</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Pergunta de Segurança</label>
+              <input type="text" id="registerQuestion" placeholder="Ex: Nome do primeiro pet?">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Resposta de Segurança</label>
+              <input type="text" id="registerAnswer" placeholder="Sua resposta secreta...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div style="flex:1">
+              <label>Cor da Aura</label>
+              <input type="color" id="registerAura" value="#ffdd57">
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top: 20px;">
+            <button class="btn" id="registerBtn">Criar Personagem</button>
+            <button class="ghost" id="showLoginBtn">Já tenho conta</button>
+          </div>
+        </div>
+
+        <!-- Guia de Instalação PWA -->
+        <div class="install-guide">
+          <h3>🚀 Quer usar como um aplicativo?</h3>
+          <p class="small">Tenha acesso rápido e offline direto da sua tela inicial!</p>
+          
+          <button class="ghost" id="installAppBtn" style="display: none; margin-top: 10px; width: 100%; border: 1px solid var(--success); color: var(--success);">📲 Instalar Aplicativo (Recomendado)</button>
+
+          <div class="install-instructions">
+            <div class="install-platform">
+              <h4>🤖 Android (Chrome)</h4>
+              <ol>
+                <li>Toque no botão <strong>"Instalar Aplicativo"</strong> acima (se aparecer).</li>
+                <li>Ou, no menu do Chrome (⋮), procure por <strong>"Instalar aplicativo"</strong>.</li>
+              </ol>
+            </div>
+            <div class="install-platform">
+              <h4>🍏 iPhone (Safari)</h4>
+              <ol>
+                <li>Toque no ícone de <strong>Compartilhar</strong> (um quadrado com uma seta para cima).</li>
+                <li>Role para baixo e escolha <strong>"Adicionar à Tela de Início"</strong>.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal de Edição de Perfil -->
+    <div class="modal" id="editProfileModal">
+      <div class="modal-content">
+        <h2>✏️ Editar Perfil</h2>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Nome do Personagem</label>
+            <input type="text" id="editName" placeholder="Nome do seu herói...">
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Classe</label>
+            <select id="editRace">
+              <option value="Guerreiro">Guerreiro</option>
+              <option value="Sábio">Sábio</option>
+              <option value="Atleta">Atleta</option>
+              <option value="Artista">Artista</option>
+              <option value="Líder">Líder</option>
+              <option value="Equilibrado">Equilibrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Título</label>
+            <select id="editTitle"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Cor da Aura</label>
+            <input type="color" id="editAura">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top: 20px;">
+          <button class="btn" id="saveProfileBtn">Salvar Alterações</button>
+          <button class="ghost" id="cancelEditBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Histórico de Tarefas -->
+    <div class="modal" id="taskHistoryModal">
+      <div class="modal-content">
+        <h2>📜 Histórico de Tarefas</h2>
+        <div id="taskHistoryList" style="max-height: 300px; overflow-y: auto; margin-bottom: 20px;"></div>
+        <button class="btn" onclick="document.getElementById('taskHistoryModal').classList.remove('active')">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Modal de Configuração de Grupos Financeiros -->
+    <div class="modal" id="groupConfigModal">
+      <div class="modal-content">
+        <h2>🧩 Configurar Grupos</h2>
+        <p class="small" style="margin-bottom: 15px;">Crie grupos para somar gastos automaticamente baseados em palavras-chave na descrição.</p>
+        <div class="form-row">
+          <input type="text" id="groupNameInput" placeholder="Nome (ex: Casa)" style="flex:1">
+        </div>
+        <div class="form-row">
+          <input type="text" id="groupKeywordsInput" placeholder="Palavras-chave (ex: luz, agua, net)" style="flex:1">
+        </div>
+        <button class="btn" id="addGroupBtn" style="width:100%; margin-bottom:20px;">Adicionar Grupo</button>
+        <div id="groupsListConfig" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px;"></div>
+        <button class="ghost" id="closeGroupConfigBtn" style="width:100%;">Fechar</button>
+      </div>
+    </div>
+
+    <!-- Tela Principal do Jogo -->
+    <div class="card hidden" id="gameScreen">
+      <!-- Mobile Header -->
+      <div class="mobile-header" id="mobileHeader">
+        <div class="logo" style="font-size: 18px;">
+          <svg class="logo-icon" style="width: 24px; height: 24px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="#ffdd57" stroke-width="6" stroke-linejoin="round"/>
+          </svg>
+          <span>Universo Real</span>
+        </div>
+      </div>
+
+      <div class="cinema">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:#ffdd57;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#ff9f40;stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="url(#logoGradient)" stroke-width="6" stroke-linejoin="round"/>
+            <path d="M58 25 L35 58 L52 58 L45 80 L68 45 L50 45 Z" fill="url(#logoGradient)"/>
+          </svg>
+          <span>Universo Real</span>
+        </div>
+        <div class="subtitle">Transforme sua vida em um RPG — ganhe XP, suba de nível e desbloqueie conquistas reais.</div>
+        <div class="stage" id="stage">
+          <div class="ring" id="ring"></div>
+          <div class="orb" id="orb">
+            <div class="inner" id="innerOrb">
+              <div id="orbLevel">1</div>
+              <div class="level-text">Nível</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Navegação Principal (Desktop) -->
+        <nav class="app-nav">
+          <button class="nav-item active tab-btn" data-tab="hero"><span class="nav-icon">🦸</span> Herói</button>
+          <button class="nav-item tab-btn" data-tab="quests"><span class="nav-icon">📜</span> Missões</button>
+          <button class="nav-item tab-btn" data-tab="finance"><span class="nav-icon">💰</span> Finanças</button>
+          <button class="nav-item tab-btn" data-tab="social"><span class="nav-icon">❤️</span> Social</button>
+          <button class="nav-item tab-btn" data-tab="dom"><span class="nav-icon">💼</span> Trabalho</button>
+        </nav>
+
+        <!-- Ferramentas e Sistema -->
+        <div class="press-start">
+          <div class="tools-section">
+            <div class="tools-header">🛠️ Ferramentas</div>
+            <div class="tools-grid">
+              <button class="tool-btn" id="zenModeBtn"><span class="tool-icon">🧘</span> Zen</button>
+              <button class="tool-btn" id="chatBtn"><span class="tool-icon">🤖</span> Oráculo</button>
+              <button class="tool-btn" id="simpleFinanceBtn"><span class="tool-icon">📊</span> Relatórios</button>
+              <button class="tool-btn" id="cargaHorariaBtn"><span class="tool-icon">⏱️</span> Ponto</button>
+            </div>
+          </div>
+          
+          <div class="system-section">
+            <div class="tools-header">⚙️ Sistema</div>
+            <div class="system-actions">
+              <button class="save-btn" id="saveBtn">💾 Salvar</button>
+              <button class="system-btn" id="updateAppBtn" title="Verificar Atualizações">🔄</button>
+            </div>
+            <div class="system-actions">
+              <button class="system-btn secondary" id="exportBtn" title="Exportar Backup">📤</button>
+              <button class="system-btn secondary" id="importBtn" title="Importar Backup">📥</button>
+              <button class="system-btn secondary" id="restoreBackupBtn" style="display: none;" title="Restaurar">↺</button>
+              <button class="system-btn secondary" id="installAppBtn2" style="display: none;" title="Instalar">📲</button>
+            </div>
+            <button class="logout-btn" id="logoutBtn">🚪 Sair da Conta</button>
+          </div>
+          <input type="file" id="importFile" accept=".json,application/json" style="display: none;">
+        </div>
+      </div>
+      
+      <div class="panel">
+        <!-- Conteúdo das Abas (Mantido igual) -->
+
+        <!-- Conteúdo da Aba: Herói -->
+        <div id="tab-hero" class="tab-content active">
+          <h3>👤 Seu Personagem</h3>
+          <div class="hero-card-container">
+            <div class="hero-card-header" id="heroCardHeader"></div>
+            <div class="hero-card-body">
+              <div class="hero-avatar-wrapper">
+                <div class="avatar large" id="avatar">🧑</div>
+                <div class="hero-level-badge">Nível <span id="level">1</span></div>
+              </div>
+              <div class="hero-info">
+                <div class="hero-identity">
+                  <h2 id="previewName">Carregando...</h2>
+                  <div class="hero-username" id="previewUsername">@...</div>
+                </div>
+                <div class="hero-badges">
+                  <span class="badge-pill race" id="previewRace">...</span>
+                  <span class="badge-pill title" id="previewTitle">...</span>
+                </div>
+                <div class="hero-visual-badges" id="heroVisualBadges"></div>
+                <div class="hero-xp-container">
+                  <div class="xp-labels">
+                    <span>Progresso de XP</span>
+                    <span id="xp" class="xp-value">0 / 100</span>
+                  </div>
+                  <div class="progress-bar slim">
+                    <div class="progress-fill" id="xpProgress" style="width: 0%"></div>
+                  </div>
+                </div>
+              </div>
+              <button class="edit-profile-icon" id="editProfileBtn" title="Editar Perfil">⚙️</button>
+            </div>
+          </div>
+
+          <h3>💪 Atributos</h3>
+          <div class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div class="small">Pontos disponíveis: <strong id="skillPoints">0</strong></div>
+              <button class="ghost" id="resetAttrsBtn" style="padding: 6px 12px; font-size: 12px;">Resetar</button>
+            </div>
+            <div class="attributes-grid" id="attributesGrid">
+              <!-- Atributos serão gerados dinamicamente -->
+            </div>
+            <div style="margin-top: 25px; max-width: 350px; margin-left: auto; margin-right: auto;">
+              <canvas id="attributesChart"></canvas>
+            </div>
+          </div>
+
+          <h3>📊 Histórico de XP</h3>
+          <div class="section">
+            <canvas id="xpChart"></canvas>
+          </div>
+
+          <h3>🏆 Conquistas</h3>
+          <div class="section">
+            <div class="achievements-list" id="achievementsList">
+              <!-- Conquistas serão geradas dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Conteúdo da Aba: Missões -->
+        <div id="tab-quests" class="tab-content">
+          <h3>🎯 Missões Diárias</h3>
+          <div class="section">
+            <div class="small" style="margin-bottom: 12px;">
+              Complete missões para ganhar XP e pontos de atributo. Cada dia que você acessa ganha recompensas!
+            </div>
+            <div style="display: flex; gap: 8px; flex-direction: column;">
+              <button class="btn success" id="claimBtn">🎁 Reivindicar Recompensa Diária</button>
+              <div class="small" style="text-align: center;">
+                Última reivindicação: <strong id="lastClaim">Nunca</strong><br>
+                Sequência: <strong id="streakDisplay">0</strong> dias 🔥
+              </div>
+            </div>
+            
+            <div class="progress-bar" style="margin-top: 12px;">
+              <div class="progress-fill" id="xpProgressMissions" style="width: 0%"></div>
+            </div>
+            <div class="small" style="text-align: center; margin-top: 4px;">
+              Progresso para o próximo nível
+            </div>
+          </div>
+
+          <h3>📝 Tarefas Diárias</h3>
+          <div class="section">
+            <div class="form-row task-input-row" style="margin-bottom: 12px; gap: 8px;">
+              <input type="text" id="taskInput" placeholder="Ex: Beber 2L de água..." style="flex: 2;">
+              <button class="ghost" id="viewTaskHistoryBtn" title="Ver Histórico" style="padding: 10px;">📜</button>
+              <button class="btn" id="addTaskBtn" style="padding: 10px; width: auto;">+</button>
+              <button class="ghost danger" id="clearAllTasksBtn" title="Remover Todas" style="padding: 10px;">🗑️</button>
+            </div>
+            <div class="task-list" id="taskList">
+              <!-- Tarefas serão geradas dinamicamente -->
+            </div>
+          </div>
+
+          <h3>📖 Diário de Gratidão</h3>
+          <div class="section">
+            <div class="small" style="margin-bottom: 12px;">Escreva 3 coisas boas do dia para ganhar <strong style="color: var(--accent);">50 XP</strong>!</div>
+            <div class="form-row" style="flex-direction: column; gap: 8px;">
+              <input type="text" id="gratitude1" placeholder="1. Sou grato por...">
+              <input type="text" id="gratitude2" placeholder="2. (Opcional)">
+              <input type="text" id="gratitude3" placeholder="3. (Opcional)">
+              <button class="btn info" id="gratitudeBtn">🙏 Registrar Gratidão</button>
+            </div>
+            <div id="gratitudeHistory" style="margin-top: 15px; max-height: 200px; overflow-y: auto; padding-right: 5px;"></div>
+          </div>
+
+          <h3>🎒 Inventário</h3>
+          <div class="section">
+            <div class="form-row" style="margin-bottom: 12px;">
+              <input type="text" id="inventoryInput" placeholder="Nome do item..." style="flex: 1;">
+              <button class="btn" id="addItemBtn" style="padding: 10px; width: auto;">+</button>
+            </div>
+            <div class="inventory-list" id="inventoryList">
+              <!-- Itens serão gerados dinamicamente -->
+            </div>
+            <div class="small" id="inventoryCount" style="margin-top: 8px; text-align: right; opacity: 0.7;">0 itens</div>
+          </div>
+
+        </div>
+
+        <!-- Conteúdo da Aba: Finanças -->
+        <div id="tab-finance" class="tab-content">
+          <h3>💰 Controle Financeiro</h3>
+          <div class="section">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <div class="small" style="opacity: 0.7;">Saldo Atual</div>
+              <div id="financeBalance" style="font-size: 2em; font-weight: 700;">R$ 0,00</div>
+            </div>
+            <div class="form-row">
+              <div style="flex: 2;">
+                <input type="text" id="financeDesc" placeholder="Descrição (ex: Salário, Mercado)">
+              </div>
+              <div style="flex: 1;">
+                <input type="text" inputmode="decimal" id="financeValue" placeholder="R$ 0,00">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 8px;">
+              <select id="financeType" style="flex: 1;">
+                <option value="expense">Despesa</option>
+                <option value="income">Receita</option>
+              </select>
+              <select id="financeCategory" style="flex: 1;">
+                <option value="Outros">Outros</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Contas">Contas</option>
+                <option value="Salário">Salário</option>
+                <option value="Extra">Extra</option>
+              </select>
+              <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
+            </div>
+
+            <!-- Meta Financeira -->
+            <div style="margin-top: 20px; margin-bottom: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+              <div class="form-row">
+                <input type="text" inputmode="decimal" id="financeGoalInput" placeholder="Definir Meta (R$)" style="flex: 2;">
+                <button class="btn" id="setFinanceGoalBtn" style="flex: 1;">🎯 Definir</button>
+              </div>
+              <div id="financeGoalDisplay" class="hidden" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span class="small">Progresso da Meta</span>
+                  <button class="ghost" id="cancelFinanceGoalBtn" style="font-size: 10px; padding: 2px 8px; color: var(--danger);">❌ Cancelar Meta</button>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                  <span class="small" id="financeGoalText">0%</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="financeGoalProgress" style="width: 0%; background: var(--success);"></div>
+                </div>
+                <div class="small" style="text-align: center; margin-top: 4px; opacity: 0.7;" id="financeGoalStatus">Faltam R$ 0,00</div>
+              </div>
+            </div>
+
+            <div class="finance-list" id="financeList">
+              <!-- Transações serão geradas dinamicamente -->
+            </div>
+          </div>
+
+          <h3>📊 Gráficos</h3>
+          <div class="section">
+            <h4 style="text-align: center; margin-bottom: 15px;">Despesas por Categoria</h4>
+            <div style="max-width: 300px; margin: 0 auto 25px auto;">
+              <canvas id="financeChart"></canvas>
+            </div>
+            <div style="height: 250px;">
+              <canvas id="financeMonthlyChart"></canvas>
+            </div>
+          </div>
+
+          <h3>🧩 Análise por Grupos</h3>
+          <div class="section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div class="small">Gastos agrupados por palavras-chave</div>
+              <button class="ghost" id="configGroupsBtn" style="font-size:12px; padding: 4px 10px;">⚙️ Configurar</button>
+            </div>
+            <div id="financeGroupsDisplay" style="display: flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+
+          <h3>📅 Contas a Pagar</h3>
+          <div class="section">
+            <div class="form-row">
+              <div style="flex: 2;">
+                <input type="text" id="billDesc" placeholder="Conta (ex: Internet, Luz)">
+              </div>
+              <div style="flex: 1;">
+                <input type="text" inputmode="decimal" id="billValue" placeholder="R$ 0,00">
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 8px;">
+              <div style="flex: 1;">
+                <input type="date" id="billDate">
+              </div>
+              <div style="flex: 1;">
+                <select id="billRecurrence">
+                  <option value="none">Única</option>
+                  <option value="monthly">Mensal</option>
+                  <option value="weekly">Semanal</option>
+                  <option value="yearly">Anual</option>
+                </select>
+              </div>
+              <button class="btn" id="addBillBtn" style="width: auto;">Agendar</button>
+            </div>
+            <div class="bill-list" id="billList" style="margin-top: 12px;">
+              <!-- Contas serão geradas dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Conteúdo da Aba: Social -->
+        <div id="tab-social" class="tab-content">
+          <h3>❤️ Contador de Relacionamento</h3>
+          <div class="section">
+            <div id="relationshipSetup">
+              <div class="small" style="margin-bottom: 8px;">Defina a data de início:</div>
+              <div class="form-row">
+                <input type="datetime-local" id="relationshipDateInput">
+              </div>
+              <div class="small" style="margin-bottom: 8px; margin-top: 8px;">Foto do Casal (Opcional):</div>
+              <div class="form-row">
+                <input type="file" id="relationshipPhotoInput" accept="image/*">
+              </div>
+              <button class="btn" id="setRelationshipBtn" style="width: 100%; margin-top: 12px;">Iniciar</button>
+            </div>
+            <div id="relationshipDisplay" class="hidden">
+              <img id="relationshipPhotoDisplay" src="" title="Clique para alterar a foto" style="width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 12px auto; display: none; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.2);">
+              <input type="file" id="updateRelationshipPhotoInput" accept="image/*" style="display: none;">
+              <div style="text-align: center; font-weight: 700; font-size: 1.1em; margin-bottom: 8px; line-height: 1.4;" id="relationshipTimer">Carregando...</div>
+              <div class="small" style="text-align: center; opacity: 0.7;">Juntos nessa jornada!</div>
+              <button class="ghost" id="resetRelationshipBtn" style="width: 100%; margin-top: 12px; font-size: 12px;">Resetar Data</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conteúdo da Aba: Trabalho -->
+        <div id="tab-dom" class="tab-content">
+          <!-- Tela de Configuração (Aparece se não tiver trabalho definido) -->
+          <div id="workSetupSection" class="section hidden">
+            <h3>💼 Configurar Novo Trabalho</h3>
+            <p class="small" style="margin-bottom: 15px;">Defina sua empresa e o tipo de atividade para personalizar sua experiência.</p>
+            
+            <div class="form-row">
+              <div style="flex:1">
+                <label>Nome da Empresa / Negócio</label>
+                <input type="text" id="jobNameInput" placeholder="Ex: Pizzaria do Zé, Uber, Minha Loja...">
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div style="flex: 1;">
+                <label>Tipo de Atividade</label>
+                <select id="jobTypeSelect">
+                  <option value="pizzaria">🍕 Pizzaria (Produção de Massas)</option>
+                  <option value="vendedor">🤝 Vendedor (Comissões)</option>
+                  <option value="motorista">🚖 Motorista (Corridas)</option>
+                  <option value="freelancer">💻 Freelancer (Projetos/Horas)</option>
+                </select>
+              </div>
+            </div>
+            
+            <button class="btn success" id="saveJobBtn" style="width:100%; margin-top:10px;">Começar Jornada</button>
+          </div>
+
+          <!-- Painel de Trabalho (Aparece quando configurado) -->
+          <div id="workDashboardSection" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+              <h3 id="workTitleDisplay" style="margin:0; font-size: 1.2rem;">💼 Trabalho</h3>
+              <button class="ghost" id="configJobBtn" style="font-size:12px; padding:4px 8px;">⚙️ Configurar</button>
+            </div>
+
+            <div class="work-dashboard-grid">
+              <!-- Cronômetro Simples -->
+              <div class="timer-card">
+                <div id="workTimerDisplay" class="digital-clock">00:00:00</div>
+                <div style="display: flex; gap: 15px; justify-content: center;">
+                  <button id="startWorkBtn" class="btn success" style="min-width: 140px; font-weight: 800; letter-spacing: 0.5px;">▶ INICIAR</button>
+                  <button id="stopWorkBtn" class="btn danger" style="min-width: 140px; font-weight: 800; letter-spacing: 0.5px;" disabled>⏹ FINALIZAR</button>
+                </div>
+              </div>
+              
+              <!-- Histórico de Ponto (Separado) -->
+              <div>
+                <div class="history-section-title">⏱️ Últimos Registros de Ponto</div>
+                <div id="workTimeHistoryList" style="max-height: 150px; overflow-y: auto;"></div>
+              </div>
+              
+              <!-- Área de Singularidade (Dinâmica por Tipo de Trabalho) -->
+              <div id="workSingularityContainer">
+                <!-- Injetado via JS -->
+              </div>
+              
+              <!-- Histórico de Produção (Separado) -->
+              <div>
+                <div class="history-section-title">📊 Histórico de Produção</div>
+                <div id="workProductionHistoryList" style="max-height: 200px; overflow-y: auto;"></div>
+              </div>
+
+              <!-- Gráfico -->
+              <div style="height: 200px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 15px;">
+                <canvas id="workChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="small" style="margin-top: auto; text-align: center;">
+          Seus dados são salvos no servidor. Acesse de qualquer dispositivo!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botão Hamburger Flutuante (Mobile) -->
+  <button class="mobile-fab-menu hidden" id="mobileFabMenu">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+
+  <!-- Menu Lateral Mobile (Drawer) -->
+  <div class="mobile-drawer-overlay hidden" id="mobileDrawerOverlay">
+    <nav class="mobile-drawer" id="mobileDrawer">
+      <div class="mobile-drawer-header">
+        <span>📍 Navegação</span>
+        <button class="mobile-drawer-close" id="mobileDrawerClose">✕</button>
+      </div>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">📑 Abas</div>
+        <button class="mobile-drawer-item tab-btn active" data-tab="hero">🦸 Herói</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="quests">📜 Missões</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="finance">💰 Finanças</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="social">❤️ Social</button>
+        <button class="mobile-drawer-item tab-btn" data-tab="dom">💼 Trabalho</button>
+      </div>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">🛠️ Ferramentas</div>
+        <button class="mobile-drawer-item" id="drawerZenBtn">🧘 Modo Zen</button>
+        <button class="mobile-drawer-item" id="drawerChatBtn">🤖 Oráculo IA</button>
+        <button class="mobile-drawer-item" id="drawerFinanceBtn">📊 Relatórios</button>
+        <button class="mobile-drawer-item" id="drawerPontoBtn">⏱️ Ponto</button>
+      </div>
+      
+      <div class="mobile-drawer-section">
+        <div class="mobile-drawer-title">⚙️ Sistema</div>
+        <button class="mobile-drawer-item" id="drawerSaveBtn">💾 Salvar</button>
+        <button class="mobile-drawer-item" id="drawerUpdateBtn">🔄 Atualizar</button>
+        <button class="mobile-drawer-item" id="drawerExportBtn">📤 Backup</button>
+        <button class="mobile-drawer-item" id="drawerImportBtn">📥 Restaurar</button>
+        <button class="mobile-drawer-item danger" id="drawerLogoutBtn">🚪 Sair</button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Modal do Chat (Oráculo) - Sistema Inteligente -->
+  <div id="chatModal" class="modal" style="--accent: #818cf8;">
+    <div class="oracle-container" style="max-width: 550px;">
+      <div class="oracle-header" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.2) 0%, rgba(124, 58, 237, 0.1) 100%);">
+        <div class="oracle-header-left" style="gap: 15px;">
+          <div class="oracle-avatar" style="width: 52px; height: 52px;">
+            <div class="oracle-avatar-ring" style="border-color: var(--accent);"></div>
+            <span id="oracleAvatarEmoji" style="font-size: 28px;">🤖</span>
+          </div>
+          <div class="oracle-info">
+            <h2 id="oracleTitle" style="font-size: 1.2rem;">Oráculo</h2>
+            <div class="oracle-status">
+              <span class="oracle-status-dot"></span>
+              <span id="oracleStatusText">Online • Pronto para ajudar</span>
+            </div>
+          </div>
+        </div>
+        <div class="oracle-header-right">
+          <select id="oraclePersonalitySelect" class="oracle-personality-select" title="Mudar Personalidade">
+            <option value="assistant">🧠 Assistente</option>
+            <option value="wise">🧙‍♂️ Sábio</option>
+            <option value="coach">🏋️ Coach</option>
+            <option value="friend">😊 Amigo</option>
+          </select>
+          <button class="oracle-close-btn" id="closeChatBtn" title="Fechar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="oracle-quick-actions" id="oracleQuickActions">
+        <button class="oracle-quick-btn" data-action="status">📊 Status</button>
+        <button class="oracle-quick-btn" data-action="tasks">📝 Tarefas</button>
+        <button class="oracle-quick-btn" data-action="finance">💰 Finanças</button>
+        <button class="oracle-quick-btn" data-action="work">💼 Trabalho</button>
+        <button class="oracle-quick-btn" data-action="help">❓ Ajuda</button>
+      </div>
+
+      <!-- Área de Mensagens do Oráculo - CRÍTICO -->
+      <div id="chatMessages" class="oracle-messages"></div>
+
+      <div class="oracle-input-area">
+        <div class="oracle-input-wrapper">
+          <button class="oracle-voice-btn" id="oracleVoiceBtn">
+            <svg class="voice-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line></svg>
+            <svg class="voice-listening hidden" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle></svg>
+          </button>
+          <input type="text" id="chatInput" class="oracle-input" placeholder="Digite sua mensagem ou use comandos como 'criar tarefa...'">
+          <button class="oracle-send-btn" id="sendMessageBtn" title="Enviar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+        <div class="oracle-input-hints">
+          <span>💡 <strong>Clique duplo</strong> no 🎤 para <strong>modo conversa</strong> • Ex: "gastei 50 no almoço"</span>
+        </div>
+      </div>
+
+      <div class="oracle-footer">
+        <div class="oracle-memory-indicator">
+          <span class="memory-icon" style="font-size: 16px;">🧠</span>
+          <span class="memory-text">Memória: <span id="oracleMemoryCount">0</span> aprendizados</span>
+        </div>
+        <button class="oracle-script-btn" id="oracleScriptBtn" title="Carregar Script/Configuração">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        </button>
+        <input type="file" id="oracleScriptInput" accept=".txt,.md,.json" style="display: none;">
+        <button class="oracle-settings-btn" id="oracleSettingsBtn" title="Ver Perfil">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none"></div>
+
+  <!-- Overlay Modo Zen -->
+  <div id="zenModeOverlay" class="hidden">
+    <img id="zenBackgroundDisplay" class="zen-bg-thumb hidden" alt="Fundo Zen">
+    <div class="breathing-orb" id="zenBreathingOrb"></div>
+    <div class="zen-content">
+      <div id="zenTimer">0 anos, 0 meses, 0 dias...</div>
+      <div id="zenQuote">"Frase inspiradora..."</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+        <button class="ghost" id="zenMusicBtn" style="font-size: 12px; opacity: 0.7;">🎵 Selecionar Pasta de Músicas</button>
+        <select id="zenTrackSelect" class="ghost" style="display: none; font-size: 12px; opacity: 0.9; max-width: 250px; cursor: pointer; background: rgba(0,0,0,0.5); width: auto; padding: 8px;"></select>
+        <button class="ghost" id="zenImageBtn" style="font-size: 12px; opacity: 0.7;">🖼️ Imagem de Fundo</button>
+        <button class="ghost" id="zenBreathingBtn" style="font-size: 12px; opacity: 0.7;">🌬️ Respiração</button>
+        <button class="ghost" id="zenToggleHudBtn" style="font-size: 12px; opacity: 0.7;">👁️ Ocultar Interface</button>
+      </div>
+      <div id="zenPlaylistInfo" class="small" style="width: 100%; text-align: center; opacity: 0.6; margin-top: -10px;"></div>
+      <input type="file" id="zenMusicInput" accept="audio/*" webkitdirectory directory multiple style="display: none;">
+      <input type="file" id="zenImageInput" accept="image/*" style="display: none;">
+      <audio id="zenAudio"></audio>
+      <button class="ghost" id="exitZenBtn">Sair do Modo Zen</button>
+    </div>
+  </div>
+
+  <!-- Supabase Service (antes do app.js) -->
+  <script src="supabase.js"></script>
+  <script src="app.js"></script>
+  <!-- Sistema de Timer de Trabalho em Segundo Plano -->
+  <script src="workTimer.js"></script>
