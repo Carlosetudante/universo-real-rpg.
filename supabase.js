@@ -16,7 +16,7 @@ const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
 // Não deixe chaves embutidas em arquivos versionados.
 // Use a Anon Key pública aqui — NÃO a Service Role Key.
 // Substitua por sua Anon Key ou injete via processo de build / variável de ambiente.
-const SUPABASE_ANON_KEY = 'SUA-ANON-KEY-AQUI';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
 
 // Importação do Supabase Client (via CDN)
 // Adicionado no index.html: <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
