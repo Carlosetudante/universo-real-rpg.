@@ -190,9 +190,10 @@ function createStars(color = '#ffffff') {
   
   // Cria mais estrelas para um céu mais rico, com otimização para mobile
   const isMobile = window.innerWidth <= 900;
-  const density = isMobile ? 15000 : 8000; // Menos estrelas em telas menores
+  // Ajuste de densidade: valores menores -> mais estrelas
+  const density = isMobile ? 8000 : 3000; // aumenta muito a densidade de estrelas
   const baseCount = Math.floor(window.innerWidth * window.innerHeight / density);
-  const starCount = isMobile ? Math.min(70, Math.max(40, baseCount)) : Math.min(150, Math.max(60, baseCount));
+  const starCount = isMobile ? Math.min(220, Math.max(80, baseCount)) : Math.min(600, Math.max(160, baseCount));
   
   for (let i = 0; i < starCount; i++) {
     const star = document.createElement('div');
@@ -200,19 +201,19 @@ function createStars(color = '#ffffff') {
     
     // Distribuição de tamanhos: mais estrelas pequenas, poucas grandes
     const sizeRand = Math.random();
-    if (sizeRand < 0.35) star.classList.add('tiny');
-    else if (sizeRand < 0.65) star.classList.add('small');
-    else if (sizeRand < 0.85) star.classList.add('medium');
-    else if (sizeRand < 0.95) star.classList.add('large');
-    else star.classList.add('bright'); // 5% são estrelas muito brilhantes
+    if (sizeRand < 0.25) star.classList.add('tiny');
+    else if (sizeRand < 0.6) star.classList.add('small');
+    else if (sizeRand < 0.88) star.classList.add('medium');
+    else if (sizeRand < 0.97) star.classList.add('large');
+    else star.classList.add('bright'); // ~3% são estrelas muito brilhantes
     
     // Posição aleatória
     star.style.left = `${Math.random() * 100}%`;
     star.style.top = `${Math.random() * 100}%`;
     
     // Duração e delay de piscagem aleatórios para efeito natural
-    const duration = 1.5 + Math.random() * 4; // 1.5-5.5 segundos
-    const delay = Math.random() * 6; // delay 0-6s
+    const duration = 0.8 + Math.random() * 5.5; // 0.8-6.3 segundos (mais variedade)
+    const delay = Math.random() * 10; // delay 0-10s
     star.style.setProperty('--twinkle-duration', `${duration}s`);
     star.style.setProperty('--twinkle-delay', `${delay}s`);
     
@@ -5405,25 +5406,55 @@ const OracleOnboarding = {
 
   async init() {
     try {
-      // Carrega JSON de regras
-      const response = await fetch('pergaminho-onboarding.json');
-      if (response.ok) {
-        this.data = await response.json();
-        console.log('📜 Pergaminho de Onboarding (JSON) carregado.');
+      // Carrega JSON de regras: tenta fetch HTTP, se falhar usa script embutido no HTML
+      try {
+        const response = await fetch('pergaminho-onboarding.json');
+        if (response.ok) {
+          this.data = await response.json();
+          console.log('📜 Pergaminho de Onboarding (JSON) carregado via fetch.');
+        }
+      } catch (fe) {
+        // fetch pode falhar quando abrimos via file:// — tentamos ler o script embutido
+        try {
+          const el = document.getElementById('pergaminho-onboarding-data');
+          if (el && el.textContent) {
+            this.data = JSON.parse(el.textContent);
+            console.log('📜 Pergaminho de Onboarding carregado via script embutido.');
+          }
+        } catch (pe) {
+          console.warn('Falha ao carregar pergaminho via fallback embutido:', pe);
+        }
       }
       
       // Carrega Markdown de documentação/regras
-      const mdResponse = await fetch('pergaminho-onboarding.md');
-      if (mdResponse.ok) {
-        this.markdown = await mdResponse.text();
-        console.log('📜 Pergaminho de Onboarding (MD) carregado.');
+      // Se estamos servindo via file://, evitar fetch que falha por motivos de segurança
+      if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+        // Não tentamos buscar .md via fetch em file:// — silêncio para evitar spam no console
+      } else {
+        try {
+          const mdResponse = await fetch('pergaminho-onboarding.md');
+          if (mdResponse.ok) {
+            this.markdown = await mdResponse.text();
+            console.log('📜 Pergaminho de Onboarding (MD) carregado.');
+          }
+        } catch (e) {
+          console.warn('Não foi possível carregar pergaminho-onboarding.md via fetch:', e);
+        }
       }
       
       // Carrega TXT de regras simples
-      const txtResponse = await fetch('pergaminho-onboarding.txt');
-      if (txtResponse.ok) {
-        this.txt = await txtResponse.text();
-        console.log('📜 Pergaminho de Onboarding (TXT) carregado.');
+      if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+        // Ignorar fetch de .txt em file://
+      } else {
+        try {
+          const txtResponse = await fetch('pergaminho-onboarding.txt');
+          if (txtResponse.ok) {
+            this.txt = await txtResponse.text();
+            console.log('📜 Pergaminho de Onboarding (TXT) carregado.');
+          }
+        } catch (e) {
+          console.warn('Não foi possível carregar pergaminho-onboarding.txt via fetch:', e);
+        }
       }
     } catch (e) {
       // Silencioso se não existir, segue sem validação estrita
@@ -5950,9 +5981,9 @@ const OracleChat = {
     const actions = {
       status: 'Qual meu status atual?',
       tasks: 'Quais são minhas tarefas?',
-      finance: 'Como estão minhas finanças?',
+      finance: 'ajuda financeira',
       work: 'Como foi meu trabalho hoje?',
-      help: 'O que você pode fazer?'
+      help: 'ajuda'
     };
     
     if (actions[action]) {
@@ -6098,6 +6129,28 @@ const OracleChat = {
     const cleanedInput = this.cleanInput(input);
     const expandedInput = this.expandAbbreviations(cleanedInput);
     const lowerInput = expandedInput.toLowerCase().trim();
+    // Intercepta pedidos explícitos de ajuda para evitar iniciar onboarding/perguntas pessoais
+    const helpPatterns = [
+      'o que você pode', 'o que voce pode', 'o que vc pode', 'o que voce faz', 'o que você faz', 'o que vc faz',
+      'o que você pode fazer', 'o que voce pode fazer', 'o que vc pode fazer', 'o que você sabe', 'o que voce sabe'
+    ];
+    for (const p of helpPatterns) {
+      if (lowerInput.includes(p)) return this.getHelpMessage();
+    }
+
+    // Intercepta pedidos de piada para evitar flows que peçam idade
+    const jokePatterns = ['conte uma piada', 'me conta uma piada', 'conta uma piada', 'piada', 'me faz rir'];
+    for (const jp of jokePatterns) {
+      if (lowerInput.includes(jp)) {
+        const jokes = [
+          `Por que o programador usa óculos? 👓 Porque ele não consegue C#! (ver sharp) 😂`,
+          `O que o zero disse pro oito? 🎱 "Que cinto maneiro!" 😄`,
+          `Por que a matemática está triste? ➗ Porque ela tem muitos problemas! 🤣`,
+          `O que é um pontinho verde no canto da sala? 🟢 Uma ervilha de castigo! 😆`
+        ];
+        return jokes[Math.floor(Math.random() * jokes.length)];
+      }
+    }
     
     // Salva se foi educado para personalizar resposta
     if (wasPolite) {
@@ -6106,6 +6159,15 @@ const OracleChat = {
     
     // --- HÍBRIDO: tentativa rápida com RAG/LLM antes do fluxo antigo
     try {
+      // Intercept quick natural question "o que você pode" to always show help
+        const q = input.toLowerCase();
+        if (q.includes('o que voc') && q.includes('pode')) {
+          return this.getHelpMessage();
+        }
+        // Intercept finance-help requests
+        if (q.includes('ajuda financeira') || q.includes('ajuda nas finanças') || q.includes('ajuda finanças')) {
+          return this.getFinanceAssistant();
+        }
       if (window.OracleClient && typeof window.OracleClient.understandWithRAG === 'function') {
         const u = await window.OracleClient.understandWithRAG(input, { session: this.sessionState }, { useLLM: false });
 
@@ -7121,25 +7183,27 @@ const OracleChat = {
         
         const unknownPhrase = action.originalInput;
         
-        // Salva o alias na memória
-        const mem = OracleMemory.get();
-        if (!mem.aliases) mem.aliases = {};
-        mem.aliases[unknownPhrase] = definition;
-        OracleMemory.save(mem);
-        
-        this.pendingAction = null;
-        
-        // Executa o comando aprendido para confirmar e mostrar que funcionou
-        setTimeout(() => {
-             const response = this.generateResponse(definition);
-             if (typeof response === 'string') {
-                addBotMessage(response);
-             } else if (response && response.message) {
-                addBotMessage(response.message, response.actions);
-             }
-        }, 1000);
+          // Salva o alias na memória (não executar automaticamente)
+          const mem = OracleMemory.get();
+          if (!mem.aliases) mem.aliases = {};
+          mem.aliases[unknownPhrase] = definition;
+          OracleMemory.save(mem);
 
-        return `Entendi! 🧠 Aprendi que "<strong>${unknownPhrase}</strong>" significa "<strong>${definition}</strong>".<br>Vou tentar fazer isso agora...`;
+          this.pendingAction = { type: 'learn_confirm', originalInput: unknownPhrase, definition };
+
+          // Pergunta ao usuário se quer executar agora a ação aprendida
+          return {
+            message: `Entendi! 🧠 Aprendi que "<strong>${unknownPhrase}</strong>" significa "<strong>${definition}</strong>". Deseja que eu execute isso agora?`,
+            actions: [
+              { text: 'Sim, executa', action: () => {
+                  this.pendingAction = null;
+                  const resp = this.generateResponse(definition);
+                  if (typeof resp === 'string') addBotMessage(resp);
+                  else if (resp && resp.message) addBotMessage(resp.message, resp.actions);
+              }},
+              { text: 'Não, obrigado', action: () => { this.pendingAction = null; addBotMessage('Ok! Não executarei agora.'); } }
+            ]
+          };
 
       case 'learn_alias':
         const newCommand = input.trim();
@@ -7201,6 +7265,22 @@ const OracleChat = {
             { text: '🚗 Transporte', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Transporte')); } },
             { text: '🎮 Lazer', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Lazer')); } },
             { text: '🛒 Compras', action: () => { this.pendingAction = null; addBotMessage(addExpense(expenseValue, 'Compras')); } }
+          ]
+        };
+
+      case 'income_amount':
+        const incomeValue = parseMoney(lowerInput);
+        if (isNaN(incomeValue) || incomeValue <= 0) {
+          return "Por favor, digite um valor válido para a entrada (ex: 500 ou 1200,50).";
+        }
+        this.pendingAction = { type: 'income_description', value: incomeValue };
+        return {
+          message: `Ok, R$ ${incomeValue.toFixed(2)}. Qual é a descrição dessa entrada?`,
+          actions: [
+            { text: '💼 Salário', action: () => { this.pendingAction = null; addBotMessage(addIncome(incomeValue, 'Salário')); } },
+            { text: '💻 Freelance', action: () => { this.pendingAction = null; addBotMessage(addIncome(incomeValue, 'Freelance')); } },
+            { text: '🎁 Presente', action: () => { this.pendingAction = null; addBotMessage(addIncome(incomeValue, 'Presente')); } },
+            { text: '📈 Investimento', action: () => { this.pendingAction = null; addBotMessage(addIncome(incomeValue, 'Investimento')); } }
           ]
         };
 
@@ -8625,6 +8705,20 @@ const OracleChat = {
       • "completar estudar" - Finalizar tarefa<br>
       • "bora trabalhar" / "terminei" - Timer<br><br>
       <em>Pode desabafar, perguntar, ou só bater papo! 😊</em>`;
+  },
+
+  getFinanceAssistant() {
+    const name = OracleMemory.getProfile('name') || 'amigo';
+    return {
+      message: `💰 Olá ${name}! Como quer que eu te ajude nas finanças? Escolha uma opção abaixo:`,
+      actions: [
+        { text: '📝 Registrar gasto', action: () => { this.pendingAction = { type: 'expense_amount' }; addBotMessage('Certo — qual o valor do gasto? (ex: 50 ou 12,50)'); } },
+        { text: '💸 Registrar receita', action: () => { this.pendingAction = { type: 'income_amount' }; addBotMessage('Beleza — qual o valor da entrada?'); } },
+        { text: '🎯 Criar meta', action: () => { this.pendingAction = null; addBotMessage(this.createFinancialGoal()); } },
+        { text: '📊 Analisar gastos', action: () => { this.pendingAction = null; addBotMessage(this.analyzeSpending()); } },
+        { text: '💡 Dicas práticas', action: () => { this.pendingAction = null; addBotMessage(this.getFinancialTip()); } }
+      ]
+    };
   },
 
   getSmartDefault(input) {
@@ -10828,12 +10922,19 @@ function addUserMessage(text) {
 }
 
 function addBotMessage(text, actions = null) {
+  // Aceita também um objeto { message, actions }
+  if (text && typeof text === 'object') {
+    const obj = text;
+    actions = obj.actions || actions || null;
+    text = obj.message || obj.text || '';
+  }
+
   const messages = document.getElementById('chatMessages');
   if (!messages) return;
-  
+
   const div = document.createElement('div');
   div.className = 'chat-message bot';
-  div.innerHTML = text;
+  div.innerHTML = String(text || '');
   
   if (actions && actions.length > 0) {
     const actionsDiv = document.createElement('div');

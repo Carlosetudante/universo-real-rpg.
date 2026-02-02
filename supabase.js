@@ -678,6 +678,21 @@ async function processOracleActions(actions) {
             description: payload.description || ''
           });
           results.push({ success: true, action: 'finance.add', data: financeResult });
+          // Pós-transação: análise financeira básica e alerts
+          try {
+            const intelligence = new FinanceIntelligence(supabaseClient);
+            const alerts = await intelligence.checkForAlerts(currentUser?.id, financeResult);
+            if (alerts && alerts.length) {
+              showFinancialAlerts(alerts);
+            }
+            // Feedback simples: comparar com média da categoria
+            const avg = await intelligence.getCategoryAverage(currentUser?.id, financeResult.category);
+            if (avg && financeResult.amount > avg) {
+              addBotMessage(`💡 Este gasto de R$ ${financeResult.amount.toFixed(2)} está ${( (financeResult.amount/avg - 1) * 100 ).toFixed(0)}% acima da sua média para ${financeResult.category}.`);
+            }
+          } catch (e) {
+            console.warn('Finance analysis failed:', e);
+          }
           break;
 
         case 'task.add':
@@ -1089,6 +1104,115 @@ async function syncAllToCloud(localData) {
 }
 
 // Exporta funções para uso global
+// ===========================================
+// FINANCE INTELLIGENCE - análise simples pós-transação
+// ===========================================
+
+class FinanceIntelligence {
+  constructor(client = supabaseClient) {
+    this.client = client;
+  }
+
+  // Retorna as últimas N transações do usuário
+  async getRecentTransactions(userId, limit = 50) {
+    if (!this.client || !userId) return [];
+    const { data, error } = await this.client
+      .from('finance_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.warn('FinanceIntelligence.getRecentTransactions error', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  // Calcula média simples da categoria com base nas últimas N transações dessa categoria
+  async getCategoryAverage(userId, category, lookback = 90) {
+    if (!this.client || !userId || !category) return 0;
+    try {
+      const fromDate = new Date(Date.now() - (lookback * 24 * 60 * 60 * 1000)).toISOString();
+      const { data, error } = await this.client
+        .from('finance_transactions')
+        .select('amount')
+        .eq('user_id', userId)
+        .eq('category', category)
+        .gte('created_at', fromDate)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      if (error) {
+        console.warn('FinanceIntelligence.getCategoryAverage error', error);
+        return 0;
+      }
+      if (!data || data.length === 0) return 0;
+      const sum = data.reduce((s, r) => s + (r.amount || 0), 0);
+      return sum / data.length;
+    } catch (e) {
+      console.warn('FinanceIntelligence.getCategoryAverage failed', e);
+      return 0;
+    }
+  }
+
+  // Retorna alertas simples baseados na transação
+  async checkForAlerts(userId, transaction) {
+    const alerts = [];
+    if (!transaction) return alerts;
+
+    // Alerta: valor muito alto absoluto
+    const HIGH_VALUE_THRESHOLD = 5000; // ajuste por região
+    if (transaction.amount >= HIGH_VALUE_THRESHOLD) {
+      alerts.push({ type: 'high_amount', message: `Valor alto detectado: R$ ${transaction.amount.toFixed(2)}.` });
+    }
+
+    // Alerta: gasto acima da média da categoria
+    try {
+      const avg = await this.getCategoryAverage(userId, transaction.category || 'Outros');
+      if (avg > 0 && transaction.amount > avg * 1.5) {
+        const pct = ((transaction.amount / avg - 1) * 100).toFixed(0);
+        alerts.push({ type: 'above_average', message: `Este gasto está ${pct}% acima da sua média para ${transaction.category}.` });
+      }
+    } catch (e) {
+      console.warn('FinanceIntelligence.checkForAlerts average check failed', e);
+    }
+
+    // Alerta: muitos gastos no mesmo dia (simples heurística)
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const { data: todays, error } = await this.client
+        .from('finance_transactions')
+        .select('id, amount')
+        .eq('user_id', userId)
+        .like('created_at', `${today}%`)
+        .limit(50);
+      if (!error && todays && todays.length >= 10) {
+        alerts.push({ type: 'many_today', message: `Você já registrou ${todays.length} transações hoje. Está tudo bem?` });
+      }
+    } catch (e) {
+      console.warn('FinanceIntelligence.checkForAlerts daily check failed', e);
+    }
+
+    return alerts;
+  }
+}
+
+// Mostra alerts no chat do Oráculo (usa addBotMessage se disponível)
+function showFinancialAlerts(alerts = []) {
+  if (!alerts || alerts.length === 0) return;
+  alerts.forEach(a => {
+    const text = `⚠️ ${a.message}`;
+    if (typeof addBotMessage === 'function') {
+      try { addBotMessage(text); } catch (e) { console.log('addBotMessage error', e); }
+    } else if (window && window.addBotMessage) {
+      try { window.addBotMessage(text); } catch (e) { console.log('window.addBotMessage error', e); }
+    } else {
+      console.log('Financial alert:', text);
+    }
+  });
+}
+
 window.SupabaseService = {
   init: initSupabase,
   isConfigured: isSupabaseConfigured,

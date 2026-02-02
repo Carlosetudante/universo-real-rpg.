@@ -297,6 +297,31 @@ CREATE POLICY "Users can manage own finance groups"
   USING (auth.uid() = user_id);
 
 
+-- 10. ORACLE_PENDING (Pending slot-fills gerados pelo Oráculo)
+-- Guarda perguntas pendentes para sessão/usuário até serem preenchidas
+CREATE TABLE IF NOT EXISTS oracle_pending (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  questions JSONB NOT NULL,
+  original JSONB NOT NULL,
+  ctx JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_oracle_pending_session ON oracle_pending(session);
+ALTER TABLE oracle_pending ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own pending"
+  ON oracle_pending FOR SELECT
+  USING (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Users can insert pending"
+  ON oracle_pending FOR INSERT
+  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+
+
 -- ===========================================
 -- FUNÇÃO: Criar perfil automaticamente no signup
 -- ===========================================

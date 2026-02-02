@@ -232,11 +232,22 @@
     <div class="card hidden" id="gameScreen">
       <!-- Mobile Header -->
       <div class="mobile-header" id="mobileHeader">
-        <div class="logo" style="font-size: 18px;">
+        <div class="left-controls">
+          <!-- reserved for back/menu buttons -->
+        </div>
+        <div class="logo center-logo" style="font-size: 18px;">
           <svg class="logo-icon" style="width: 24px; height: 24px;" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <path d="M50 5 L93 27.5 L93 72.5 L50 95 L7 72.5 L7 27.5 Z" fill="none" stroke="#ffdd57" stroke-width="6" stroke-linejoin="round"/>
           </svg>
           <span>Universo Real</span>
+        </div>
+        <div class="header-right">
+          <!-- Small orb shown in header on mobile -->
+          <div class="orb header-orb" role="img" aria-label="orb">
+            <div class="inner">
+              <div class="orb-icon">⚡</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -788,7 +799,82 @@
   <!-- Supabase Service (antes do app.js) -->
   <script src="supabase.js"></script>
   <script src="brain.js"></script>
-  <script src="frontend/oracle-client.js"></script>
+  <script src="oracle-client.js"></script>
+  <script>
+    // Fallback leve: se `frontend/oracle-client.js` falhar (404), prevenimos que o app quebre.
+    if (!window.OracleClient) {
+      console.warn('OracleClient não carregado — aplicando fallback leve. Verifique a Network para 404.');
+      window.OracleClient = {
+        understandWithRAG: async (message, ctx = {}, opts = {}) => ({
+          intent: 'desconhecido',
+          entities: {},
+          confidence: 0.2,
+          reply: 'Não entendi, pode reformular? (fallback)',
+          questions: [],
+          actions: [],
+          source: 'fallback',
+          session: (ctx && ctx.session) || (`s_${Date.now().toString(36)}`)
+        }),
+        getPending: async (session) => null,
+        fillPending: async (session, answers) => ({ result: null })
+      };
+    }
+  </script>
+  <!-- Embutir pergaminho-onboarding.json como fallback para evitar issues com file:// -->
+  <script id="pergaminho-onboarding-data" type="application/json">
+{
+  "meta": {
+    "name": "Pergaminho de Cadastro e Memória do Usuário",
+    "version": "1.0"
+  },
+  "rules": [
+    "Quando eu estiver coletando dados do usuário, eu devo salvar cada resposta no campo correto.",
+    "Eu nunca devo sobrescrever user.name com user.workplace (ou qualquer outro campo).",
+    "Se eu fizer uma pergunta de cadastro, eu devo guardar qual campo estou esperando antes de salvar a resposta.",
+    "Se a resposta parecer não combinar com a pergunta (ex: resposta parece trabalho quando eu pedi nome), eu devo confirmar antes de salvar."
+  ],
+  "schema": {
+    "user.name": "Nome do usuário (pessoa)",
+    "user.workplace": "Local onde trabalha (empresa/loja/órgão)",
+    "user.role": "Cargo/atividade",
+    "user.city": "Cidade",
+    "relationship.partner": "Nome do(a) parceiro(a)"
+  },
+  "onboarding_flow": [
+    {
+      "key": "user.name",
+      "question": "Qual é o seu nome?",
+      "validation": "deve ser um nome de pessoa, normalmente 2+ letras e não conter palavras como 'trabalho', 'empresa', 'mercado'.",
+      "examples_good": ["Carlos", "Carlos Eduardo", "Ana"],
+      "examples_bad": ["Trabalho no mercado", "Empresa X", "Sou pedreiro"]
+    },
+    {
+      "key": "user.workplace",
+      "question": "Onde você trabalha?",
+      "validation": "deve ser um lugar/empresa, pode conter palavras como mercado, empresa, loja, hospital etc.",
+      "examples_good": ["Mercado Silva", "Hospital Central", "Empresa X"],
+      "examples_bad": ["Carlos", "João", "Meu nome é Carlos"]
+    },
+    {
+      "key": "user.role",
+      "question": "Qual é o seu cargo ou o que você faz lá?",
+      "examples_good": ["Repositor", "Analista", "Vendedor", "Autônomo"],
+      "examples_bad": ["Mercado Silva", "São Paulo"]
+    }
+  ],
+  "confirmation_policy": {
+    "when_mismatch": "Se houver dúvida entre nome e trabalho, perguntar: 'Isso é seu nome ou seu local de trabalho?' antes de salvar.",
+    "when_overwrite": "Se eu for salvar em um campo que já tem valor, perguntar confirmação antes de substituir."
+  }
+}
+  </script>
   <script src="app.js"></script>
   <!-- Sistema de Timer de Trabalho em Segundo Plano -->
   <script src="workTimer.js"></script>
+  <!-- Placeholders ocultos para evitar warnings de elementos faltando (fab) -->
+  <div id="fabContainer" style="display:none"></div>
+  <button id="fabMainBtn" style="display:none"></button>
+  <div id="fabActions" style="display:none"></div>
+  <button id="fabWorkBtn" style="display:none"></button>
+  <button id="fabTaskBtn" style="display:none"></button>
+  <button id="fabFinanceBtn" style="display:none"></button>

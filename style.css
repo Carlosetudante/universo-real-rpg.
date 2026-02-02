@@ -112,8 +112,8 @@
         radial-gradient(1px 1px at 130px 80px, rgba(255,255,255,0.7), transparent),
         radial-gradient(2px 2px at 160px 120px, white, transparent);
       background-repeat: repeat;
-      background-size: 200px 200px;
-      opacity: 0.4;
+      background-size: 120px 120px; /* aumenta densidade */
+      opacity: 0.55; /* ligeiramente mais visíveis */
     }
     
     /* Camada extra de estrelas menores */
@@ -127,9 +127,9 @@
         radial-gradient(1px 1px at 60px 100px, rgba(255,255,255,0.5), transparent),
         radial-gradient(1px 1px at 150px 150px, rgba(255,255,255,0.3), transparent);
       background-repeat: repeat;
-      background-size: 150px 150px;
-      opacity: 0.3;
-      animation: driftStars 120s linear infinite;
+      background-size: 100px 100px; /* mais estrelas pequenas */
+      opacity: 0.45;
+      animation: driftStars 100s linear infinite;
     }
     
     @keyframes driftStars {
@@ -180,7 +180,8 @@
     .logo {
       display: flex;
       align-items: center;
-      justify-content: center; /* Centraliza no mobile se necessário */
+      justify-content: center; /* Centraliza no mobile e desktop */
+      width: 100%;
       gap: 12px;
     }
 
@@ -193,6 +194,13 @@
       -webkit-text-fill-color: transparent;
       background-clip: text;
       text-transform: uppercase;
+      display: block;
+      text-align: center;
+    }
+
+    .logo .logo-icon {
+      display: block;
+      margin: 0 auto;
     }
 
     .logo-icon {
@@ -390,6 +398,61 @@
     button, .btn, .icon-btn, .tab-btn, .task-item, .bill-item, .shop-item {
       touch-action: manipulation;
     }
+
+  /* Mobile header: central logo + orb (lightning) to the right */
+  @media (max-width: 600px) {
+    .mobile-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      gap: 8px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      z-index: 30;
+    }
+    .mobile-header .left-controls {
+      width: 36px;
+      height: 36px;
+    }
+    .mobile-header .center-logo {
+      flex: 1 1 auto;
+      text-align: center;
+      transform: none;
+      left: auto;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .mobile-header .header-right {
+      width: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .header-orb {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #fff6 0%, #ffffff10 40%, transparent 60%), linear-gradient(135deg, #6ab7ff 0%, #2b8cff 100%);
+      box-shadow: 0 6px 18px rgba(20,60,120,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .header-orb .orb-icon {
+      font-size: 18px;
+      color: #fff;
+      text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      transform: translateY(-1px);
+    }
+    /* prevent main stage orb from overlapping header on small screens */
+    .stage {
+      margin-top: 8px;
+    }
+  }
 
     .btn.success {
       background: linear-gradient(180deg, var(--success), #22c55e);
@@ -908,6 +971,38 @@
     @media(max-width: 900px) {
       .container {
         padding: 0;
+
+      /* Mobile logo adjustments */
+      .mobile-header .logo {
+        justify-content: center;
+        width: 100%;
+        gap: 8px;
+        padding: 6px 0;
+      }
+
+      .mobile-header .logo span {
+        font-size: 16px;
+      }
+
+      .mobile-header .logo .logo-icon {
+        width: 28px !important;
+        height: 28px !important;
+      }
+
+      /* Ensure left column logo also centers on narrow screens */
+      .cinema .logo {
+        justify-content: center;
+        width: 100%;
+      }
+
+      .cinema .logo span {
+        font-size: 20px;
+      }
+
+      .cinema .logo .logo-icon {
+        width: 44px;
+        height: 44px;
+      }
         align-items: flex-start;
       }
 
@@ -916,7 +1011,7 @@
       }
 
       .cinema {
-        display: none; /* Esconde sidebar no mobile */
+          display: none; /* Esconde sidebar no mobile */
       }
       
       .mobile-header {
@@ -1078,6 +1173,23 @@
   justify-content: center;
   z-index: 2000;
   padding: 20px;
+}
+
+/* Oculta o stage / orb no mobile para um header mais limpo (opção 1) */
+@media (max-width: 900px) {
+  .stage, .orb, #orb, .ring {
+    display: none !important;
+  }
+
+  /* Ajuste extra: reduz tamanho do logo mobile caso precise */
+  .mobile-header .logo .logo-icon {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .mobile-header .logo span {
+    font-size: 15px;
+  }
 }
 
 @keyframes modalOverlayEnter {
@@ -2678,19 +2790,19 @@ input.success {
 
 .oracle-action-btn {
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06); /* mais claro e mais transparente */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  color: #ffffffcc; /* leve transparência no texto */
+  font-size: 13px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .oracle-action-btn:hover {
-  background: rgba(255, 221, 87, 0.2);
-  color: #1a1a1a;
-  border-color: var(--accent);
+  background: rgba(255, 221, 87, 0.12); /* hover mais sutil */
+  color: #0f172a;
+  border-color: rgba(255,221,87,0.25);
 }
 
 .oracle-action-btn.success {
@@ -2758,6 +2870,31 @@ input.success {
     max-width: 90%;
     padding: 12px 14px;
     font-size: 14px;
+  }
+}
+
+/* Opção B: centralização absoluta da logo no header móvel */
+@media (max-width: 900px) {
+  .mobile-header { position: relative; }
+  .mobile-header .logo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none; /* evita que a logo capture clicks por cima de controles */
+  }
+  .mobile-header .logo * { pointer-events: auto; }
+
+  /* Garante que botões laterais fiquem acima da logo */
+  .mobile-header .controls,
+  .mobile-header .left-controls,
+  .mobile-header .right-controls {
+    position: relative;
+    z-index: 10;
   }
 }
 
