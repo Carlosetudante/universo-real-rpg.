@@ -179,16 +179,17 @@
     
     .logo {
       display: flex;
+      flex-direction: column; /* Ícone em cima do texto no Desktop */
       align-items: center;
-      justify-content: center; /* Centraliza no mobile e desktop */
+      justify-content: center;
       width: 100%;
-      gap: 12px;
+      gap: 10px;
     }
 
     .logo span {
       font-weight: 900;
       letter-spacing: 1px;
-      font-size: 26px;
+      font-size: 32px; /* Fonte maior no Desktop */
       background: linear-gradient(90deg, var(--accent), #fff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
@@ -204,9 +205,11 @@
     }
 
     .logo-icon {
-      width: 48px;
-      height: 48px;
-      filter: drop-shadow(0 0 15px rgba(255, 221, 87, 0.3));
+      width: 120px; /* Ícone bem grande no Desktop */
+      height: 120px;
+      /* Novo ícone de Escudo com Raio Azul Elétrico */
+      content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' fill='%230d1b2a' stroke='%23ffdd57' stroke-width='1.5'/%3E%3Cpath d='M13 7l-3 5h3l-2 6 5-6h-3l2-5z' fill='%2300eaff'/%3E%3C/svg%3E");
+      filter: drop-shadow(0 0 25px rgba(0, 234, 255, 0.6));
       animation: floatLogo 6s ease-in-out infinite;
     }
 
@@ -974,19 +977,20 @@
 
       /* Mobile logo adjustments */
       .mobile-header .logo {
+        flex-direction: row; /* Força linha (lado a lado) no celular */
         justify-content: center;
-        width: 100%;
+        width: auto;
         gap: 8px;
-        padding: 6px 0;
+        padding: 0;
       }
 
       .mobile-header .logo span {
-        font-size: 16px;
+        font-size: 18px; /* Tamanho legível para celular */
       }
 
       .mobile-header .logo .logo-icon {
-        width: 28px !important;
-        height: 28px !important;
+        width: 36px !important; /* Tamanho ajustado para a barra do celular */
+        height: 36px !important;
       }
 
       /* Ensure left column logo also centers on narrow screens */
