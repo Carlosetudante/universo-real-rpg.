@@ -666,29 +666,31 @@ async function processOracleActions(actions) {
   const results = [];
 
   for (const action of actions) {
+    // aceita formato { type, payload } vindo do LLM
+    const payload = action.payload || action;
     try {
       switch (action.type) {
         case 'finance.add':
           const financeResult = await addFinance({
-            type: action.amount > 0 ? 'income' : 'expense',
-            category: action.category || 'Outros',
-            amount: Math.abs(action.amount),
-            description: action.description || ''
+            type: payload.amount > 0 ? 'income' : 'expense',
+            category: payload.category || 'Outros',
+            amount: Math.abs(payload.amount || 0),
+            description: payload.description || ''
           });
           results.push({ success: true, action: 'finance.add', data: financeResult });
           break;
 
         case 'task.add':
           const taskResult = await addTask({
-            title: action.title,
-            xpReward: action.xp || 10,
-            dueDate: action.due_date || null
+            title: payload.title || payload.name,
+            xpReward: payload.xp || payload.xpReward || 10,
+            dueDate: payload.date || payload.due_date || null
           });
           results.push({ success: true, action: 'task.add', data: taskResult });
           break;
 
         case 'task.complete':
-          await updateTask(action.task_id, { 
+          await updateTask(payload.task_id || action.task_id, { 
             status: 'completed',
             completed_at: new Date().toISOString()
           });
@@ -697,17 +699,17 @@ async function processOracleActions(actions) {
 
         case 'memory.save':
           const memoryResult = await saveOracleMemory(
-            action.title,
-            action.fact,
-            action.tags || [],
-            action.importance || 5
+            payload.title || action.title,
+            payload.fact || action.fact,
+            payload.tags || action.tags || [],
+            payload.importance || action.importance || 5
           );
           results.push({ success: true, action: 'memory.save', data: memoryResult });
           break;
 
         case 'xp.add':
-          await addXpEvent(action.amount, action.reason || 'Bônus do Oráculo');
-          results.push({ success: true, action: 'xp.add', amount: action.amount });
+          await addXpEvent(payload.amount || action.amount, payload.reason || action.reason || 'Bônus do Oráculo');
+          results.push({ success: true, action: 'xp.add', amount: payload.amount || action.amount });
           break;
 
         default:

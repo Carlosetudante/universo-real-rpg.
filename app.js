@@ -2,6 +2,37 @@
 // API Base URL
 const API_URL = '/api';
 
+// Configuração global do Oráculo (telemetria e controle de LLM)
+window.OracleConfig = window.OracleConfig || {
+  useLLM: false,          // começa desligado
+  telemetry: true,        // liga log básico
+  telemetrySample: 1.0    // 1.0 = logar tudo, 0.2 = 20%
+};
+
+// Telemetria leve (console + localStorage)
+window.OracleTelemetry = window.OracleTelemetry || {
+  log(event, data = {}) {
+    try {
+      const cfg = window.OracleConfig || {};
+      if (!cfg.telemetry) return;
+      if (Math.random() > (cfg.telemetrySample ?? 1.0)) return;
+
+      const payload = {
+        t: new Date().toISOString(),
+        event,
+        ...data
+      };
+
+      console.debug('[OracleTelemetry]', payload);
+
+      const key = 'oracle_telemetry';
+      const arr = JSON.parse(localStorage.getItem(key) || '[]');
+      arr.push(payload);
+      while (arr.length > 200) arr.shift();
+      localStorage.setItem(key, JSON.stringify(arr));
+    } catch (_) {}
+  }
+};
 // Sistema de Som (Web Audio API) - Inicializado sob demanda
 let audioCtx = null;
 
@@ -5933,7 +5964,7 @@ const OracleChat = {
     }
   },
   
-  processMessage() {
+  async processMessage() {
     const input = document.getElementById('chatInput');
     if (!input) return;
     
@@ -5947,13 +5978,18 @@ const OracleChat = {
     showThinking();
     
     // Processa com delay para parecer natural
-    setTimeout(() => {
+    setTimeout(async () => {
       removeThinking();
-      const response = this.generateResponse(text);
-      if (typeof response === 'string') {
-        addBotMessage(response);
-      } else if (response.message) {
-        addBotMessage(response.message, response.actions);
+      try {
+        const response = await this.generateResponse(text);
+        if (typeof response === 'string') {
+          addBotMessage(response);
+        } else if (response && response.message) {
+          addBotMessage(response.message, response.actions);
+        }
+      } catch (err) {
+        console.error('Erro em generateResponse:', err);
+        addBotMessage('Desculpe, deu um erro ao processar sua mensagem.');
       }
     }, 600 + Math.random() * 400);
   },
@@ -6057,7 +6093,7 @@ const OracleChat = {
     return result;
   },
   
-  generateResponse(input) {
+  async generateResponse(input) {
     const wasPolite = this.detectPoliteness(input);
     const cleanedInput = this.cleanInput(input);
     const expandedInput = this.expandAbbreviations(cleanedInput);
@@ -6066,6 +6102,61 @@ const OracleChat = {
     // Salva se foi educado para personalizar resposta
     if (wasPolite) {
       OracleMemory.setProfile('isPolite', true);
+    }
+    
+    // --- HÍBRIDO: tentativa rápida com RAG/LLM antes do fluxo antigo
+    try {
+      if (window.OracleClient && typeof window.OracleClient.understandWithRAG === 'function') {
+        const u = await window.OracleClient.understandWithRAG(input, { session: this.sessionState }, { useLLM: false });
+
+        const safe = (obj) => ({
+          intent: obj?.intent || 'desconhecido',
+          entities: obj?.entities || {},
+          confidence: typeof obj?.confidence === 'number' ? obj.confidence : 0,
+          reply: obj?.reply || '',
+          questions: Array.isArray(obj?.questions) ? obj.questions.slice(0,2) : [],
+          actions: Array.isArray(obj?.actions) ? obj.actions : []
+        });
+
+        const result = safe(u || {});
+
+        window.OracleTelemetry?.log('understand_result', {
+          intent: result.intent,
+          confidence: result.confidence,
+          hasActions: !!(result.actions && result.actions.length),
+          hasQuestions: !!(result.questions && result.questions.length)
+        });
+
+        if (result.questions && result.questions.length > 0) {
+          const sessionId = result.session || (this.sessionState && (this.sessionState.id || this.sessionState.sessionId));
+          this.pendingAction = { type: 'slot_fill', originalInput: input, understand: result, awaiting: result.questions, collectedAnswers: [], session: sessionId || null };
+          window.OracleTelemetry?.log('pending_questions', { count: result.questions.length });
+          return { message: result.questions.map(q => `❓ ${q}`).join('\n'), actions: [] };
+        }
+
+        if (result.actions && result.actions.length > 0 && result.confidence >= 0.7) {
+          window.OracleTelemetry?.log('action_execute_attempt', { count: result.actions.length, types: result.actions.map(a => a.type) });
+          try {
+            await processOracleActions(result.actions);
+            const okMsg = result.reply || 'Feito ✅';
+            window.OracleTelemetry?.log('action_execute', { count: result.actions.length, types: result.actions.map(a => a.type) });
+            return { message: okMsg, actions: [] };
+          } catch (e) {
+            console.error('Erro ao executar actions:', e);
+            window.OracleTelemetry?.log('action_execute_error', { msg: String(e?.message || e) });
+            return { message: 'Tentei executar a ação, mas deu erro. Quer que eu tente novamente?', actions: [] };
+          }
+        }
+
+        if (result.reply && result.confidence >= 0.6) {
+          return { message: result.reply, actions: [] };
+        }
+        if (result.intent === 'desconhecido') {
+          window.OracleTelemetry?.log('fallback', { text: String(input).slice(0,80) });
+        }
+      }
+    } catch (err) {
+      console.warn('understandWithRAG falhou:', err);
     }
     
     // -1. VERIFICA COMANDOS PERSONALIZADOS DOS SCRIPTS
@@ -6110,8 +6201,29 @@ const OracleChat = {
     }
 
     // 0.1. DETECÇÃO DE INTENÇÕES PRIORITÁRIAS (Comandos diretos)
-    // Isso evita que comandos como "minhas tarefas" sejam interpretados como respostas de conversa
-    const nluResult = OracleNLU.detectIntent(input);
+    // Primeiro tenta um NLU rápido do `OracleBrain` (fallback por palavras-chave) para respostas imediatas
+    let nluResult;
+    try {
+      if (window.OracleBrain && typeof window.OracleBrain.keywordFallback === 'function') {
+        const br = window.OracleBrain.keywordFallback(input);
+        const mapping = {
+          'criar_tarefa': 'task.create',
+          'listar_tarefas': 'task.list',
+          'saudacao': 'saudacao',
+          'desconhecido': 'unknown'
+        };
+        if (br && br.intent && (br.confidence || 0) >= 0.5) {
+          nluResult = { intent: mapping[br.intent] || br.intent, confidence: br.confidence || 0.5, entities: br.entities || {} };
+        } else {
+          nluResult = OracleNLU.detectIntent(input);
+        }
+      } else {
+        nluResult = OracleNLU.detectIntent(input);
+      }
+    } catch (e) {
+      console.warn('Erro ao usar OracleBrain.keywordFallback, fallback para OracleNLU', e);
+      nluResult = OracleNLU.detectIntent(input);
+    }
     const isPriorityIntent = nluResult.intent !== 'unknown' && 
                              nluResult.confidence > 0.8 && 
                              !['memory.save'].includes(nluResult.intent);
@@ -6956,6 +7068,52 @@ const OracleChat = {
     }
     
     switch(action.type) {
+      case 'slot_fill':
+        // User answered one of the pending questions
+        try {
+          const answer = input.trim();
+          action.collectedAnswers = action.collectedAnswers || [];
+          action.collectedAnswers.push(answer);
+
+          // If still need more answers, ask next question
+          if (action.collectedAnswers.length < (action.awaiting || []).length) {
+            const nextQ = action.awaiting[action.collectedAnswers.length];
+            this.pendingAction = action; // keep pending
+            window.OracleTelemetry?.log('slot_fill_progress', { got: action.collectedAnswers.length, need: action.awaiting.length });
+            return `❓ ${nextQ}`;
+          }
+
+          // Have all answers: try server-side fill if session available
+          const session = action.session;
+          if (session && window.OracleClient && typeof window.OracleClient.fillPending === 'function') {
+            const resp = await window.OracleClient.fillPending(session, action.collectedAnswers.slice());
+            this.pendingAction = null;
+            if (resp && resp.result) {
+              const out = resp.result;
+              if (out.actions && out.actions.length) {
+                try {
+                  await processOracleActions(out.actions);
+                  window.OracleTelemetry?.log('slot_fill_executed', { types: out.actions.map(a=>a.type) });
+                  return out.reply || 'Feito ✅';
+                } catch (e) {
+                  console.error('Erro ao executar actions preenchidas:', e);
+                  return 'Tentei executar a ação preenchida, mas deu erro.';
+                }
+              }
+              return out.reply || 'Resposta processada.';
+            }
+            return 'Não consegui preencher automaticamente. Tente novamente.';
+          }
+
+          // No session / server: fallback to local handling (attach answers to entities)
+          this.pendingAction = null;
+          return `Ok, entendi: ${action.collectedAnswers.join('; ')}`;
+        } catch (e) {
+          this.pendingAction = null;
+          console.error('Erro slot_fill:', e);
+          return 'Desculpe, não consegui processar sua resposta.';
+        }
+
       case 'learn_unknown':
         let definition = lowerInput;
         // Remove prefixos comuns de definição para limpar o comando
