@@ -6167,7 +6167,7 @@ const OracleChat = {
     
     // 0. PRIMEIRO: Verifica se há ação pendente aguardando resposta
     if (this.pendingAction) {
-      const pendingResult = this.handlePendingAction(cleanedInput, lowerInput);
+      const pendingResult = await this.handlePendingAction(cleanedInput, lowerInput);
       if (pendingResult) return pendingResult;
     }
     
@@ -7055,7 +7055,7 @@ const OracleChat = {
   },
   
   // Processa resposta para ação pendente
-  handlePendingAction(input, lowerInput) {
+  async handlePendingAction(input, lowerInput) {
     const action = this.pendingAction;
     const name = OracleMemory.getProfile('name');
     const gender = OracleMemory.getProfile('gender');
