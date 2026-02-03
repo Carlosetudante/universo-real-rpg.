@@ -1,16 +1,21 @@
-const CACHE_NAME = 'universo-real-v49';
+const CACHE_NAME = 'universo-real-v50';
 
 const urlsToCache = [
   './index.html',
+  './biblia.html',
+  './biblia-leitura.html',
   './financeiro.html',
   './carga-horaria.html',
   './style.css',
   './app.js',
+  './biblia.js',
+  './biblia-leitura.js',
   './supabase.js',
   './workTimer.js',
   './logo.svg',
   './offline.html',
   './manifest.json',
+  './biblia_de_estudo_de_genebra.pdf',
   './pergaminho-onboarding.json',
   './pergaminho-onboarding.md',
   './pergaminho-onboarding.txt',
@@ -23,6 +28,8 @@ const externalResources = [
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
   'https://unpkg.com/@supabase/supabase-js@2',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js',
+  'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1/dist/transformers.min.js',
   'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js'
 ];
 
