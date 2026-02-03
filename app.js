@@ -11893,6 +11893,8 @@ try {
       nav.addEventListener('click', function(e){
         const btn = e.target.closest && e.target.closest('.nav-btn');
         if (!btn) return;
+        // Ignore 'more' button here — it has its own handler that opens the drawer
+        if (btn.classList && btn.classList.contains('more-btn')) return;
         const view = btn.getAttribute('data-view') || 'home';
         navigateTo(view, true);
       });
