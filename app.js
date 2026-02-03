@@ -11035,14 +11035,7 @@ const mobileNavMoreBtn = document.getElementById('mobileNavMoreBtn');
 const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
 const mobileDrawerClose = document.getElementById('mobileDrawerClose');
 
-// DEBUG: logs temporários para checar existência e comportamento do botão 'Mais'
-if (mobileNavMoreBtn) {
-  try {
-    console.log('[DEBUG] mobileNavMoreBtn encontrado — registrando listener');
-  } catch (e) {}
-} else {
-  try { console.log('[DEBUG] mobileNavMoreBtn NÃO encontrado no DOM'); } catch (e) {}
-}
+// (logs de debug removidos)
 
 function openDrawer() {
   if (mobileDrawerOverlay) mobileDrawerOverlay.classList.remove('hidden');
@@ -11065,7 +11058,6 @@ if (mobileFabMenu) mobileFabMenu.addEventListener('click', () => {
 });
 
 if (mobileNavMoreBtn) mobileNavMoreBtn.addEventListener('click', () => {
-  try { console.log('[DEBUG] mobileNavMoreBtn clicado — overlay hidden?', mobileDrawerOverlay?.classList.contains('hidden')); } catch (e) {}
   if (mobileDrawerOverlay?.classList.contains('hidden')) openDrawer(); else closeDrawer();
 });
 
@@ -11874,6 +11866,21 @@ try {
     }, 120);
   }
 
+  function openBiblia(){
+    // garante que a aba Bíblia exista e abre ela
+    if (!document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
+      try { injectBibleTab(); } catch(e) { console.warn('injectBibleTab falhou:', e); }
+    }
+    const tab = document.querySelector('.tab-btn[data-tab="bible"]');
+    if (tab) { tab.click(); }
+    setTimeout(() => {
+      const input = document.getElementById('bibleInput');
+      if (input) input.focus();
+    }, 120);
+  }
+
+    try { console.info('[UI] Aba Bíblia aberta'); } catch (e) {}
+
   function navigateTo(view, addHistory = true){
     switch(view){
       case 'home': {
@@ -11884,6 +11891,7 @@ try {
       case 'oraculo': openOraculo(); break;
       case 'tarefas': openTarefas(); break;
       case 'financeiro': openFinanceiro(); break;
+      case 'bible': openBiblia(); break;
       default: showSplash(); break;
     }
     if (addHistory) {
