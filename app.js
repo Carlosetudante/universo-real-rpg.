@@ -4012,7 +4012,11 @@ function updateUI() {
         }
       }
     } catch (e) { /* silencioso */ }
-    if (!gameState) return;
+    // Se ainda não temos gameState (usuário não logado / sem OracleMemory),
+    // cria um estado padrão para que a UI mostre placeholders em vez de sair.
+    if (!gameState) {
+      gameState = normalizeGameState({});
+    }
   }
   
   // Atualizar preview do personagem (com placeholders seguros)
@@ -11898,6 +11902,8 @@ try {
       return true;
     } catch (e) { return true; }
   }
+  // Tornar disponível globalmente para handlers inline e scripts externos
+  try { window.shouldAutoFocus = shouldAutoFocus; } catch(e) {}
   
   // Fecha ferramentas/modais/abas ativas antes de abrir nova ferramenta
   function closeActiveTools() {
@@ -11923,6 +11929,8 @@ try {
       if (fabActions) fabActions.classList.add('hidden');
     } catch (e) { /* silencioso */ }
   }
+  // Expõe globalmente para handlers inline (onclick) e código externo
+  try { window.closeActiveTools = closeActiveTools; } catch(e) {}
   function openOraculo(){
     // usa botão existente se houver
     const chatBtn = document.getElementById('chatBtn');

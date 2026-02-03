@@ -493,7 +493,7 @@
     
     .panel {
       flex: 1;
-      padding: 30px;
+      padding: 30px 30px 120px 30px; /* espaço extra inferior para o rodapé fixo */
       border-left: none;
       display: flex;
       flex-direction: column;
