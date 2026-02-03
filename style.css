@@ -1523,6 +1523,11 @@
   width: 100%;
 }
 
+/* Permitir quebra de linha natural nos rótulos da sidebar sem cortar palavras */
+.nav-item{ white-space: normal; }
+.nav-item span{ overflow-wrap: break-word; word-break: normal; }
+.nav-item .nav-icon{ flex-shrink: 0; }
+
 .nav-item:hover {
   background: rgb(255 255 255 / 5%);
   color: #fff;
@@ -1831,14 +1836,16 @@
   border-radius: 8px;
   color: #ccc;
   cursor: pointer;
-  white-space: nowrap;
+  /* Permite que labels longos quebrem em múltiplas linhas em vez de serem cortados */
+  white-space: normal;
   transition: all 0.3s ease;
   flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
+  text-align: center;
   flex-shrink: 0;
-  min-width: 90px;
+  min-width: 60px;
 }
 
 .tab-btn:hover {
@@ -3253,6 +3260,9 @@ body.logged-in #mobile-nav{
   display:block;
   color: rgb(230 238 248 / 0.85);
 }
+
+/* Permite que o rótulo mobile quebre linhas curtas (ex: 'Recompensa diária') sem cortar palavras */
+.nav-label{ white-space: normal; line-height: 1.1; font-size:11px; }
 
 /* Visual ativo e hover */
 .nav-btn:hover{ transform: translateY(-3px); color: var(--accent); }
