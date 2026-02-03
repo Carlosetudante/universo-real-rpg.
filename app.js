@@ -1212,6 +1212,7 @@ async function checkSession() {
           isLoggedIn = true;
           loginTime = new Date();
           hideAuthModal();
+          setMobileNavVisible(true);
           checkDailyTaskReset();
           updateUI();
           if (typeof renderDailyTasks === 'function') renderDailyTasks();
@@ -1240,6 +1241,7 @@ async function checkSession() {
     isLoggedIn = true;
     loginTime = new Date();
     hideAuthModal();
+      setMobileNavVisible(true);
     checkDailyTaskReset();
     updateUI();
     if (typeof checkAchievements === 'function') checkAchievements();
