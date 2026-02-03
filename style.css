@@ -958,6 +958,9 @@
       box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
       animation: slide-up .3s ease;
       border: 1px solid rgb(255 255 255 / 10%);
+      max-width: calc(100% - 40px);
+      word-break: break-word;
+      text-align: center;
     }
     
     @keyframes slide-up {
@@ -969,6 +972,18 @@
       to {
         transform: translateX(-50%) translateY(0);
         opacity: 1;
+      }
+    }
+
+    /* Quando a barra móvel estiver visível, eleva o toast para ficar acima dela e respeitar safe-area */
+    body.logged-in #mobile-nav + .toast, body.logged-in .toast {
+      bottom: calc(56px + env(safe-area-inset-bottom) + 12px);
+    }
+
+    /* Em telas muito pequenas, aumenta o deslocamento para evitar sobreposição */
+    @media (max-width: 420px) {
+      body.logged-in #mobile-nav + .toast, body.logged-in .toast {
+        bottom: calc(62px + env(safe-area-inset-bottom) + 8px);
       }
     }
     
