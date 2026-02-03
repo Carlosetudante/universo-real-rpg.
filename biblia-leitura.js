@@ -1,4 +1,17 @@
 (() => {
+  const showError = (msg) => {
+    const box = document.getElementById('bibleErrorBox');
+    if (!box) return;
+    box.textContent = msg;
+    box.classList.remove('hidden');
+  };
+
+  window.addEventListener('error', (e) => {
+    showError(`Erro: ${e.message || 'desconhecido'}`);
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    showError(`Erro: ${e.reason?.message || e.reason || 'desconhecido'}`);
+  });
   let biblePdfDoc = null;
   let biblePdfPage = 1;
   let biblePdfRendering = false;
@@ -157,6 +170,7 @@
       return biblePdfDoc;
     } catch (err) {
       if (statusEl) statusEl.textContent = 'Não foi possível carregar o PDF da Bíblia.';
+      showError('Não foi possível carregar o PDF. Verifique se o arquivo está no servidor.');
       throw err;
     }
   };

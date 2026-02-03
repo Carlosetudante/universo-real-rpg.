@@ -102,7 +102,11 @@ self.addEventListener('fetch', event => {
         cache.put(event.request, networkResponse.clone()).catch(() => {});
         return networkResponse;
       } catch (e) {
-        const cacheMatch = await caches.match('./index.html') || await caches.match('./offline.html');
+        const cacheMatch = await caches.match(event.request) ||
+          await caches.match('./biblia-leitura.html') ||
+          await caches.match('./biblia.html') ||
+          await caches.match('./index.html') ||
+          await caches.match('./offline.html');
         return cacheMatch || Response.error();
       }
     })());
