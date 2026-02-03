@@ -3277,6 +3277,14 @@ body.logged-in #mobile-nav{
   .nav-label{ display:none }
 }
 
+/* Move o rótulo 'Mais' um pouco para cima para evitar que seja cortado */
+#mobileNavMoreBtn .nav-label{
+  margin-top: -6px;
+  transform: translateY(-6px);
+  line-height: 1.05;
+  display: block;
+}
+
 /* Empurra conteúdo principal para cima para não ser coberto pela nav apenas quando visível */
 body.logged-in{padding-bottom:56px}
 
