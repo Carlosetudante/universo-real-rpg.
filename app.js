@@ -11393,7 +11393,11 @@ window.addEventListener('DOMContentLoaded', () => {
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const tabId = btn.getAttribute('data-tab');
-      
+      // Se for a aba Bíblia e o conteúdo ainda não existir, injeta antes de prosseguir
+      if (tabId === 'bible' && !document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
+        try { injectBibleTab(); } catch (e) { console.warn('injectBibleTab falhou ao clicar na aba:', e); }
+      }
+
       // Remove active de todos os botões e conteúdos
       tabBtns.forEach(b => b.classList.remove('active'));
       tabContents.forEach(c => c.classList.remove('active'));
