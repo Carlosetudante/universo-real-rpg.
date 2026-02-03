@@ -975,15 +975,16 @@
       }
     }
 
-    /* Quando a barra móvel estiver visível, eleva o toast para ficar acima dela e respeitar safe-area */
-    body.logged-in #mobile-nav + .toast, body.logged-in .toast {
-      bottom: calc(56px + env(safe-area-inset-bottom) + 12px);
+    /* Quando a barra móvel estiver visível, eleva o toast para ficar acima dela e respeitar safe-area.
+       Usa um offset maior para garantir que não fique encostado no fundo em dispositivos com gestos/GUI diferentes. */
+    body.logged-in .toast {
+      bottom: calc(72px + env(safe-area-inset-bottom));
     }
 
-    /* Em telas muito pequenas, aumenta o deslocamento para evitar sobreposição */
+    /* Em telas muito pequenas, aumenta levemente o deslocamento para evitar sobreposição */
     @media (max-width: 420px) {
-      body.logged-in #mobile-nav + .toast, body.logged-in .toast {
-        bottom: calc(62px + env(safe-area-inset-bottom) + 8px);
+      body.logged-in .toast {
+        bottom: calc(80px + env(safe-area-inset-bottom));
       }
     }
     
