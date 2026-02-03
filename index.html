@@ -655,12 +655,7 @@
     </div>
   </div>
 
-  <!-- Botão Hamburger Flutuante (Mobile) -->
-  <button class="mobile-fab-menu hidden" id="mobileFabMenu">
-    <span></span>
-    <span></span>
-    <span></span>
-  </button>
+  <!-- Botão Hamburger Flutuante (migrado para a nav inferior) -->
 
   <!-- Menu Lateral Mobile (Drawer) -->
   <div class="mobile-drawer-overlay hidden" id="mobileDrawerOverlay">
@@ -879,11 +874,12 @@
   <button id="fabTaskBtn" style="display:none"></button>
   <button id="fabFinanceBtn" style="display:none"></button>
   <!-- Barra de navegação móvel: evita saída do PWA em dispositivos móveis -->
-  <nav id="mobile-nav" aria-label="Navegação inferior">
+  <nav id="mobile-nav" class="hidden" aria-label="Navegação inferior">
     <button class="nav-btn" data-view="home" aria-label="Home">🏠<span class="nav-label">Início</span></button>
     <button class="nav-btn" data-view="oraculo" aria-label="Oráculo">🤖<span class="nav-label">Oráculo</span></button>
     <button class="nav-btn" data-view="tarefas" aria-label="Tarefas">✅<span class="nav-label">Tarefas</span></button>
     <button class="nav-btn" data-view="financeiro" aria-label="Financeiro">💰<span class="nav-label">Financeiro</span></button>
+    <button class="nav-btn more-btn" id="mobileNavMoreBtn" aria-label="Mais">⋮<span class="nav-label">Mais</span></button>
   </nav>
 
 </body>

@@ -864,6 +864,7 @@ async function login() {
         loginTime = new Date();
         saveSession(email);
         hideAuthModal();
+        setMobileNavVisible(true);
         updateUI();
         if (typeof renderDailyTasks === 'function') renderDailyTasks();
         if (typeof renderFinances === 'function') renderFinances();
@@ -1176,6 +1177,7 @@ async function logout() {
   isLoggedIn = false;
   gameState = null;
   clearSession();
+  setMobileNavVisible(false);
   showAuthModal();
   showLoginForm();
 }
@@ -11027,17 +11029,20 @@ window.showAchievementDetails = showAchievementDetails;
 
 // --- Lógica do Menu Drawer Mobile ---
 const mobileFabMenu = document.getElementById('mobileFabMenu');
+const mobileNavMoreBtn = document.getElementById('mobileNavMoreBtn');
 const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
 const mobileDrawerClose = document.getElementById('mobileDrawerClose');
 
 function openDrawer() {
   if (mobileDrawerOverlay) mobileDrawerOverlay.classList.remove('hidden');
   if (mobileFabMenu) mobileFabMenu.classList.add('active');
+  if (mobileNavMoreBtn) mobileNavMoreBtn.classList.add('active');
 }
 
 function closeDrawer() {
   if (mobileDrawerOverlay) mobileDrawerOverlay.classList.add('hidden');
   if (mobileFabMenu) mobileFabMenu.classList.remove('active');
+  if (mobileNavMoreBtn) mobileNavMoreBtn.classList.remove('active');
 }
 
 if (mobileFabMenu) mobileFabMenu.addEventListener('click', () => {
@@ -11046,6 +11051,10 @@ if (mobileFabMenu) mobileFabMenu.addEventListener('click', () => {
   } else {
     closeDrawer();
   }
+});
+
+if (mobileNavMoreBtn) mobileNavMoreBtn.addEventListener('click', () => {
+  if (mobileDrawerOverlay?.classList.contains('hidden')) openDrawer(); else closeDrawer();
 });
 
 if (mobileDrawerClose) mobileDrawerClose.addEventListener('click', closeDrawer);
@@ -11621,6 +11630,152 @@ async function ingestPdfToOracle(url, options = { chunkSize: 2000 }) {
 // Helper para chamar pela UI (ex: botão)
 window.ingestPdfToOracle = ingestPdfToOracle;
 
+// Controla visibilidade da navegação móvel conforme autenticação
+function setMobileNavVisible(visible) {
+  try {
+    const nav = document.getElementById('mobile-nav');
+    if (!nav) return;
+    if (visible) {
+      nav.classList.remove('hidden');
+      document.body.classList.add('logged-in');
+    } else {
+      nav.classList.add('hidden');
+      document.body.classList.remove('logged-in');
+    }
+  } catch (e) { /* silencioso */ }
+}
+
+/* ---------------------------
+   Notificações (Work Timer / Bills)
+   --------------------------- */
+let _workNotifInterval = null;
+let _lastNotificationType = null;
+
+async function ensureNotificationPermission() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  try {
+    const p = await Notification.requestPermission();
+    return p === 'granted';
+  } catch (e) { return false; }
+}
+
+async function showNotificationViaSW(title, options = {}) {
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return true;
+      }
+    }
+  } catch (e) {}
+  // Fallback direto
+  try {
+    const n = new Notification(title, options);
+    return !!n;
+  } catch (e) { return false; }
+}
+
+function formatElapsed(ms) {
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  const secs = Math.floor((ms % 60000) / 1000);
+  return `${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+
+async function startWorkNotification() {
+  if (!await ensureNotificationPermission()) return;
+  stopWorkNotification();
+  _lastNotificationType = 'work-timer';
+  // update every second
+  _workNotifInterval = setInterval(async () => {
+    const elapsed = window.WorkTimer?.getElapsedTime?.() || 0;
+    const text = `Cronômetro: ${formatElapsed(elapsed)}`;
+    await showNotificationViaSW('Tempo de Trabalho', {
+      body: text,
+      tag: 'work-timer',
+      renotify: true,
+      silent: true,
+      data: { type: 'work-timer' },
+      actions: [ { action: 'pause', title: 'Pausar' } ]
+    });
+  }, 1000);
+}
+
+async function stopWorkNotification() {
+  if (_workNotifInterval) { clearInterval(_workNotifInterval); _workNotifInterval = null; }
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.getNotifications) {
+        const notifs = await reg.getNotifications({ tag: 'work-timer' });
+        notifs.forEach(n => n.close());
+      }
+    }
+  } catch (e) {}
+  // also try to clear direct Notification objects if any (best-effort)
+}
+
+// Hook into WorkTimer events
+window.addEventListener('workTimerStarted', (e) => {
+  startWorkNotification();
+});
+
+window.addEventListener('workTimerStopped', (e) => {
+  stopWorkNotification();
+});
+
+// Notificar contas vencendo hoje com ação para abrir financeiro
+async function notifyBillsDue(bills) {
+  if (!bills || bills.length === 0) return;
+  if (!await ensureNotificationPermission()) return;
+  const total = bills.reduce((s,b) => s + (b.value || 0), 0);
+  await showNotificationViaSW('Contas vencendo hoje', {
+    body: `Você tem ${bills.length} conta(s) vencendo hoje. Total: R$ ${total.toLocaleString('pt-BR')}`,
+    tag: 'bills-due',
+    renotify: true,
+    data: { type: 'bills-due' },
+    actions: [ { action: 'pay', title: 'Pagar agora' } ]
+  });
+}
+
+// Integrate with existing checkBillsDueToday (override the function to also notify)
+const _orig_checkBillsDueToday = typeof checkBillsDueToday === 'function' ? checkBillsDueToday : null;
+function checkBillsDueTodayWithNotif() {
+  if (typeof _orig_checkBillsDueToday === 'function') _orig_checkBillsDueToday();
+  // compute bills and notify
+  try {
+    if (!gameState || !gameState.bills) return;
+    const now = new Date();
+    const localDate = new Date(now.getTime() - (now.getTimezoneOffset() * 60000));
+    const today = localDate.toISOString().split('T')[0];
+    const dueBills = gameState.bills.filter(b => !b.paid && b.dueDate === today);
+    if (dueBills.length > 0) notifyBillsDue(dueBills);
+  } catch (e) { console.warn('checkBillsDueTodayWithNotif failed', e); }
+}
+// Replace references
+try { if (typeof window !== 'undefined') window.checkBillsDueToday = checkBillsDueTodayWithNotif; } catch(e){}
+
+// Recebe mensagens do Service Worker (ex: ação de notificação)
+if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+  navigator.serviceWorker.addEventListener('message', (evt) => {
+    try {
+      const d = evt.data;
+      if (!d) return;
+      if (d.type === 'WORK_TIMER_ACTION' && d.action === 'pause') {
+        if (window.WorkTimer && typeof window.WorkTimer.stop === 'function') {
+          window.WorkTimer.stop();
+        }
+      } else if (d.type === 'OPEN_URL' && d.url) {
+        try { window.location.href = d.url; } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+  });
+}
+
+
 // -------------------------------
 // Aliases globais de compatibilidade
 // Evita erros quando código externo/antigo chama nomes diferentes
@@ -11646,7 +11801,7 @@ try {
 (function(){
   function showSplash(){
     const splash = document.getElementById('splashScreen');
-    if (splash) splash.style.display = '';
+    if (splash) splash.classList.remove('hidden');
     const chatModal = document.getElementById('chatModal');
     if (chatModal) chatModal.classList.remove('open');
   }

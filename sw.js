@@ -136,4 +136,48 @@ self.addEventListener('message', event => {
   }
 });
 
+// Tratar cliques em notificações (ações: pause, pay)
+self.addEventListener('notificationclick', event => {
+  const action = event.action;
+  event.notification.close();
+
+  event.waitUntil((async () => {
+    try {
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+      if (action === 'pause') {
+        // Envia mensagem para todas as janelas para pausar o cronômetro
+        for (const c of allClients) {
+          try { c.postMessage({ type: 'WORK_TIMER_ACTION', action: 'pause' }); } catch (e) {}
+        }
+        if (allClients.length === 0) {
+          // Se não houver janela aberta, abre a aplicação
+          await clients.openWindow('/');
+        }
+        return;
+      }
+
+      if (action === 'pay') {
+        const url = '/financeiro.html';
+        for (const c of allClients) {
+          try { c.postMessage({ type: 'OPEN_URL', url }); } catch (e) {}
+        }
+        if (allClients.length === 0) {
+          await clients.openWindow(url);
+        }
+        return;
+      }
+
+      // Sem ação específica: foca a primeira janela ou abre a raiz
+      if (allClients.length > 0) {
+        try { allClients[0].focus && allClients[0].focus(); } catch (e) {}
+      } else {
+        await clients.openWindow('/');
+      }
+    } catch (e) {
+      // silencioso
+    }
+  })());
+});
+
 console.log('📡 Service Worker carregado:', CACHE_NAME);
