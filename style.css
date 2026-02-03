@@ -3201,3 +3201,50 @@ input.success {
   transform: scale(1.02);
 }
 
+
+/* ------------------------- */
+/* Navegação móvel (barra inferior)
+   Mantida simples para evitar navegações fora do PWA
+*/
+#mobile-nav{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  height:56px;
+  background:rgba(255,255,255,0.98);
+  display:flex;
+  align-items:center;
+  justify-content:space-around;
+  border-top:1px solid rgba(0,0,0,0.06);
+  z-index:9999;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+.nav-btn{
+  background:transparent;
+  border:none;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  font-size:18px;
+  color:var(--text-color, #111);
+  padding:6px 8px;
+}
+.nav-btn:active{transform:translateY(1px)}
+.nav-label{
+  font-size:10px;
+  margin-top:2px;
+  display:block;
+}
+
+/* Empurra conteúdo principal para cima para não ser coberto pela nav */
+body{padding-bottom:56px}
+
+@media(min-width:900px){
+  /* esconder em telas grandes */
+  #mobile-nav{display:none}
+  body{padding-bottom:0}
+}
+

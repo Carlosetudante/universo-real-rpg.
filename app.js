@@ -11639,3 +11639,71 @@ try {
 } catch (e) {
   console.warn('Erro ao definir aliases globais de compatibilidade:', e);
 }
+
+// -------------------------------
+// Navegação móvel interna (previne saída do PWA no mobile)
+// -------------------------------
+(function(){
+  function showSplash(){
+    const splash = document.getElementById('splashScreen');
+    if (splash) splash.style.display = '';
+    const chatModal = document.getElementById('chatModal');
+    if (chatModal) chatModal.classList.remove('open');
+  }
+
+  function openOraculo(){
+    // usa botão existente se houver
+    const chatBtn = document.getElementById('chatBtn');
+    if (chatBtn) { chatBtn.click(); return; }
+    const chatModal = document.getElementById('chatModal');
+    if (chatModal) chatModal.classList.add('open');
+    const input = document.getElementById('chatInput');
+    if (input) input.focus();
+  }
+
+  function openTarefas(){
+    const fab = document.getElementById('fabTaskBtn') || document.getElementById('fabWorkBtn');
+    if (fab) { fab.click(); return; }
+    alert('Abrir Tarefas (não implementado)');
+  }
+
+  function openFinanceiro(){
+    const fab = document.getElementById('fabFinanceBtn');
+    if (fab) { fab.click(); return; }
+    alert('Abrir Financeiro (não implementado)');
+  }
+
+  function navigateTo(view, addHistory = true){
+    switch(view){
+      case 'oraculo': openOraculo(); break;
+      case 'tarefas': openTarefas(); break;
+      case 'financeiro': openFinanceiro(); break;
+      default: showSplash(); break;
+    }
+    if (addHistory) {
+      try { history.pushState({view}, '', '#'+view); } catch(e){}
+    }
+  }
+
+  window.addEventListener('popstate', function(e){
+    const state = (e.state && e.state.view) ? e.state.view : (location.hash ? location.hash.replace('#','') : 'home');
+    navigateTo(state, false);
+  });
+
+  document.addEventListener('DOMContentLoaded', function(){
+    // delegação de eventos na nav
+    const nav = document.getElementById('mobile-nav');
+    if (nav){
+      nav.addEventListener('click', function(e){
+        const btn = e.target.closest && e.target.closest('.nav-btn');
+        if (!btn) return;
+        const view = btn.getAttribute('data-view') || 'home';
+        navigateTo(view, true);
+      });
+    }
+
+    // Navega conforme hash inicial
+    const initial = location.hash ? location.hash.replace('#','') : 'home';
+    navigateTo(initial, false);
+  });
+})();
