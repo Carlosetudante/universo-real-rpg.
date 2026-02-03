@@ -31,19 +31,39 @@ self.addEventListener('install', event => {
   console.log('🔧 SW: Instalando versão', CACHE_NAME);
   self.skipWaiting();
 
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(async cache => {
-      console.log('📦 SW: Fazendo cache dos arquivos (resiliente)');
-      // Usa addAll com fallback para evitar falha total se algum recurso remoto falhar
-      const allToCache = urlsToCache.concat(externalResources);
-      const settle = await Promise.allSettled(allToCache.map(u => fetch(u).then(r => {
-        if (!r.ok) throw new Error('fetch-failed');
-        return cache.put(u, r.clone()).catch(() => {});
-      }).catch(() => {})));
-      // Não retorna erro — continuamos com o que foi cacheado
-      return settle;
-    })
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    console.log('📦 SW: Fazendo cache dos arquivos locais');
+    try {
+      // Tenta adicionar todos os arquivos locais de uma vez; falhas aqui são capturadas
+      await cache.addAll(urlsToCache.map(u => new Request(u, {cache: 'reload'})));
+    } catch (e) {
+      console.warn('SW: Falha ao cachear alguns recursos locais, tentando individualmente', e);
+      for (const u of urlsToCache) {
+        try {
+          const resp = await fetch(u, {cache: 'reload'});
+          if (resp && (resp.ok || resp.type === 'opaque')) await cache.put(u, resp.clone());
+        } catch (err) {
+          // ignora falhas individuais
+        }
+      }
+    }
+
+    // Recursos externos: tenta buscar com no-cors quando apropriado e adiciona ao cache de forma resiliente
+    console.log('📦 SW: Fazendo cache dos recursos externos (CDNs)');
+    for (const u of externalResources) {
+      try {
+        const resp = await fetch(u, {mode: 'no-cors'}).catch(() => null);
+        if (resp) {
+          try { await cache.put(u, resp.clone()); } catch (e) { /* ignora */ }
+        }
+      } catch (e) {
+        // ignora
+      }
+    }
+
+    return true;
+  })());
 });
 
 // Ativação - limpa caches antigos

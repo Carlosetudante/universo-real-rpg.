@@ -11662,15 +11662,23 @@ try {
   }
 
   function openTarefas(){
-    const fab = document.getElementById('fabTaskBtn') || document.getElementById('fabWorkBtn');
-    if (fab) { fab.click(); return; }
-    alert('Abrir Tarefas (não implementado)');
+    // troca para a aba de Missões/Tarefas e foca o input de tarefas
+    const tab = document.querySelector('.tab-btn[data-tab="quests"]');
+    if (tab) { tab.click(); }
+    setTimeout(() => {
+      const input = document.getElementById('taskInput') || document.querySelector('input[name="task"]');
+      if (input) input.focus();
+    }, 120);
   }
 
   function openFinanceiro(){
-    const fab = document.getElementById('fabFinanceBtn');
-    if (fab) { fab.click(); return; }
-    alert('Abrir Financeiro (não implementado)');
+    // troca para a aba de Finanças e foca o campo de descrição
+    const tab = document.querySelector('.tab-btn[data-tab="finance"]');
+    if (tab) { tab.click(); }
+    setTimeout(() => {
+      const input = document.getElementById('financeDesc') || document.querySelector('input[name="financeDesc"]');
+      if (input) input.focus();
+    }, 120);
   }
 
   function navigateTo(view, addHistory = true){
