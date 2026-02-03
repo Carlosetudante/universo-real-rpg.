@@ -3207,9 +3207,6 @@ input.success {
 /* Navegação móvel (barra inferior)
    Mantida simples para evitar navegações fora do PWA
 */
-.mobile-bottom-nav {
-  /* wrapper class for progressive enhancement if needed */
-}
 
 /* Mobile nav is hidden by default; only shown when user is logged-in */
 #mobile-nav{
