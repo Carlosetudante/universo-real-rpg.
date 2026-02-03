@@ -11636,12 +11636,22 @@ window.ingestPdfToOracle = ingestPdfToOracle;
 function setMobileNavVisible(visible) {
   try {
     const nav = document.getElementById('mobile-nav');
-    if (!nav) return;
+    if (!nav) {
+      // Se o nav ainda não existir (execução precoce), guarda o desejo e aplica quando o DOM estiver pronto
+      window.__mobileNavPending = !!visible;
+      document.addEventListener('DOMContentLoaded', () => {
+        try { setMobileNavVisible(window.__mobileNavPending); } catch (e) {}
+      });
+      return;
+    }
     if (visible) {
       nav.classList.remove('hidden');
+      // Força display flex inline como fallback caso regras CSS sejam conflitantes
+      nav.style.display = 'flex';
       document.body.classList.add('logged-in');
     } else {
       nav.classList.add('hidden');
+      nav.style.display = ''; // remove override
       document.body.classList.remove('logged-in');
     }
   } catch (e) { /* silencioso */ }
