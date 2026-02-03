@@ -11035,6 +11035,15 @@ const mobileNavMoreBtn = document.getElementById('mobileNavMoreBtn');
 const mobileDrawerOverlay = document.getElementById('mobileDrawerOverlay');
 const mobileDrawerClose = document.getElementById('mobileDrawerClose');
 
+// DEBUG: logs temporários para checar existência e comportamento do botão 'Mais'
+if (mobileNavMoreBtn) {
+  try {
+    console.log('[DEBUG] mobileNavMoreBtn encontrado — registrando listener');
+  } catch (e) {}
+} else {
+  try { console.log('[DEBUG] mobileNavMoreBtn NÃO encontrado no DOM'); } catch (e) {}
+}
+
 function openDrawer() {
   if (mobileDrawerOverlay) mobileDrawerOverlay.classList.remove('hidden');
   if (mobileFabMenu) mobileFabMenu.classList.add('active');
@@ -11056,6 +11065,7 @@ if (mobileFabMenu) mobileFabMenu.addEventListener('click', () => {
 });
 
 if (mobileNavMoreBtn) mobileNavMoreBtn.addEventListener('click', () => {
+  try { console.log('[DEBUG] mobileNavMoreBtn clicado — overlay hidden?', mobileDrawerOverlay?.classList.contains('hidden')); } catch (e) {}
   if (mobileDrawerOverlay?.classList.contains('hidden')) openDrawer(); else closeDrawer();
 });
 
