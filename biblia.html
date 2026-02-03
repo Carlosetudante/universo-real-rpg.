@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071428">
+  <title>Bíblia — Estudo</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="logo.svg">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1/dist/transformers.min.js"></script>
+</head>
+<body class="bible-page">
+  <div class="bible-page-header">
+    <a class="bible-page-back" href="index.html#home">← Voltar</a>
+    <div class="bible-page-title">
+      <span class="bible-page-icon">✝️</span>
+      <span>Bíblia — Estudo</span>
+    </div>
+    <a class="bible-page-link" href="biblia-leitura.html">Modo Leitura</a>
+  </div>
+
+  <main class="bible-page-main">
+    <div class="bible-interface">
+      <div class="bible-header">
+        <div class="bible-header-top">
+          <div class="bible-icon">✝️</div>
+          <div>
+            <h2 class="bible-title">Assistente Bíblico</h2>
+            <p class="bible-subtitle">"Lâmpada para os meus pés é a tua palavra"</p>
+          </div>
+        </div>
+        <div class="bible-quick-actions">
+          <button class="btn ghost bible-tag" data-query="quem foi jesus">✝️ Jesus</button>
+          <button class="btn ghost bible-tag" data-query="o que você sabe?">🧠 O que você sabe?</button>
+          <button class="btn ghost bible-tag" data-query="plano de leitura">📅 Plano de Leitura</button>
+          <button class="btn ghost bible-tag" id="bibleSemanticBtn">✨ Busca inteligente</button>
+        </div>
+      </div>
+
+      <div class="bible-pdf-search">
+        <input type="text" id="biblePdfSearchInput" class="bible-pdf-search-input" placeholder="Buscar na Bíblia...">
+        <button class="ghost" id="biblePdfSearchBtn">Buscar</button>
+      </div>
+
+      <div class="bible-pdf-tools">
+        <div id="biblePdfStatus" class="bible-pdf-status">Bíblia pronta para busca.</div>
+        <div id="biblePdfResults" class="bible-pdf-results"></div>
+      </div>
+
+      <div class="bible-books">
+        <div class="bible-books-title">Livros da Bíblia</div>
+        <div class="bible-books-filters">
+          <button class="ghost bible-filter-btn active" data-filter="all">Todos</button>
+          <button class="ghost bible-filter-btn" data-filter="AT">Antigo Testamento</button>
+          <button class="ghost bible-filter-btn" data-filter="NT">Novo Testamento</button>
+        </div>
+        <div class="bible-book-selector">
+          <div class="bible-book-selector-title">Abrir livro</div>
+          <div class="bible-book-selector-controls">
+            <span id="bibleBookSelected" class="bible-book-selected">Selecione um livro abaixo</span>
+            <div class="bible-book-selector-inputs">
+              <input type="number" id="bibleBookChapter" class="bible-book-input" min="1" value="1" placeholder="Capítulo">
+              <input type="number" id="bibleBookVerse" class="bible-book-input" min="1" value="1" placeholder="Verso">
+              <button class="btn success" id="bibleBookOpenBtn">Abrir</button>
+            </div>
+          </div>
+        </div>
+        <div class="bible-books-grid" id="bibleBooksGrid"></div>
+      </div>
+
+      <div id="biblePdfReader" class="bible-pdf-reader hidden">
+        <div class="bible-pdf-reader-header">
+          <div id="biblePdfPageLabel" class="bible-pdf-page">Página 1</div>
+          <div class="bible-pdf-controls">
+            <button class="ghost" id="biblePdfPrevBtn">◀</button>
+            <button class="ghost" id="biblePdfNextBtn">▶</button>
+            <button class="ghost" id="biblePdfCloseBtn">Fechar</button>
+          </div>
+        </div>
+        <div id="biblePdfCanvasWrap" class="bible-pdf-canvas-wrap">
+          <canvas id="biblePdfCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="biblia.js"></script>
+</body>
+</html>

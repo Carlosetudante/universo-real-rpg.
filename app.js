@@ -423,6 +423,20 @@ function showAchievementDetails(achievementId) {
   
   // Calcula estatísticas dinâmicas
   const stats = achievement.getStats ? achievement.getStats() : '';
+  let statsHtml = stats ? stats.split('\n').map(s => `<div>${s}</div>`).join('') : '';
+  let liveTimerStartMs = null;
+  
+  if (achievementId === 'first_step') {
+    const createdAt = gameState.createdAt ? new Date(gameState.createdAt) : null;
+    const startMs = createdAt instanceof Date && !isNaN(createdAt) ? createdAt.getTime() : Date.now();
+    const startDateLabel = createdAt instanceof Date && !isNaN(createdAt) ? createdAt.toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR');
+    const initialSeconds = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+    liveTimerStartMs = startMs;
+    statsHtml = `
+      <div>📅 Início: ${startDateLabel}</div>
+      <div>⏱️ Tempo desde início: <span class="live-seconds" data-start="${startMs}">${initialSeconds}s</span></div>
+    `;
+  }
   
   // Cria modal de detalhes
   const modal = document.createElement('div');
@@ -438,15 +452,35 @@ function showAchievementDetails(achievementId) {
       </div>
       <p class="achievement-detail-desc">${achievement.description}</p>
       <div class="achievement-detail-stats">
-        ${stats.split('\n').map(s => `<div>${s}</div>`).join('')}
+        ${statsHtml}
       </div>
-      <button class="btn" onclick="this.closest('.achievement-detail-modal').remove()">Fechar</button>
+      <button class="btn achievement-detail-close">Fechar</button>
     </div>
   `;
   
-  modal.onclick = (e) => {
-    if (e.target === modal) modal.remove();
+  let timerId = null;
+  if (liveTimerStartMs) {
+    const timerEl = modal.querySelector('.live-seconds');
+    if (timerEl) {
+      timerId = setInterval(() => {
+        const start = parseInt(timerEl.dataset.start, 10);
+        const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+        timerEl.textContent = `${seconds}s`;
+      }, 1000);
+    }
+  }
+  
+  const cleanup = () => {
+    if (timerId) clearInterval(timerId);
+    modal.remove();
   };
+  
+  modal.onclick = (e) => {
+    if (e.target === modal) cleanup();
+  };
+  
+  const closeBtn = modal.querySelector('.achievement-detail-close');
+  if (closeBtn) closeBtn.addEventListener('click', cleanup);
   
   document.body.appendChild(modal);
   playSound('click');
@@ -557,6 +591,7 @@ const elements = {
   restoreBackupBtn: document.getElementById('restoreBackupBtn'),
   importFile: document.getElementById('importFile'),
   logoutBtn: document.getElementById('logoutBtn'),
+  resetAccountBtn: document.getElementById('resetAccountBtn'),
   claimBtn: document.getElementById('claimBtn'),
   resetAttrsBtn: document.getElementById('resetAttrsBtn'),
   
@@ -839,6 +874,10 @@ async function login() {
           }
         }
 
+        if (!data || !data.user || !data.user.email) {
+          throw new Error('Não foi possível confirmar o usuário no Supabase. Tente novamente.');
+        }
+
         // Carrega o perfil primeiro (rápido) e atualiza a UI;
         // em seguida carrega o restante (tarefas, finanças, workLog, memórias)
         elements.loginBtn.textContent = 'Carregando perfil...';
@@ -847,11 +886,12 @@ async function login() {
           return null;
         });
 
+        const authEmail = data.user.email || email;
         if (profile) {
-          gameState = normalizeGameState(Object.assign({}, profile, { username: data.user.email }));
+          gameState = normalizeGameState(Object.assign({}, profile, { username: authEmail }));
         } else {
           // Primeiro login ou profile indisponível - cria estado inicial
-          gameState = normalizeGameState({ username: data.user.email, name: 'Novo Herói' });
+          gameState = normalizeGameState({ username: authEmail, name: 'Novo Herói' });
         }
 
         // Atualiza a interface rapidamente com o perfil carregado
@@ -967,8 +1007,8 @@ async function login() {
         
       } catch (supabaseError) {
         console.warn('Supabase login falhou:', supabaseError.message);
-        // Mostra o erro do Supabase e para (não tenta fallback local)
-        throw supabaseError;
+        showToast('⚠️ Falha no login da nuvem. Tentando login local...');
+        // segue para o fallback local abaixo
       }
     }
 
@@ -1510,7 +1550,13 @@ async function resetAccount() {
     return;
   }
 
-  const confirmation = prompt('🚨 ATENÇÃO! 🚨\n\nIsso apagará TODOS os seus dados (perfil, tarefas, finanças, etc.) permanentemente, tanto neste dispositivo quanto na nuvem.\n\nPara confirmar, digite "DELETAR":');
+  const preConfirm = confirm('Tudo bem resetar sua conta?\n\nIsso apagará todos os seus dados deste perfil.');
+  if (!preConfirm) {
+    showToast('❌ Ação cancelada.');
+    return;
+  }
+
+  const confirmation = prompt('⚠️ Confirmação final\n\nVou apagar TODOS os seus dados (perfil, tarefas, finanças, etc.) permanentemente, tanto neste dispositivo quanto na nuvem.\n\nPara confirmar, digite "DELETAR":');
 
   if (confirmation !== 'DELETAR') {
     showToast('❌ Ação cancelada.');
@@ -3994,6 +4040,21 @@ function setTabBadge(tabId, show) {
 }
 
 function updateUI() {
+  // Debug temporário: registrar fontes possíveis de perfil (OracleMemory / localStorage)
+  try {
+    const dbg = { gameStatePresent: !!gameState };
+    dbg.oracleMemory = (typeof OracleMemory !== 'undefined') ? {
+      hasGetProfile: !!OracleMemory.getProfile,
+      sampleName: (OracleMemory.getProfile && OracleMemory.getProfile('name')) || null
+    } : null;
+    dbg.ur_last_user = localStorage.getItem('ur_last_user');
+    try { dbg.ur_users = localStorage.getItem('ur_users'); } catch (e) { dbg.ur_users = null; }
+    console.log('[debug][updateUI]', dbg);
+    if (window.OracleTelemetry && OracleTelemetry.log) OracleTelemetry.log('updateUI_debug', dbg);
+  } catch (e) {
+    console.warn('updateUI debug failed', e);
+  }
+
   // Se não houver gameState, tenta preencher com memórias locais (OracleMemory) antes de sair
   if (!gameState) {
     try {
@@ -4013,9 +4074,23 @@ function updateUI() {
       }
     } catch (e) { /* silencioso */ }
     // Se ainda não temos gameState (usuário não logado / sem OracleMemory),
-    // cria um estado padrão para que a UI mostre placeholders em vez de sair.
+    // tenta carregar o último usuário local salvo no dispositivo antes de usar placeholder.
     if (!gameState) {
-      gameState = normalizeGameState({});
+      try {
+        const lastUser = localStorage.getItem('ur_last_user');
+        if (lastUser) {
+          const users = (typeof getUsers === 'function') ? getUsers() : JSON.parse(localStorage.getItem('ur_users') || '{}');
+          if (users && users[lastUser] && users[lastUser].character) {
+            gameState = users[lastUser].character;
+          } else {
+            gameState = normalizeGameState({});
+          }
+        } else {
+          gameState = normalizeGameState({});
+        }
+      } catch (e) {
+        gameState = normalizeGameState({});
+      }
     }
   }
   
@@ -10193,8 +10268,290 @@ const BibleAssistant = {
   }
 };
 
+const BIBLE_BOOKS = [
+  { name: 'Gênesis', order: 1, group: 'Pentateuco', testament: 'AT' },
+  { name: 'Êxodo', order: 2, group: 'Pentateuco', testament: 'AT' },
+  { name: 'Levítico', order: 3, group: 'Pentateuco', testament: 'AT' },
+  { name: 'Números', order: 4, group: 'Pentateuco', testament: 'AT' },
+  { name: 'Deuteronômio', order: 5, group: 'Pentateuco', testament: 'AT' },
+  { name: 'Josué', order: 6, group: 'Históricos', testament: 'AT' },
+  { name: 'Juízes', order: 7, group: 'Históricos', testament: 'AT' },
+  { name: 'Rute', order: 8, group: 'Históricos', testament: 'AT' },
+  { name: '1 Samuel', order: 9, group: 'Históricos', testament: 'AT' },
+  { name: '2 Samuel', order: 10, group: 'Históricos', testament: 'AT' },
+  { name: '1 Reis', order: 11, group: 'Históricos', testament: 'AT' },
+  { name: '2 Reis', order: 12, group: 'Históricos', testament: 'AT' },
+  { name: '1 Crônicas', order: 13, group: 'Históricos', testament: 'AT' },
+  { name: '2 Crônicas', order: 14, group: 'Históricos', testament: 'AT' },
+  { name: 'Esdras', order: 15, group: 'Históricos', testament: 'AT' },
+  { name: 'Neemias', order: 16, group: 'Históricos', testament: 'AT' },
+  { name: 'Ester', order: 17, group: 'Históricos', testament: 'AT' },
+  { name: 'Jó', order: 18, group: 'Poéticos', testament: 'AT' },
+  { name: 'Salmos', order: 19, group: 'Poéticos', testament: 'AT' },
+  { name: 'Provérbios', order: 20, group: 'Poéticos', testament: 'AT' },
+  { name: 'Eclesiastes', order: 21, group: 'Poéticos', testament: 'AT' },
+  { name: 'Cantares', order: 22, group: 'Poéticos', testament: 'AT' },
+  { name: 'Isaías', order: 23, group: 'Profetas Maiores', testament: 'AT' },
+  { name: 'Jeremias', order: 24, group: 'Profetas Maiores', testament: 'AT' },
+  { name: 'Lamentações', order: 25, group: 'Profetas Maiores', testament: 'AT' },
+  { name: 'Ezequiel', order: 26, group: 'Profetas Maiores', testament: 'AT' },
+  { name: 'Daniel', order: 27, group: 'Profetas Maiores', testament: 'AT' },
+  { name: 'Oséias', order: 28, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Joel', order: 29, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Amós', order: 30, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Obadias', order: 31, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Jonas', order: 32, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Miquéias', order: 33, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Naum', order: 34, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Habacuque', order: 35, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Sofonias', order: 36, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Ageu', order: 37, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Zacarias', order: 38, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Malaquias', order: 39, group: 'Profetas Menores', testament: 'AT' },
+  { name: 'Mateus', order: 40, group: 'Evangelhos', testament: 'NT' },
+  { name: 'Marcos', order: 41, group: 'Evangelhos', testament: 'NT' },
+  { name: 'Lucas', order: 42, group: 'Evangelhos', testament: 'NT' },
+  { name: 'João', order: 43, group: 'Evangelhos', testament: 'NT' },
+  { name: 'Atos', order: 44, group: 'História da Igreja', testament: 'NT' },
+  { name: 'Romanos', order: 45, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '1 Coríntios', order: 46, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '2 Coríntios', order: 47, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Gálatas', order: 48, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Efésios', order: 49, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Filipenses', order: 50, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Colossenses', order: 51, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '1 Tessalonicenses', order: 52, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '2 Tessalonicenses', order: 53, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '1 Timóteo', order: 54, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: '2 Timóteo', order: 55, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Tito', order: 56, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Filemom', order: 57, group: 'Cartas Paulinas', testament: 'NT' },
+  { name: 'Hebreus', order: 58, group: 'Cartas Gerais', testament: 'NT' },
+  { name: 'Tiago', order: 59, group: 'Cartas Gerais', testament: 'NT' },
+  { name: '1 Pedro', order: 60, group: 'Cartas Gerais', testament: 'NT' },
+  { name: '2 Pedro', order: 61, group: 'Cartas Gerais', testament: 'NT' },
+  { name: '1 João', order: 62, group: 'Cartas Gerais', testament: 'NT' },
+  { name: '2 João', order: 63, group: 'Cartas Gerais', testament: 'NT' },
+  { name: '3 João', order: 64, group: 'Cartas Gerais', testament: 'NT' },
+  { name: 'Judas', order: 65, group: 'Cartas Gerais', testament: 'NT' },
+  { name: 'Apocalipse', order: 66, group: 'Profético', testament: 'NT' }
+];
+
 // Função para injetar a aba Bíblia na interface
 function injectBibleTab() {
+  let biblePdfDoc = null;
+  let biblePdfPage = 1;
+  let biblePdfRendering = false;
+  let biblePdfPageCache = new Map();
+  let biblePdfSearchToken = 0;
+  let bibleSemanticEnabled = false;
+  let bibleEmbedder = null;
+  let bibleEmbedderPromise = null;
+
+  const normalizeText = (str) => String(str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  const extractSearchTerms = (query) => {
+    const stop = new Set(['de','da','do','dos','das','para','por','com','sem','uma','um','uns','umas','que','qual','quais','como','porque','por que','sobre','na','no','nas','nos','a','o','os','as','em','e','ou','se','eu','voce','você','meu','minha','meus','minhas','sua','seu','suas','seus']);
+    const raw = normalizeText(query).replace(/[^a-z0-9:\s]/g, ' ').split(/\s+/).filter(Boolean);
+    const terms = raw.filter(w => w.length >= 4 && !stop.has(w));
+    return terms.slice(0, 3);
+  };
+
+  const ensurePdf = async () => {
+    if (biblePdfDoc) return biblePdfDoc;
+    const statusEl = document.getElementById('biblePdfStatus');
+    try {
+      const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+      if (!pdfjsLib) throw new Error('PDF.js não carregado');
+      // Em file:// alguns navegadores bloqueiam o worker do PDF.js
+      if (window.location.protocol === 'file:') {
+        pdfjsLib.disableWorker = true;
+      }
+      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      }
+      if (statusEl) statusEl.textContent = 'Carregando Bíblia...';
+      let loadingTask = pdfjsLib.getDocument('biblia_de_estudo_de_genebra.pdf');
+      try {
+        biblePdfDoc = await loadingTask.promise;
+      } catch (err) {
+        // fallback: tenta sem worker caso tenha falhado
+        pdfjsLib.disableWorker = true;
+        loadingTask = pdfjsLib.getDocument('biblia_de_estudo_de_genebra.pdf');
+        biblePdfDoc = await loadingTask.promise;
+      }
+      if (statusEl) statusEl.textContent = `Bíblia carregada (${biblePdfDoc.numPages} páginas).`;
+      return biblePdfDoc;
+    } catch (err) {
+      if (statusEl) statusEl.textContent = 'Não foi possível carregar o PDF da Bíblia.';
+      throw err;
+    }
+  };
+
+  const loadEmbedder = async () => {
+    if (bibleEmbedder) return bibleEmbedder;
+    if (bibleEmbedderPromise) return bibleEmbedderPromise;
+    const t = window.transformers;
+    if (!t || !t.pipeline) {
+      throw new Error('Transformers.js não carregado');
+    }
+    if (t.env) {
+      t.env.allowRemoteModels = true;
+      t.env.useBrowserCache = true;
+      t.env.allowLocalModels = false;
+    }
+    const statusEl = document.getElementById('biblePdfStatus');
+    if (statusEl) statusEl.textContent = 'Carregando IA de busca inteligente...';
+    if (window.location.protocol === 'file:') {
+      if (statusEl) statusEl.textContent = 'Para busca inteligente, abra o site via servidor local (não file://).';
+    }
+    bibleEmbedderPromise = t.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
+    bibleEmbedder = await bibleEmbedderPromise;
+    if (statusEl) statusEl.textContent = 'Busca inteligente ativada.';
+    return bibleEmbedder;
+  };
+
+  const embedText = async (text) => {
+    const model = await loadEmbedder();
+    const output = await model(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data || []);
+  };
+
+  const cosineSimilarity = (a, b) => {
+    if (!a || !b || a.length !== b.length) return 0;
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
+    return sum;
+  };
+
+  const getPageText = async (pageNum) => {
+    if (biblePdfPageCache.has(pageNum)) return biblePdfPageCache.get(pageNum);
+    const pdf = await ensurePdf();
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    const text = content.items.map(i => i.str).join(' ');
+    const normalized = normalizeText(text);
+    const result = { raw: text, normalized };
+    biblePdfPageCache.set(pageNum, result);
+    return result;
+  };
+
+  const renderPdfPage = async (pageNum) => {
+    if (biblePdfRendering) return;
+    biblePdfRendering = true;
+    const pdf = await ensurePdf();
+    pageNum = Math.max(1, Math.min(pageNum, pdf.numPages));
+    biblePdfPage = pageNum;
+
+    const canvas = document.getElementById('biblePdfCanvas');
+    const label = document.getElementById('biblePdfPageLabel');
+    const container = document.getElementById('biblePdfCanvasWrap');
+    if (!canvas || !container) {
+      biblePdfRendering = false;
+      return;
+    }
+
+    const page = await pdf.getPage(pageNum);
+    const containerWidth = container.clientWidth || 320;
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(2, Math.max(1, (containerWidth - 8) / viewport.width));
+    const scaledViewport = page.getViewport({ scale });
+    const ctx = canvas.getContext('2d');
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+    await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+    if (label) label.textContent = `Página ${pageNum} / ${pdf.numPages}`;
+    biblePdfRendering = false;
+  };
+
+  const searchPdf = async (query) => {
+    const statusEl = document.getElementById('biblePdfStatus');
+    const resultsEl = document.getElementById('biblePdfResults');
+    const token = ++biblePdfSearchToken;
+    if (resultsEl) resultsEl.innerHTML = '';
+    if (statusEl) statusEl.textContent = 'Buscando no PDF...';
+
+    const pdf = await ensurePdf();
+    const terms = [];
+    const normalizedQuery = normalizeText(query);
+    if (normalizedQuery.length >= 4) terms.push(normalizedQuery);
+    terms.push(...extractSearchTerms(query));
+
+    const matches = [];
+    const maxScanPages = Math.min(pdf.numPages, 420);
+    for (let i = 1; i <= maxScanPages; i++) {
+      if (token !== biblePdfSearchToken) return;
+      const pageText = await getPageText(i);
+      const hit = terms.find(t => t && pageText.normalized.includes(t));
+      if (hit) {
+        matches.push({ page: i, term: hit, text: pageText.raw });
+        if (matches.length >= 12) break;
+      }
+      if (statusEl && i % 10 === 0) statusEl.textContent = `Buscando no PDF... (${i}/${maxScanPages})`;
+    }
+
+    if (!matches.length) {
+      if (statusEl) statusEl.textContent = 'Nenhum trecho encontrado no PDF.';
+      return;
+    }
+
+    let finalMatches = matches;
+    if (bibleSemanticEnabled) {
+      try {
+        if (statusEl) statusEl.textContent = 'Reordenando com busca inteligente...';
+        const queryEmb = await embedText(query);
+        const scored = [];
+        for (const m of matches) {
+          const snippet = m.text.slice(0, 600);
+          const emb = await embedText(snippet);
+          const score = cosineSimilarity(queryEmb, emb);
+          scored.push({ ...m, score });
+        }
+        scored.sort((a, b) => b.score - a.score);
+        finalMatches = scored.slice(0, 5);
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Busca inteligente indisponível. Mostrando resultados normais.';
+      }
+    }
+
+    if (statusEl) statusEl.textContent = `Encontrado ${finalMatches.length} resultado(s).`;
+    if (resultsEl) {
+      const highlightTerms = terms.filter(Boolean).slice(0, 3);
+      const highlightSnippet = (text) => {
+        let snippet = text.slice(0, 220).replace(/\s+/g, ' ').trim();
+        highlightTerms.forEach((t, idx) => {
+          if (!t) return;
+          const re = new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+          snippet = snippet.replace(re, `<mark class="hl-${idx + 1}">$1</mark>`);
+        });
+        return snippet;
+      };
+      resultsEl.innerHTML = finalMatches.map(m => {
+        const safe = highlightSnippet(m.text);
+        const scoreText = (typeof m.score === 'number') ? `<div class="bible-result-score">Relevância: ${(m.score * 100).toFixed(1)}%</div>` : '';
+        return `
+          <div class="bible-result">
+            <div class="bible-result-title">Página ${m.page}</div>
+            <div class="bible-result-snippet">${safe}...</div>
+            ${scoreText}
+            <button class="ghost bible-open-page-btn" data-page="${m.page}">Abrir página</button>
+          </div>
+        `;
+      }).join('');
+      resultsEl.querySelectorAll('.bible-open-page-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const page = parseInt(btn.dataset.page, 10);
+          const reader = document.getElementById('biblePdfReader');
+          if (reader) reader.classList.remove('hidden');
+          renderPdfPage(page);
+        });
+      });
+    }
+  };
+
   const activateBibleTab = () => {
     // Desativa todos os outros botões de navegação e abas de conteúdo
     document.querySelectorAll('.nav-item, .mobile-drawer-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
@@ -10238,28 +10595,78 @@ function injectBibleTab() {
     content.className = 'tab-content';
     content.style.cssText = 'padding: 10px;';
     
+    // BIBLE_BOOKS moved to top-level to reduce injectBibleTab function size
+
+    const booksHtml = BIBLE_BOOKS.map(b => `
+      <button class="bible-book-card" data-book="${b.name}" data-testament="${b.testament}">
+        <div class="bible-book-name">${b.name}</div>
+        <div class="bible-book-meta">${b.group} • ${b.order}º livro</div>
+      </button>
+    `).join('');
+
     content.innerHTML = `
-      <div class="bible-interface" style="width: 100%; max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.95); border-radius: 16px; padding: 15px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 100%; max-height: 100%;">
-        <div class="bible-header" style="text-align: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; flex-shrink: 0;">
-          <h2 style="color: #ffdd57; margin: 0; font-family: serif; font-size: 1.4rem;">✝️ Assistente Bíblico</h2>
-          <p style="opacity: 0.7; font-size: 0.8rem; margin-top: 5px;">"Lâmpada para os meus pés é a tua palavra"</p>
+      <div class="bible-interface">
+        <div class="bible-header">
+          <div class="bible-header-top">
+            <div class="bible-icon">✝️</div>
+            <div>
+              <h2 class="bible-title">Assistente Bíblico</h2>
+              <p class="bible-subtitle">"Lâmpada para os meus pés é a tua palavra"</p>
+            </div>
+          </div>
+          <div class="bible-quick-actions">
+            <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')">✝️ Jesus</button>
+            <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')">🧠 O que você sabe?</button>
+            <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')">📅 Plano de Leitura</button>
+            <button class="btn ghost bible-tag" id="bibleOpenPdfBtn">📖 Abrir Bíblia</button>
+            <button class="btn ghost bible-tag" id="bibleSemanticBtn">✨ Busca inteligente</button>
+          </div>
         </div>
         
-        <div id="bibleChatArea" style="flex: 1; overflow-y: auto; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
-          <div class="chat-message bot" style="align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 85%; font-size: 0.95rem;">
+        <div id="bibleChatArea" class="bible-chat">
+          <div class="bible-message bot">
             Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Posso explicar sobre livros (ex: "Gênesis"), temas (ex: "ansiedade") ou dar um versículo do dia.
           </div>
         </div>
 
-        <div class="bible-input-area" style="display: flex; gap: 10px; position: relative; flex-shrink: 0;">
-          <input type="text" id="bibleInput" placeholder="Ex: Gênesis, Salmos..." style="flex: 1; padding: 12px; border-radius: 25px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.05); color: white; font-size: 16px;">
-          <button id="bibleSendBtn" style="width: 45px; height: 45px; border-radius: 50%; border: none; background: #ffdd57; color: #000; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">➤</button>
+        <div class="bible-pdf-tools">
+          <div id="biblePdfStatus" class="bible-pdf-status">Bíblia pronta para busca.</div>
+          <div id="biblePdfResults" class="bible-pdf-results"></div>
         </div>
-        
-        <div class="bible-quick-actions" style="display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 5px; flex-shrink: 0;">
-          <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">✝️ Jesus</button>
-          <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">🧠 O que você sabe?</button>
-          <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')" style="font-size: 0.75rem; white-space: nowrap; padding: 6px 12px;">📅 Plano de Leitura</button>
+
+        <div class="bible-books">
+          <div class="bible-books-title">Livros da Bíblia</div>
+          <div class="bible-books-filters">
+            <button class="ghost bible-filter-btn active" data-filter="all">Todos</button>
+            <button class="ghost bible-filter-btn" data-filter="AT">Antigo Testamento</button>
+            <button class="ghost bible-filter-btn" data-filter="NT">Novo Testamento</button>
+          </div>
+          <div class="bible-books-grid">
+            ${booksHtml}
+          </div>
+        </div>
+
+        <div id="biblePdfReader" class="bible-pdf-reader hidden">
+          <div class="bible-pdf-reader-header">
+            <div id="biblePdfPageLabel" class="bible-pdf-page">Página 1</div>
+            <div class="bible-pdf-controls">
+              <button class="ghost" id="biblePdfPrevBtn">◀</button>
+              <button class="ghost" id="biblePdfNextBtn">▶</button>
+              <button class="ghost" id="biblePdfCloseBtn">Fechar</button>
+            </div>
+          </div>
+          <div class="bible-pdf-search">
+            <input type="text" id="biblePdfSearchInput" class="bible-pdf-search-input" placeholder="Buscar na Bíblia...">
+            <button class="ghost" id="biblePdfSearchBtn">Buscar</button>
+          </div>
+          <div id="biblePdfCanvasWrap" class="bible-pdf-canvas-wrap">
+            <canvas id="biblePdfCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="bible-input-area">
+          <input type="text" id="bibleInput" class="bible-input" placeholder="Ex: Gênesis, Salmos...">
+          <button id="bibleSendBtn" class="bible-send-btn" aria-label="Enviar">➤</button>
         </div>
       </div>
     `;
@@ -10270,6 +10677,15 @@ function injectBibleTab() {
     const input = document.getElementById('bibleInput');
     const btn = document.getElementById('bibleSendBtn');
     const chat = document.getElementById('bibleChatArea');
+    const openPdfBtn = document.getElementById('bibleOpenPdfBtn');
+    const semanticBtn = document.getElementById('bibleSemanticBtn');
+    const pdfPrevBtn = document.getElementById('biblePdfPrevBtn');
+    const pdfNextBtn = document.getElementById('biblePdfNextBtn');
+    const pdfCloseBtn = document.getElementById('biblePdfCloseBtn');
+    const pdfSearchInput = document.getElementById('biblePdfSearchInput');
+    const pdfSearchBtn = document.getElementById('biblePdfSearchBtn');
+    const bookCards = document.querySelectorAll('.bible-book-card');
+    const filterButtons = document.querySelectorAll('.bible-filter-btn');
     
     const sendMessage = async () => {
         const text = input.value.trim();
@@ -10277,16 +10693,14 @@ function injectBibleTab() {
         
         // User Message
         const userDiv = document.createElement('div');
-        userDiv.className = 'chat-message user';
-        userDiv.style.cssText = 'align-self: flex-end; background: rgba(255, 255, 255, 0.1); padding: 10px 15px; border-radius: 12px 12px 0 12px; max-width: 80%;';
+        userDiv.className = 'bible-message user';
         userDiv.textContent = text;
         chat.appendChild(userDiv);
         chat.scrollTop = chat.scrollHeight;
         
         // Bot Thinking
         const thinkingDiv = document.createElement('div');
-        thinkingDiv.className = 'chat-message bot thinking';
-        thinkingDiv.style.cssText = 'align-self: flex-start; opacity: 0.7; font-style: italic; margin-top: 5px;';
+        thinkingDiv.className = 'bible-message bot thinking';
         thinkingDiv.textContent = 'Buscando na palavra...';
         chat.appendChild(thinkingDiv);
         chat.scrollTop = chat.scrollHeight;
@@ -10307,8 +10721,7 @@ function injectBibleTab() {
         thinkingDiv.remove();
         
         const botDiv = document.createElement('div');
-        botDiv.className = 'chat-message bot';
-        botDiv.style.cssText = 'align-self: flex-start; background: rgba(255, 221, 87, 0.1); color: #ffdd57; padding: 10px 15px; border-radius: 12px 12px 12px 0; max-width: 80%; margin-top: 5px; line-height: 1.5;';
+        botDiv.className = 'bible-message bot';
         // Proteção anti-welcome: se a resposta for apenas a mensagem de boas-vindas, tente esclarecer
         let finalResponse = response;
         try {
@@ -10327,10 +10740,89 @@ function injectBibleTab() {
           console.warn('saveOracleChatMessage não disponível', e);
         }
         chat.scrollTop = chat.scrollHeight;
+
+        // Busca no PDF para abrir versículos relacionados
+        try {
+          await searchPdf(text);
+        } catch (e) {
+          const statusEl = document.getElementById('biblePdfStatus');
+          if (statusEl) statusEl.textContent = 'Não foi possível buscar no PDF.';
+        }
     };
     
     btn.addEventListener('click', sendMessage);
     input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
+
+    if (openPdfBtn) {
+      openPdfBtn.addEventListener('click', async () => {
+        const reader = document.getElementById('biblePdfReader');
+        if (reader) reader.classList.remove('hidden');
+        await renderPdfPage(biblePdfPage || 1);
+      });
+    }
+    if (semanticBtn) {
+      semanticBtn.addEventListener('click', async () => {
+        try {
+          await loadEmbedder();
+          bibleSemanticEnabled = true;
+          semanticBtn.classList.add('active');
+          semanticBtn.textContent = '✨ Inteligente ativo';
+        } catch (e) {
+          const statusEl = document.getElementById('biblePdfStatus');
+          if (statusEl) statusEl.textContent = 'Falha ao ativar busca inteligente. Verifique se abriu via localhost.';
+        }
+      });
+    }
+
+    const runPdfSearch = async () => {
+      const q = (pdfSearchInput && pdfSearchInput.value || '').trim();
+      if (!q) return;
+      const reader = document.getElementById('biblePdfReader');
+      if (reader) reader.classList.remove('hidden');
+      await searchPdf(q);
+    };
+    if (pdfSearchBtn) pdfSearchBtn.addEventListener('click', runPdfSearch);
+    if (pdfSearchInput) {
+      pdfSearchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') runPdfSearch();
+      });
+    }
+
+    if (bookCards.length) {
+      bookCards.forEach(card => {
+        card.addEventListener('click', () => {
+          const book = card.getAttribute('data-book');
+          if (input && book) {
+            input.value = book;
+            btn.click();
+          }
+        });
+      });
+    }
+
+    if (filterButtons.length) {
+      const setFilter = (filter) => {
+        bookCards.forEach(card => {
+          const t = card.getAttribute('data-testament');
+          const show = filter === 'all' || t === filter;
+          card.style.display = show ? '' : 'none';
+        });
+      };
+      filterButtons.forEach(btnEl => {
+        btnEl.addEventListener('click', () => {
+          filterButtons.forEach(b => b.classList.remove('active'));
+          btnEl.classList.add('active');
+          setFilter(btnEl.dataset.filter);
+        });
+      });
+      setFilter('all');
+    }
+    if (pdfPrevBtn) pdfPrevBtn.addEventListener('click', () => renderPdfPage(biblePdfPage - 1));
+    if (pdfNextBtn) pdfNextBtn.addEventListener('click', () => renderPdfPage(biblePdfPage + 1));
+    if (pdfCloseBtn) pdfCloseBtn.addEventListener('click', () => {
+      const reader = document.getElementById('biblePdfReader');
+      if (reader) reader.classList.add('hidden');
+    });
     
     // Global helper for tags
     window.askBible = (query) => {
@@ -11962,16 +12454,8 @@ try {
   }
 
   function openBiblia(){
-    // garante que a aba Bíblia exista e abre ela
-    if (!document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
-      try { injectBibleTab(); } catch(e) { console.warn('injectBibleTab falhou:', e); }
-    }
-    const tab = document.querySelector('.tab-btn[data-tab="bible"]');
-    if (tab) { tab.click(); }
-    setTimeout(() => {
-      const input = document.getElementById('bibleInput');
-      if (input && shouldAutoFocus()) input.focus();
-    }, 120);
+    // abre página dedicada da Bíblia (leitura)
+    try { window.location.href = 'biblia-leitura.html'; } catch (e) {}
   }
 
     try { console.info('[UI] Aba Bíblia aberta'); } catch (e) {}
