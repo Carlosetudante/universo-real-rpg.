@@ -440,7 +440,12 @@
             <div class="small" id="inventoryCount" style="margin-top: 8px; text-align: right; opacity: 0.7;">0 itens</div>
           </div>
 
-        </div>
+          </div>
+
+          <footer class="site-footer" role="contentinfo">
+            <div class="footer-msg">Seus dados estão salvos — pode acessar de qualquer dispositivo.</div>
+            <div class="copyright">© Universo Real</div>
+          </footer>
 
         <!-- Conteúdo da Aba: Finanças -->
         <div id="tab-finance" class="tab-content">
@@ -777,6 +782,7 @@
     <div class="zen-content">
       <div id="zenTimer">0 anos, 0 meses, 0 dias...</div>
       <div id="zenQuote">"Frase inspiradora..."</div>
+      <div class="zen-exit-hint">Pressione <strong>Esc</strong> ou clique em "Sair do Modo Zen" para voltar</div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
         <button class="ghost" id="zenMusicBtn" style="font-size: 12px; opacity: 0.7;">🎵 Selecionar Pasta de Músicas</button>
         <select id="zenTrackSelect" class="ghost" style="display: none; font-size: 12px; opacity: 0.9; max-width: 250px; cursor: pointer; background: rgba(0,0,0,0.5); width: auto; padding: 8px;"></select>
@@ -788,7 +794,7 @@
       <input type="file" id="zenMusicInput" accept="audio/*" webkitdirectory directory multiple style="display: none;">
       <input type="file" id="zenImageInput" accept="image/*" style="display: none;">
       <audio id="zenAudio"></audio>
-      <button class="ghost" id="exitZenBtn">Sair do Modo Zen</button>
+      <button class="ghost" id="exitZenBtn" title="Pressione Esc para sair" aria-label="Sair do Modo Zen">Sair do Modo Zen</button>
     </div>
   </div>
 

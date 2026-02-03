@@ -27,7 +27,7 @@
       overflow-y: auto;
 
       /* Garante que o conteúdo não fique atrás da barra de home em iPhones */
-      padding-bottom: env(safe-area-inset-bottom);
+      padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
     }
     
     /* ===== UNIVERSO ESTRELADO ===== */
@@ -1203,6 +1203,46 @@
   padding: 20px;
 }
 
+/* Rodapé fixo com mensagem de backup/sincronização e direito autoral */
+.site-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  background: rgba(8,12,20,0.85);
+  color: #cfe6ff;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  z-index: 20000;
+  backdrop-filter: blur(6px);
+}
+
+/* Quando no Zen Mode, esconder barras de navegação e controles para foco total */
+body.zen-mode-active #mobile-nav,
+body.zen-mode-active .control-bar,
+body.zen-mode-active .app-nav,
+body.zen-mode-active .mobile-header,
+body.zen-mode-active .cinema {
+  display: none !important;
+}
+
+/* Ajusta padding inferior quando nav escondida para evitar espaços extras */
+body.zen-mode-active .container {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.site-footer .footer-msg {
+  font-size: 13px;
+  opacity: 0.95;
+}
+.site-footer .copyright {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
 /* Oculta o stage / orb no mobile para um header mais limpo (opção 1) */
 @media (width <= 900px) {
   .stage, .orb, #orb, .ring {
@@ -1320,6 +1360,31 @@
   flex-direction: column;
   gap: 32px;
   align-items: center;
+}
+
+/* Botão de sair do Zen posicionado no canto superior direito */
+#zenModeOverlay #exitZenBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  opacity: 0.95;
+}
+
+/* Rótulo visível que explica como sair do Zen Mode */
+.zen-exit-hint {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  font-size: 13px;
+  color: #cfe6ff;
+  background: rgba(0,0,0,0.25);
+  padding: 6px 10px;
+  border-radius: 8px;
+  opacity: 0.95;
+  z-index: 3100;
 }
 
 .zen-bg-thumb {
@@ -3290,8 +3355,14 @@ body.logged-in #mobile-nav{
 .nav-btn:hover{ transform: translateY(-3px); color: var(--accent); }
 .nav-btn.active, .nav-btn[aria-pressed="true"]{ color: var(--bg1); background: linear-gradient(135deg, var(--accent), var(--accent-hover)); border-radius: 12px; padding: 8px 12px; box-shadow: 0 6px 18px rgba(255,217,87,0.12); transform: translateY(-4px); }
 
-/* 'Mais' botão com estilo discreto */
-.nav-btn.more-btn{ font-size:20px; opacity:0.95 }
+/* 'Mais' botão: manter estilo consistente com outros nav-btns */
+.nav-btn.more-btn{
+  font-size:18px;
+  opacity:0.95;
+  padding:6px 10px;
+  min-width:48px;
+  gap:2px;
+}
 
 /* Adapt layout for very small screens */
 @media (max-width:360px){
@@ -3299,11 +3370,11 @@ body.logged-in #mobile-nav{
   .nav-label{ display:none }
 }
 
-/* Move o rótulo 'Mais' um pouco para cima para evitar que seja cortado */
+/* Rótulo 'Mais' segue o mesmo espaçamento dos demais rótulos */
 #mobileNavMoreBtn .nav-label{
-  margin-top: -6px;
-  transform: translateY(-6px);
-  line-height: 1.05;
+  margin-top: 3px;
+  transform: none;
+  line-height: 1.1;
   display: block;
 }
 

@@ -2793,7 +2793,25 @@ function toggleZenMode() {
     overlay.classList.add('hidden');
     elements.zenAudio.pause();
   }
+
+  // Alterna classe no body para esconder a UI não essencial (navs/controls)
+  try {
+    if (document.body.classList.contains('zen-mode-active')) {
+      document.body.classList.remove('zen-mode-active');
+    } else {
+      document.body.classList.add('zen-mode-active');
+    }
+  } catch (e) { /* silencioso */ }
 }
+
+// Atalho de teclado para sair do Zen Mode com Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    if (document.body.classList.contains('zen-mode-active')) {
+      try { toggleZenMode(); } catch (err) { /* silencioso */ }
+    }
+  }
+});
 
 function toggleZenHud() {
   if (elements.zenModeOverlay) {
@@ -3976,15 +3994,41 @@ function setTabBadge(tabId, show) {
 }
 
 function updateUI() {
-  if (!gameState) return;
+  // Se não houver gameState, tenta preencher com memórias locais (OracleMemory) antes de sair
+  if (!gameState) {
+    try {
+      if (typeof OracleMemory !== 'undefined') {
+        const name = OracleMemory.getProfile && OracleMemory.getProfile('name');
+        if (name) {
+          gameState = normalizeGameState({
+            name: name,
+            username: OracleMemory.getProfile('email') || OracleMemory.getProfile('username') || 'user',
+            race: OracleMemory.getProfile('occupation') || OracleMemory.getProfile('race') || 'Humano',
+            title: OracleMemory.getProfile('title') || 'Viajante',
+            level: parseInt(OracleMemory.getProfile('level')) || 1,
+            xp: parseInt(OracleMemory.getProfile('xp')) || 0,
+            skillPoints: parseInt(OracleMemory.getProfile('skillPoints')) || 0
+          });
+        }
+      }
+    } catch (e) { /* silencioso */ }
+    if (!gameState) return;
+  }
   
-  // Atualizar preview do personagem
-  if (elements.previewName) elements.previewName.textContent = gameState.name;
-  if (elements.previewTitle) elements.previewTitle.textContent = gameState.title || 'Viajante';
-  if (elements.previewRace) elements.previewRace.textContent = gameState.race;
-  if (elements.previewUsername) elements.previewUsername.textContent = `@${gameState.username}`;
-  if (elements.level) elements.level.textContent = gameState.level;
-  if (elements.orbLevel) elements.orbLevel.textContent = gameState.level;
+  // Atualizar preview do personagem (com placeholders seguros)
+  const safeName = gameState.name || 'Viajante';
+  const safeTitle = gameState.title || 'Viajante';
+  const safeRace = gameState.race || 'Humano';
+  const safeUsername = gameState.username || 'usuario';
+  const safeLevel = (typeof gameState.level === 'number' ? gameState.level : parseInt(gameState.level) || 1);
+  const safeXp = (typeof gameState.xp === 'number' ? gameState.xp : parseInt(gameState.xp) || 0);
+
+  if (elements.previewName) elements.previewName.textContent = safeName;
+  if (elements.previewTitle) elements.previewTitle.textContent = safeTitle;
+  if (elements.previewRace) elements.previewRace.textContent = safeRace;
+  if (elements.previewUsername) elements.previewUsername.textContent = `@${safeUsername}`;
+  if (elements.level) elements.level.textContent = safeLevel;
+  if (elements.orbLevel) elements.orbLevel.textContent = safeLevel;
   // xpToNextLevel fixo em 100 para lógica local
   const xpToNextLevel = 100;
   if (elements.xp) elements.xp.textContent = `${gameState.xp} / ${xpToNextLevel}`;
@@ -11396,6 +11440,8 @@ window.addEventListener('DOMContentLoaded', () => {
   tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const tabId = btn.getAttribute('data-tab');
+      // Fecha ferramentas ativas antes de trocar
+      closeActiveTools();
       // Se for a aba Bíblia e o conteúdo ainda não existir, injeta antes de prosseguir
       if (tabId === 'bible' && !document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
         try { injectBibleTab(); } catch (e) { console.warn('injectBibleTab falhou ao clicar na aba:', e); }
@@ -11851,6 +11897,31 @@ try {
       if (navigator && /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return false;
       return true;
     } catch (e) { return true; }
+  }
+  
+  // Fecha ferramentas/modais/abas ativas antes de abrir nova ferramenta
+  function closeActiveTools() {
+    try {
+      // Fecha modal de chat se aberto
+      const chatModal = document.getElementById('chatModal');
+      if (chatModal) { chatModal.classList.remove('open'); chatModal.classList.remove('active'); }
+
+      // Fecha quaisquer modais abertos
+      document.querySelectorAll('.modal.active').forEach(m => m.classList.remove('active'));
+
+      // Remove aba Bíblia da DOM (será reinjetada quando abrir de novo)
+      const bible = document.getElementById('tab-bible');
+      if (bible) bible.remove();
+
+      // Fecha drawer/mobile se houver função
+      if (typeof closeDrawer === 'function') {
+        try { closeDrawer(); } catch(e){}
+      }
+
+      // Esconde ações flutuantes (FAB)
+      const fabActions = document.querySelector('.fab-actions') || document.getElementById('fabActions');
+      if (fabActions) fabActions.classList.add('hidden');
+    } catch (e) { /* silencioso */ }
   }
   function openOraculo(){
     // usa botão existente se houver
