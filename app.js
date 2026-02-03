@@ -11646,12 +11646,12 @@ function setMobileNavVisible(visible) {
     }
     if (visible) {
       nav.classList.remove('hidden');
-      // Força display flex inline como fallback caso regras CSS sejam conflitantes
-      nav.style.display = 'flex';
+      // Aplica display inline apenas em telas pequenas; evita forçar em desktop
+      if (window.innerWidth < 900) nav.style.display = 'flex'; else nav.style.display = '';
       document.body.classList.add('logged-in');
     } else {
       nav.classList.add('hidden');
-      nav.style.display = ''; // remove override
+      nav.style.display = '';
       document.body.classList.remove('logged-in');
     }
   } catch (e) { /* silencioso */ }
@@ -11812,10 +11812,16 @@ try {
 // -------------------------------
 (function(){
   function showSplash(){
-    const splash = document.getElementById('splashScreen');
-    if (splash) splash.classList.remove('hidden');
-    const chatModal = document.getElementById('chatModal');
-    if (chatModal) chatModal.classList.remove('open');
+      const splash = document.getElementById('splashScreen');
+      if (splash) {
+        splash.classList.remove('hidden');
+        // Esconde automaticamente o splash após um curto período
+        setTimeout(() => {
+          try { splash.classList.add('hidden'); } catch (e) { /* silencioso */ }
+        }, 220);
+      }
+      const chatModal = document.getElementById('chatModal');
+      if (chatModal) chatModal.classList.remove('open');
   }
 
   function openOraculo(){
