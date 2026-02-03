@@ -5835,7 +5835,10 @@ const OracleChat = {
     modal.classList.toggle('active');
     
     if (modal.classList.contains('active')) {
-      setTimeout(() => document.getElementById('chatInput')?.focus(), 100);
+      setTimeout(() => {
+        const ci = document.getElementById('chatInput');
+        if (ci && shouldAutoFocus()) ci.focus();
+      }, 100);
       
       const messages = document.getElementById('chatMessages');
       if (messages && messages.children.length === 0) {
@@ -10185,7 +10188,7 @@ function injectBibleTab() {
     const content = document.createElement('div');
     content.id = 'tab-bible';
     content.className = 'tab-content';
-    content.style.cssText = 'padding: 10px; height: 100%; overflow: hidden;';
+    content.style.cssText = 'padding: 10px;';
     
     content.innerHTML = `
       <div class="bible-interface" style="width: 100%; max-width: 800px; margin: 0 auto; background: rgba(20, 20, 30, 0.95); border-radius: 16px; padding: 15px; border: 1px solid rgba(255, 215, 0, 0.2); box-shadow: 0 0 20px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: 100%; max-height: 100%;">
@@ -11144,7 +11147,7 @@ if (elements.fabTaskBtn) {
     document.querySelector('.tab-btn[data-tab="quests"]').click();
     elements.fabActions.classList.add('hidden');
     elements.fabMainBtn.classList.remove('active');
-    setTimeout(() => elements.taskInput?.focus(), 100);
+    setTimeout(() => { const ti = elements.taskInput; if (ti && shouldAutoFocus()) ti.focus(); }, 100);
   });
 }
 
@@ -11153,7 +11156,7 @@ if (elements.fabFinanceBtn) {
     document.querySelector('.tab-btn[data-tab="finance"]').click();
     elements.fabActions.classList.add('hidden');
     elements.fabMainBtn.classList.remove('active');
-    setTimeout(() => elements.financeDesc?.focus(), 100);
+    setTimeout(() => { const fd = elements.financeDesc; if (fd && shouldAutoFocus()) fd.focus(); }, 100);
   });
 }
 
@@ -11840,6 +11843,15 @@ try {
       if (chatModal) chatModal.classList.remove('open');
   }
 
+  // Evita foco automático em dispositivos touch (abre teclado indesejado)
+  function shouldAutoFocus() {
+    try {
+      if (typeof window === 'undefined') return true;
+      if ('ontouchstart' in window) return false; // dispositivos touch não devem auto-focar
+      if (navigator && /Mobi|Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return false;
+      return true;
+    } catch (e) { return true; }
+  }
   function openOraculo(){
     // usa botão existente se houver
     const chatBtn = document.getElementById('chatBtn');
@@ -11847,7 +11859,7 @@ try {
     const chatModal = document.getElementById('chatModal');
     if (chatModal) chatModal.classList.add('open');
     const input = document.getElementById('chatInput');
-    if (input) input.focus();
+    if (input && shouldAutoFocus()) input.focus();
   }
 
   function openTarefas(){
@@ -11856,7 +11868,7 @@ try {
     if (tab) { tab.click(); }
     setTimeout(() => {
       const input = document.getElementById('taskInput') || document.querySelector('input[name="task"]');
-      if (input) input.focus();
+      if (input && shouldAutoFocus()) input.focus();
     }, 120);
   }
 
@@ -11866,7 +11878,7 @@ try {
     if (tab) { tab.click(); }
     setTimeout(() => {
       const input = document.getElementById('financeDesc') || document.querySelector('input[name="financeDesc"]');
-      if (input) input.focus();
+      if (input && shouldAutoFocus()) input.focus();
     }, 120);
   }
 
@@ -11879,7 +11891,7 @@ try {
     if (tab) { tab.click(); }
     setTimeout(() => {
       const input = document.getElementById('bibleInput');
-      if (input) input.focus();
+      if (input && shouldAutoFocus()) input.focus();
     }, 120);
   }
 

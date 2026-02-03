@@ -1880,10 +1880,16 @@
   flex-direction: column;
   gap: 18px;
   animation: fade-in 0.3s ease;
+  position: absolute;
+  inset: 0;
+  padding: 30px; /* mantém espaçamento interno consistente */
+  overflow: auto;
+  z-index: 2;
 }
 
 .tab-content.active {
   display: flex;
+  z-index: 50; /* deve ficar acima de outros elementos */
 }
 
 @keyframes fade-in {

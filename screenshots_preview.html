@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Preview - Screenshots Bíblia</title>
+  <style>
+    body{background:#0a0a1a;color:#e6eef8;font-family:Inter,Arial;padding:20px}
+    h1{color:#ffdd57}
+    .grid{display:flex;flex-wrap:wrap;gap:16px}
+    .card{background:#0d1b2a;border-radius:10px;padding:12px;width:calc(50% - 16px);box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+    img{width:100%;height:auto;border-radius:6px;border:1px solid rgba(255,255,255,0.04)}
+    @media(max-width:700px){.card{width:100%}}
+  </style>
+</head>
+<body>
+  <h1>Preview das Screenshots</h1>
+  <p>Se não aparecer, abra a pasta <strong>screenshots/</strong> no explorador do VS Code.</p>
+  <div class="grid">
+    <div class="card">
+      <h3>Bíblia (desktop)</h3>
+      <img src="screenshots/bible_desktop.png" alt="bible_desktop">
+    </div>
+
+    <div class="card">
+      <h3>Bíblia (mobile)</h3>
+      <img src="screenshots/bible_mobile.png" alt="bible_mobile">
+    </div>
+
+    <div class="card">
+      <h3>Home após abrir Bíblia</h3>
+      <img src="screenshots/home_after_bible.png" alt="home_after_bible">
+    </div>
+  </div>
+</body>
+</html>
