@@ -11086,8 +11086,18 @@ document.querySelectorAll('.mobile-drawer-item.tab-btn').forEach(btn => {
 // Ações do drawer - Ferramentas
 document.getElementById('drawerZenBtn')?.addEventListener('click', () => { closeDrawer(); toggleZenMode(); });
 document.getElementById('drawerChatBtn')?.addEventListener('click', () => { closeDrawer(); OracleChat.toggle(); });
-document.getElementById('drawerFinanceBtn')?.addEventListener('click', () => { closeDrawer(); window.location.href = './financeiro.html'; });
-document.getElementById('drawerPontoBtn')?.addEventListener('click', () => { closeDrawer(); window.location.href = './carga-horaria.html'; });
+document.getElementById('drawerFinanceBtn')?.addEventListener('click', () => {
+  closeDrawer();
+  const tab = document.querySelector('.tab-btn[data-tab="finance"]');
+  if (tab) { tab.click(); return; }
+  window.location.href = './financeiro.html';
+});
+document.getElementById('drawerPontoBtn')?.addEventListener('click', () => {
+  closeDrawer();
+  const tab = document.querySelector('.tab-btn[data-tab="dom"]');
+  if (tab) { tab.click(); return; }
+  window.location.href = './carga-horaria.html';
+});
 
 // Ações do drawer - Sistema
 document.getElementById('drawerSaveBtn')?.addEventListener('click', () => { closeDrawer(); saveGame(); });
@@ -11856,6 +11866,11 @@ try {
 
   function navigateTo(view, addHistory = true){
     switch(view){
+      case 'home': {
+        const tab = document.querySelector('.tab-btn[data-tab="hero"]');
+        if (tab) { tab.click(); }
+        break;
+      }
       case 'oraculo': openOraculo(); break;
       case 'tarefas': openTarefas(); break;
       case 'financeiro': openFinanceiro(); break;
