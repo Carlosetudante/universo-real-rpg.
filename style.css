@@ -131,10 +131,10 @@
       background-repeat: repeat;
       background-size: 100px 100px; /* mais estrelas pequenas */
       opacity: 0.45;
-      animation: driftStars 100s linear infinite;
+      animation: drift-stars 100s linear infinite;
     }
     
-    @keyframes driftStars {
+    @keyframes drift-stars {
       from { transform: translateY(0) translateX(0); }
       to { transform: translateY(-300px) translateX(-150px); }
     }
@@ -212,10 +212,10 @@
       /* Novo ícone de Escudo com Raio Azul Elétrico */
       content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' fill='%230d1b2a' stroke='%23ffdd57' stroke-width='1.5'/%3E%3Cpath d='M13 7l-3 5h3l-2 6 5-6h-3l2-5z' fill='%2300eaff'/%3E%3C/svg%3E");
       filter: drop-shadow(0 0 25px rgb(0 234 255 / 60%));
-      animation: floatLogo 6s ease-in-out infinite;
+      animation: float-logo 6s ease-in-out infinite;
     }
 
-    @keyframes floatLogo {
+    @keyframes float-logo {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-4px); }
     }
@@ -956,11 +956,11 @@
       color: #fff;
       z-index: 1000;
       box-shadow: 0 8px 24px rgb(0 0 0 / 40%);
-      animation: slideUp .3s ease;
+      animation: slide-up .3s ease;
       border: 1px solid rgb(255 255 255 / 10%);
     }
     
-    @keyframes slideUp {
+    @keyframes slide-up {
       from {
         transform: translateX(-50%) translateY(20px);
         opacity: 0;
@@ -1149,9 +1149,6 @@
       }
 
       /* Garante que o modal não fique preso atrás do teclado */
-      .modal-content {
-        padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* Espaço extra + área segura */
-      }
 
       /* Empilha campos de formulário em telas pequenas para melhor toque */
       .form-row {
@@ -1207,19 +1204,19 @@
   }
 }
 
-@keyframes modalOverlayEnter {
+@keyframes modal-overlay-enter {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes modalContentEnter {
+@keyframes modal-content-enter {
   from { opacity: 0; transform: translateY(20px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .modal.active {
   display: flex;
-  animation: modalOverlayEnter 0.3s ease-out;
+  animation: modal-overlay-enter 0.3s ease-out;
 }
 
 .modal-content {
@@ -1232,7 +1229,7 @@
   box-shadow: 0 20px 60px rgb(0 0 0 / 80%);
   max-height: 90vh;
   overflow-y: auto;
-  animation: modalContentEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: modal-content-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-content h2 {
@@ -1249,13 +1246,13 @@
   margin-bottom: 16px;
 }
 
-@keyframes formSlideIn {
+@keyframes form-slide-in {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 #loginForm:not(.hidden), #registerForm:not(.hidden) {
-  animation: formSlideIn 0.3s ease-out;
+  animation: form-slide-in 0.3s ease-out;
 }
 
 .hidden {
@@ -1339,10 +1336,10 @@
   opacity: 1; /* Totalmente visível */
   z-index: 0;
   transform: none;
-  animation: breatheBg 12s ease-in-out infinite alternate;
+  animation: breathe-bg 12s ease-in-out infinite alternate;
 }
 
-@keyframes breatheBg {
+@keyframes breathe-bg {
   0% { transform: scale(1); }
   100% { transform: scale(1.1); }
 }
@@ -1404,7 +1401,7 @@
 
 .breathing-orb.active {
   opacity: 1;
-  animation: breatheGold 5s infinite ease-in-out;
+  animation: breathe-gold 5s infinite ease-in-out;
 }
 
 .breathing-orb::before {
@@ -1419,29 +1416,29 @@
 
 .breathing-orb.active::before {
   opacity: 1;
-  animation: breatheGoldOuter 5s infinite ease-in-out;
+  animation: breathe-gold-outer 5s infinite ease-in-out;
   animation-delay: 0.2s;
 }
 
-@keyframes breatheGold {
+@keyframes breathe-gold {
   0%, 100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; box-shadow: 0 0 30px rgb(255 221 87 / 10%); }
   50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; box-shadow: 0 0 80px rgb(255 221 87 / 30%), inset 0 0 30px rgb(255 221 87 / 20%); border-color: rgb(255 221 87 / 50%); }
 }
 
-@keyframes breatheGoldOuter {
+@keyframes breathe-gold-outer {
   0%, 100% { transform: scale(0.9); opacity: 0.3; border-color: rgb(255 255 255 / 5%); }
   50% { transform: scale(1.3); opacity: 0.6; border-color: rgb(255 221 87 / 30%); }
 }
 
 /* Animação de Level Up */
-@keyframes levelUpPulse {
+@keyframes level-up-pulse {
   0% { box-shadow: 0 0 0 0 rgb(255 221 87 / 70%); transform: scale(1); filter: brightness(1); }
   50% { box-shadow: 0 0 50px 20px rgb(255 221 87 / 50%); transform: scale(1.15); filter: brightness(1.3); border-color: var(--accent); }
   100% { box-shadow: 0 0 0 0 rgb(255 221 87 / 0%); transform: scale(1); filter: brightness(1); }
 }
 
 .level-up-anim {
-  animation: levelUpPulse 1.5s ease-out;
+  animation: level-up-pulse 1.5s ease-out;
 }
 
 /* Finanças */
@@ -1859,14 +1856,14 @@
   display: none;
   flex-direction: column;
   gap: 18px;
-  animation: fadeIn 0.3s ease;
+  animation: fade-in 0.3s ease;
 }
 
 .tab-content.active {
   display: flex;
 }
 
-@keyframes fadeIn {
+@keyframes fade-in {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
@@ -1901,7 +1898,7 @@
   width: 120px;
   height: 120px;
   filter: drop-shadow(0 0 30px rgb(255 221 87 / 40%));
-  animation: pulseLogo 2s infinite ease-in-out;
+  animation: pulse-logo 2s infinite ease-in-out;
 }
 
 .splash-content h1 {
@@ -1930,15 +1927,15 @@
   background: var(--accent);
   position: absolute;
   left: 0;
-  animation: loadBar 1.5s infinite ease-in-out;
+  animation: load-bar 1.5s infinite ease-in-out;
 }
 
-@keyframes pulseLogo {
+@keyframes pulse-logo {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.1); }
 }
 
-@keyframes loadBar {
+@keyframes load-bar {
   0% { left: -50%; }
   100% { left: 100%; }
 }
@@ -2294,33 +2291,6 @@ input.success {
 }
 
 /* --- Chat do Oráculo --- */
-.chat-message {
-  max-width: 80%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  line-height: 1.5;
-  position: relative;
-  animation: fadeIn 0.3s ease;
-}
-
-.chat-message.bot {
-  align-self: flex-start;
-  background: rgb(255 255 255 / 10%);
-  border-bottom-left-radius: 2px;
-  border: 1px solid rgb(255 255 255 / 5%);
-}
-
-.chat-message.user {
-  align-self: flex-end;
-  background: var(--accent);
-  color: #1a1a1a;
-  border-bottom-right-radius: 2px;
-  font-weight: 500;
-  box-shadow: 0 4px 15px rgb(255 221 87 / 20%);
-}
-
-.chat-message strong { font-weight: 800; }
 
 /* ========================================
    NOVO SISTEMA DO ORÁCULO - Interface Premium
@@ -2373,10 +2343,10 @@ input.success {
   inset: 0;
   border-radius: 50%;
   border: 2px solid var(--accent);
-  animation: oraclePulse 3s ease-in-out infinite;
+  animation: oracle-pulse 3s ease-in-out infinite;
 }
 
-@keyframes oraclePulse {
+@keyframes oracle-pulse {
   0%, 100% { 
     transform: scale(1); 
     opacity: 1; 
@@ -2407,10 +2377,10 @@ input.success {
   height: 8px;
   background: #4ade80;
   border-radius: 50%;
-  animation: statusPulse 1.5s ease-in-out infinite;
+  animation: status-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes statusPulse {
+@keyframes status-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
@@ -2525,10 +2495,10 @@ input.success {
   font-size: 14px;
   line-height: 1.6;
   position: relative;
-  animation: messageSlide 0.3s ease;
+  animation: message-slide 0.3s ease;
 }
 
-@keyframes messageSlide {
+@keyframes message-slide {
   from {
     opacity: 0;
     transform: translateY(10px);
@@ -2586,13 +2556,13 @@ input.success {
   height: 8px;
   background: rgb(255 255 255 / 50%);
   border-radius: 50%;
-  animation: thinkingBounce 1.4s ease-in-out infinite;
+  animation: thinking-bounce 1.4s ease-in-out infinite;
 }
 
 .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
 .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-@keyframes thinkingBounce {
+@keyframes thinking-bounce {
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
   40% { transform: scale(1); opacity: 0.8; }
 }
@@ -2657,13 +2627,13 @@ input.success {
 
 .oracle-voice-btn.listening {
   background: rgb(239 68 68 / 30%);
-  animation: voicePulse 1s ease-in-out infinite;
+  animation: voice-pulse 1s ease-in-out infinite;
 }
 
 /* Modo conversa contínua (como telefone) */
 .oracle-voice-btn.conversation-mode {
   background: linear-gradient(135deg, rgb(34 197 94 / 50%) 0%, rgb(22 163 74 / 50%) 100%);
-  animation: conversationPulse 2s ease-in-out infinite;
+  animation: conversation-pulse 2s ease-in-out infinite;
 } 
 
 .oracle-voice-btn.conversation-mode::after {
@@ -2680,20 +2650,20 @@ input.success {
 
 .oracle-voice-btn.conversation-mode.listening {
   background: linear-gradient(135deg, rgb(34 197 94 / 70%) 0%, rgb(22 163 74 / 70%) 100%);
-  animation: conversationPulseActive 0.5s ease-in-out infinite;
+  animation: conversation-pulse-active 0.5s ease-in-out infinite;
 }
 
-@keyframes conversationPulse {
+@keyframes conversation-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgb(34 197 94 / 30%); }
   50% { box-shadow: 0 0 0 8px rgb(34 197 94 / 0%); }
 }
 
-@keyframes conversationPulseActive {
+@keyframes conversation-pulse-active {
   0%, 100% { box-shadow: 0 0 0 0 rgb(34 197 94 / 50%); transform: scale(1); }
   50% { box-shadow: 0 0 0 12px rgb(34 197 94 / 0%); transform: scale(1.05); }
 }
 
-@keyframes voicePulse {
+@keyframes voice-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgb(239 68 68 / 50%); }
   50% { box-shadow: 0 0 0 10px rgb(239 68 68 / 0%); }
 }
@@ -2849,7 +2819,9 @@ input.success {
     padding: 12px 16px;
     flex-shrink: 0;
   }
-  
+  }
+
+/* Opção B: centralização absoluta da logo no header móvel */
   .oracle-avatar {
     width: 40px;
     height: 40px;
@@ -2880,12 +2852,7 @@ input.success {
     flex-shrink: 0;
   }
   
-  .chat-message {
-    max-width: 90%;
-    padding: 12px 14px;
-    font-size: 14px;
-  }
-}
+  
 
 /* Opção B: centralização absoluta da logo no header móvel */
 @media (width <= 900px) {
@@ -3128,7 +3095,7 @@ input.success {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  animation: fadeIn 0.3s ease;
+  animation: fade-in 0.3s ease;
   padding: 20px;
 }
 
@@ -3141,10 +3108,10 @@ input.success {
   border: 2px solid rgb(255 221 87 / 40%);
   box-shadow: 0 20px 60px rgb(0 0 0 / 50%), 0 0 40px rgb(255 221 87 / 10%);
   text-align: center;
-  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: scale-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes scaleIn {
+@keyframes scale-in {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
@@ -3234,26 +3201,3 @@ input.success {
   transform: scale(1.02);
 }
 
-/* === BOTÕES DE AÇÃO DO ORÁCULO === */
-.oracle-action-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.oracle-action-btn {
-  padding: 8px 14px;
-  font-size: 12px;
-  border-radius: 20px;
-  background: rgb(255 221 87 / 15%);
-  border: 1px solid rgb(255 221 87 / 40%);
-  color: var(--accent);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.oracle-action-btn:hover {
-  background: rgb(255 221 87 / 30%);
-  transform: translateY(-2px);
-}

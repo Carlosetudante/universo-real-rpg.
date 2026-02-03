@@ -11460,7 +11460,7 @@ function showUpdateNotification() {
       align-items: center;
       gap: 12px;
       font-weight: 600;
-      animation: slideUp 0.3s ease;
+      animation: slide-up 0.3s ease;
     ">
       <span>🔄 Nova versão disponível!</span>
       <button onclick="forceAppUpdate()" style="
@@ -11487,7 +11487,7 @@ function showUpdateNotification() {
 // Adiciona estilos de animação
 const updateStyles = document.createElement('style');
 updateStyles.textContent = `
-  @keyframes slideUp {
+  @keyframes slide-up {
     from { transform: translateX(-50%) translateY(100px); opacity: 0; }
     to { transform: translateX(-50%) translateY(0); opacity: 1; }
   }
