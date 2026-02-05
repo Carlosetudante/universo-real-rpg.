@@ -485,39 +485,120 @@
                 <button class="ghost" id="deleteSelectedCategoryBtn" title="Remover categoria" style="display:none; margin-left:6px;">✖</button>
                 <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
               </div>
-              <!-- antigo container de chips removido para evitar sobreposição que bloqueava o botão '+' -->
-              <!-- Inline: Criar Categoria Financeira (fallback simples, evita modal problemático) - movido aqui -->
-              <div id="inlineAddFinanceCategory" style="display:none; margin-top:10px; position:relative;">
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <input type="text" id="inlineCategoryKey" placeholder="identificador (ex: casa)" style="width:140px;">
-                  <input type="text" id="inlineCategoryName" placeholder="Nome (ex: Casa)" style="width:160px;">
-                  <input type="text" id="inlineCategoryEmoji" placeholder="Emoji (opcional)" style="width:64px;">
-                  <button class="ghost" id="inlineEmojiBtn" title="Escolher emoji">😊</button>
-                  <button class="btn" id="saveInlineCategoryBtn">Salvar</button>
-                  <button class="ghost" id="cancelInlineCategoryBtn">Cancelar</button>
+              <!-- Inline: Criar Categoria Financeira -->
+              <div id="inlineAddFinanceCategory" style="display:none; position:fixed; z-index:10000; left:50%; top:50%; transform:translate(-50%,-50%); width:min(480px, 90vw); max-width:90vw; box-sizing:border-box; background:var(--card-bg, #0a1628); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.5); padding:16px;">
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                  <div style="font-weight:600; font-size:1rem; color:#fff; margin-bottom:4px;">➕ Nova Categoria</div>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <input type="text" id="inlineCategoryKey" placeholder="ID (ex: casa)" style="flex:1; min-width:100px;">
+                    <input type="text" id="inlineCategoryName" placeholder="Nome (ex: Casa)" style="flex:1; min-width:120px;">
+                    <div style="display:flex; gap:4px; align-items:center;">
+                      <input type="text" id="inlineCategoryEmoji" placeholder="🏠" style="width:50px; text-align:center;">
+                      <button class="ghost" id="inlineEmojiBtn" title="Escolher emoji" style="padding:8px;">😊</button>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
+                    <button class="ghost" id="cancelInlineCategoryBtn" style="padding:8px 16px;">Cancelar</button>
+                    <button class="btn" id="saveInlineCategoryBtn" style="padding:8px 16px;">Salvar</button>
+                  </div>
                 </div>
-                <div id="inlineEmojiPicker" style="display:none; position:absolute; top:40px; right:0; background:var(--card-bg, #061226); border:1px solid rgba(255,255,255,0.06); padding:8px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.6); z-index:60;">
-                  <!-- emojis comuns -->
-                  <div style="display:flex; gap:6px; flex-wrap:wrap; max-width:300px;">
-                    <button class="emoji-option">😀</button>
-                    <button class="emoji-option">😁</button>
-                    <button class="emoji-option">😂</button>
-                    <button class="emoji-option">😊</button>
-                    <button class="emoji-option">😉</button>
-                    <button class="emoji-option">😍</button>
-                    <button class="emoji-option">🤩</button>
-                    <button class="emoji-option">😎</button>
-                    <button class="emoji-option">🤖</button>
-                    <button class="emoji-option">🍕</button>
-                    <button class="emoji-option">🍔</button>
-                    <button class="emoji-option">☕</button>
-                    <button class="emoji-option">🚗</button>
-                    <button class="emoji-option">🏠</button>
-                    <button class="emoji-option">💡</button>
-                    <button class="emoji-option">💰</button>
-                    <button class="emoji-option">✨</button>
-                    <button class="emoji-option">🎉</button>
-                    <button class="emoji-option">🧾</button>
+                <div id="inlineEmojiPicker" style="display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:8px; background:var(--card-bg, #0a1628); border:1px solid rgba(255,255,255,0.12); padding:12px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.6); z-index:10001; max-height:300px; overflow-y:auto;">
+                  <div style="display:flex; gap:4px; flex-wrap:wrap; max-width:320px; justify-content:center;">
+                    <!-- Dinheiro e Finanças -->
+                    <button class="emoji-option" type="button">💰</button>
+                    <button class="emoji-option" type="button">💵</button>
+                    <button class="emoji-option" type="button">💳</button>
+                    <button class="emoji-option" type="button">🏦</button>
+                    <button class="emoji-option" type="button">💎</button>
+                    <button class="emoji-option" type="button">🪙</button>
+                    <button class="emoji-option" type="button">📈</button>
+                    <button class="emoji-option" type="button">📉</button>
+                    <button class="emoji-option" type="button">🧾</button>
+                    <button class="emoji-option" type="button">🛒</button>
+                    <!-- Casa e Moradia -->
+                    <button class="emoji-option" type="button">🏠</button>
+                    <button class="emoji-option" type="button">🏡</button>
+                    <button class="emoji-option" type="button">🏢</button>
+                    <button class="emoji-option" type="button">🔑</button>
+                    <button class="emoji-option" type="button">🛋️</button>
+                    <button class="emoji-option" type="button">🛏️</button>
+                    <button class="emoji-option" type="button">🚿</button>
+                    <button class="emoji-option" type="button">💡</button>
+                    <button class="emoji-option" type="button">🔌</button>
+                    <button class="emoji-option" type="button">📺</button>
+                    <!-- Transporte -->
+                    <button class="emoji-option" type="button">🚗</button>
+                    <button class="emoji-option" type="button">🚕</button>
+                    <button class="emoji-option" type="button">🚌</button>
+                    <button class="emoji-option" type="button">🚇</button>
+                    <button class="emoji-option" type="button">✈️</button>
+                    <button class="emoji-option" type="button">⛽</button>
+                    <button class="emoji-option" type="button">🚲</button>
+                    <button class="emoji-option" type="button">🛵</button>
+                    <button class="emoji-option" type="button">🚙</button>
+                    <button class="emoji-option" type="button">🅿️</button>
+                    <!-- Alimentação -->
+                    <button class="emoji-option" type="button">🍽️</button>
+                    <button class="emoji-option" type="button">🍕</button>
+                    <button class="emoji-option" type="button">🍔</button>
+                    <button class="emoji-option" type="button">🍟</button>
+                    <button class="emoji-option" type="button">🍣</button>
+                    <button class="emoji-option" type="button">🥗</button>
+                    <button class="emoji-option" type="button">🍺</button>
+                    <button class="emoji-option" type="button">☕</button>
+                    <button class="emoji-option" type="button">🧃</button>
+                    <button class="emoji-option" type="button">🍰</button>
+                    <!-- Saúde -->
+                    <button class="emoji-option" type="button">💊</button>
+                    <button class="emoji-option" type="button">🏥</button>
+                    <button class="emoji-option" type="button">🩺</button>
+                    <button class="emoji-option" type="button">💉</button>
+                    <button class="emoji-option" type="button">🦷</button>
+                    <button class="emoji-option" type="button">👓</button>
+                    <button class="emoji-option" type="button">🏋️</button>
+                    <button class="emoji-option" type="button">🧘</button>
+                    <!-- Lazer e Entretenimento -->
+                    <button class="emoji-option" type="button">🎉</button>
+                    <button class="emoji-option" type="button">🎬</button>
+                    <button class="emoji-option" type="button">🎮</button>
+                    <button class="emoji-option" type="button">🎵</button>
+                    <button class="emoji-option" type="button">📚</button>
+                    <button class="emoji-option" type="button">🎁</button>
+                    <button class="emoji-option" type="button">🎨</button>
+                    <button class="emoji-option" type="button">⚽</button>
+                    <button class="emoji-option" type="button">🏖️</button>
+                    <button class="emoji-option" type="button">🎢</button>
+                    <!-- Educação e Trabalho -->
+                    <button class="emoji-option" type="button">📖</button>
+                    <button class="emoji-option" type="button">🎓</button>
+                    <button class="emoji-option" type="button">💼</button>
+                    <button class="emoji-option" type="button">💻</button>
+                    <button class="emoji-option" type="button">📱</button>
+                    <button class="emoji-option" type="button">🖨️</button>
+                    <button class="emoji-option" type="button">✏️</button>
+                    <button class="emoji-option" type="button">📝</button>
+                    <!-- Vestuário e Beleza -->
+                    <button class="emoji-option" type="button">👕</button>
+                    <button class="emoji-option" type="button">👗</button>
+                    <button class="emoji-option" type="button">👟</button>
+                    <button class="emoji-option" type="button">👜</button>
+                    <button class="emoji-option" type="button">💄</button>
+                    <button class="emoji-option" type="button">💇</button>
+                    <!-- Pets -->
+                    <button class="emoji-option" type="button">🐕</button>
+                    <button class="emoji-option" type="button">🐈</button>
+                    <button class="emoji-option" type="button">🐾</button>
+                    <!-- Outros -->
+                    <button class="emoji-option" type="button">✨</button>
+                    <button class="emoji-option" type="button">⭐</button>
+                    <button class="emoji-option" type="button">❤️</button>
+                    <button class="emoji-option" type="button">🗂️</button>
+                    <button class="emoji-option" type="button">📦</button>
+                    <button class="emoji-option" type="button">🔧</button>
+                    <button class="emoji-option" type="button">🛠️</button>
+                    <button class="emoji-option" type="button">📞</button>
+                    <button class="emoji-option" type="button">📧</button>
+                    <button class="emoji-option" type="button">🌐</button>
                   </div>
                 </div>
               </div>

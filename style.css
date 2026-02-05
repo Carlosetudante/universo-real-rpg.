@@ -398,6 +398,41 @@ body {
       transform: translateY(0);
     }
         /* ===== CHIPS DE CATEGORIA FINANCEIRA ===== */
+/* Força centralização fixa do painel inline de criação de categorias financeiras.
+   Resolve casos onde o painel aparecia deslocado/cortado à esquerda.
+*/
+#inlineAddFinanceCategory {
+  /* posição controlada via JS: por padrão é fixed sem translate
+     para permitir posicionamento relativo ao botão de '+'. */
+  position: fixed !important;
+  width: min(520px, 92%) !important;
+  max-width: 520px !important;
+  max-height: calc(100vh - 40px) !important;
+  overflow: auto !important;
+  z-index: 9999 !important;
+  display: none; /* controlado por JS */
+  background: var(--card-bg, #061226);
+  border: 1px solid rgba(255,255,255,0.06);
+  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+}
+
+/* Emoji picker above the panel when open */
+#inlineEmojiPicker {
+  z-index: 10001 !important;
+}
+
+@media (max-width: 520px) {
+  #inlineAddFinanceCategory {
+    width: calc(94vw) !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    border-radius: 10px;
+    padding: 10px;
+  }
+}
         /* Container já existe em index.html: #financeCategoryControls */
         #financeCategoryControls {
           display: flex;
@@ -4230,7 +4265,22 @@ body.logged-in{padding-bottom:56px}
   height: 36px;
 }
 
-#inlineAddFinanceCategory .emoji-option { background: transparent; border: none; cursor: pointer; padding: 6px; font-size: 18px; }
+#inlineAddFinanceCategory .emoji-option { 
+  background: transparent; 
+  border: none; 
+  cursor: pointer; 
+  padding: 6px; 
+  font-size: 1.3rem; 
+  border-radius: 6px;
+  transition: background 0.15s, transform 0.1s;
+}
+#inlineAddFinanceCategory .emoji-option:hover {
+  background: rgba(255,255,255,0.1);
+  transform: scale(1.15);
+}
+#inlineAddFinanceCategory .emoji-option:active {
+  transform: scale(0.95);
+}
 
 /* Emoji picker positioning fallback when panel is fixed */
 #inlineEmojiPicker { z-index: 10000; }

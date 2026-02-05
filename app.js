@@ -1423,14 +1423,17 @@ function normalizeGameState(data) {
     zenMusic: null,
     gratitudeJournal: [],
     taskHistory: [],
-    expenseGroups: [] // Novos grupos de despesas
+    expenseGroups: [], // Novos grupos de despesas
+    financeCategories: null // Categorias financeiras personalizadas (será inicializado por ensureFinanceCategories)
   };
 
   // Mescla os dados importados com o padrão para preencher campos faltantes
   const merged = { ...defaultState, ...data };
   
   // Remove valores undefined/null que vieram do data e usa o default
+  // EXCETO para financeCategories que tem tratamento especial
   Object.keys(defaultState).forEach(key => {
+    if (key === 'financeCategories') return; // tratado separadamente
     if (merged[key] === undefined || merged[key] === null) {
       merged[key] = defaultState[key];
     }
@@ -1439,6 +1442,15 @@ function normalizeGameState(data) {
   // Garante a integridade dos atributos
   if (data.attributes) {
     merged.attributes = { ...defaultState.attributes, ...data.attributes };
+  }
+
+  // Preserva financeCategories se existir em data (array de categorias personalizadas)
+  // Só sobrescreve se data tiver um array válido
+  if (Array.isArray(data.financeCategories) && data.financeCategories.length > 0) {
+    merged.financeCategories = data.financeCategories;
+  } else {
+    // Deixa null para ensureFinanceCategories tratar depois
+    merged.financeCategories = null;
   }
   
   return merged;
@@ -2112,18 +2124,35 @@ function addTransaction() {
 
 // --- Categorias de Finanças (Nome + Emoji) ---
 function ensureFinanceCategories() {
-  if (!gameState.financeCategories) {
-    gameState.financeCategories = [
-      { id: 'c_outros', name: 'Outros', emoji: '🗂️' },
-      { id: 'c_alimentacao', name: 'Alimentação', emoji: '🍽️' },
-      { id: 'c_transporte', name: 'Transporte', emoji: '🚌' },
-      { id: 'c_lazer', name: 'Lazer', emoji: '🎉' },
-      { id: 'c_contas', name: 'Contas', emoji: '💡' },
-      { id: 'c_salario', name: 'Salário', emoji: '💼' },
-      { id: 'c_extra', name: 'Extra', emoji: '✨' }
-    ];
-    saveGame();
+  // Se já tem categorias (incluindo personalizadas), não sobrescreve
+  if (gameState.financeCategories && Array.isArray(gameState.financeCategories) && gameState.financeCategories.length > 0) {
+    return;
   }
+  
+  // Tenta recuperar do localStorage diretamente como fallback
+  try {
+    const username = getSession && getSession();
+    if (username) {
+      const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+      if (users[username] && users[username].character && Array.isArray(users[username].character.financeCategories) && users[username].character.financeCategories.length > 0) {
+        gameState.financeCategories = users[username].character.financeCategories;
+        console.log('📂 Categorias restauradas do localStorage:', gameState.financeCategories.length);
+        return;
+      }
+    }
+  } catch (e) { console.warn('Fallback de categorias falhou:', e); }
+  
+  // Se não tem nada, cria as padrão
+  gameState.financeCategories = [
+    { id: 'c_outros', name: 'Outros', emoji: '🗂️' },
+    { id: 'c_alimentacao', name: 'Alimentação', emoji: '🍽️' },
+    { id: 'c_transporte', name: 'Transporte', emoji: '🚌' },
+    { id: 'c_lazer', name: 'Lazer', emoji: '🎉' },
+    { id: 'c_contas', name: 'Contas', emoji: '💡' },
+    { id: 'c_salario', name: 'Salário', emoji: '💼' },
+    { id: 'c_extra', name: 'Extra', emoji: '✨' }
+  ];
+  saveGame();
 }
 
 function populateFinanceCategorySelect() {
@@ -4577,17 +4606,87 @@ function openInlineAddFinanceCategory() {
   const key = document.getElementById('inlineCategoryKey');
   const name = document.getElementById('inlineCategoryName');
   if (!node) { console.warn('inlineAddFinanceCategory node not found'); openAddFinanceCategory(); return; }
-  // Mostrar como fixed e centralizar na viewport para evitar cortes laterais
+  // Garantir que o painel esteja diretamente no body para evitar que
+  // transforms em elementos-ancestrais quebrem o posicionamento `fixed`.
+  if (node.parentNode !== document.body) document.body.appendChild(node);
+
+  // Mostrar o painel próximo ao botão '+' quando possível.
   node.style.display = 'block';
   node.style.position = 'fixed';
-  node.style.left = '50%';
-  node.style.top = '50%';
-  node.style.transform = 'translate(-50%,-50%)';
+  node.style.transform = 'none';
+  node.style.visibility = 'hidden';
+  node.style.left = '0px';
+  node.style.top = '0px';
   node.style.zIndex = '9999';
-  node.style.maxWidth = 'min(92%, 520px)';
+  // sizing responsivo: largura máxima e altura máxima baseada na viewport
+  node.style.width = 'min(520px, 92vw)';
+  node.style.maxWidth = 'min(520px, 92vw)';
+  node.style.boxSizing = 'border-box';
+  node.style.height = 'auto';
   node.style.maxHeight = 'calc(100vh - 40px)';
   node.style.overflow = 'auto';
   node.style.padding = node.style.padding || '10px';
+
+  // medir tamanho do painel (agora que está exibido, porém invisível)
+  const rect = node.getBoundingClientRect();
+  const nodeW = rect.width || Math.min(520, window.innerWidth * 0.92);
+  const nodeH = rect.height || Math.min(300, window.innerHeight - 40);
+  // função para posicionar/ajustar o painel (chamada também no resize)
+  const SMALL_VIEWPORT_WIDTH = 520;
+  const btn = document.getElementById('addFinanceCategoryBtn');
+  const adjustPosition = () => {
+    // recalcular medidas após aplicar largura responsiva
+    node.style.width = 'min(520px, 92vw)';
+    const rectNow = node.getBoundingClientRect();
+    const nodeWnow = rectNow.width || Math.min(520, window.innerWidth * 0.92);
+    const nodeHnow = Math.min(rectNow.height || 300, window.innerHeight - 40);
+
+    if (window.innerWidth <= SMALL_VIEWPORT_WIDTH) {
+      node.style.left = '50%';
+      node.style.top = '50%';
+      node.style.transform = 'translate(-50%,-50%)';
+      node.style.maxWidth = '92vw';
+      node.style.maxHeight = 'calc(100vh - 40px)';
+      node.style.visibility = 'visible';
+      return;
+    }
+
+    // preferir direita do botão
+    let left = 8;
+    let top = 8;
+    if (btn) {
+      const b = btn.getBoundingClientRect();
+      left = Math.round(b.right + 8);
+      top = Math.round(b.top);
+      if (left + nodeWnow > window.innerWidth - 8) {
+        left = Math.round(b.left - nodeWnow - 8);
+      }
+      if (left < 8 || left + nodeWnow > window.innerWidth - 8) {
+        left = Math.round(Math.max(8, Math.min(b.left, window.innerWidth - nodeWnow - 8)));
+        top = Math.round(b.bottom + 8);
+      }
+      if (top + nodeHnow > window.innerHeight - 8) {
+        top = Math.round(Math.max(8, window.innerHeight - nodeHnow - 8));
+      }
+    }
+
+    node.style.transform = 'none';
+    node.style.left = left + 'px';
+    node.style.top = top + 'px';
+    node.style.visibility = 'visible';
+  };
+
+  // executar ajuste inicial
+  adjustPosition();
+
+  // adiciona listener de resize para reajustar dinamicamente
+  try {
+    // remove handler antigo se existir
+    if (window._inlineFinanceResizeHandler) window.removeEventListener('resize', window._inlineFinanceResizeHandler);
+  } catch (e) {}
+  window._inlineFinanceResizeHandler = () => { try { if (node && node.style.display !== 'none') adjustPosition(); } catch(e){} };
+  window.addEventListener('resize', window._inlineFinanceResizeHandler);
+  window.addEventListener('orientationchange', window._inlineFinanceResizeHandler);
 
   // garantir que o emoji picker mantenha-se visível
   const picker = document.getElementById('inlineEmojiPicker');
@@ -4614,20 +4713,63 @@ function trySaveInlineCategory() {
   if (existsKey) { showToast('⚠️ Identificador já em uso.'); keyEl.focus(); return; }
   if (existsName) { showToast('⚠️ Já existe uma categoria com esse nome.'); nameEl.focus(); return; }
   const id = `c_${key}`;
-  gameState.financeCategories.push({ id, key, name, emoji });
-  saveGame();
+  const newCat = { id, key, name, emoji };
+  gameState.financeCategories.push(newCat);
+  
+  console.log('📝 Nova categoria criada:', newCat);
+  console.log('📂 Total de categorias:', gameState.financeCategories.length);
+  
+  // Salvar diretamente no localStorage PRIMEIRO (garantir persistência independente do saveGame)
+  try {
+    const username = getSession ? getSession() : null;
+    if (username) {
+      let users = JSON.parse(localStorage.getItem('ur_users') || '{}');
+      if (!users[username]) users[username] = { character: {} };
+      if (!users[username].character) users[username].character = {};
+      users[username].character.financeCategories = gameState.financeCategories;
+      localStorage.setItem('ur_users', JSON.stringify(users));
+      console.log('✅ Categoria salva no localStorage com sucesso!');
+    } else {
+      console.warn('⚠️ Sem sessão ativa, salvando apenas no gameState');
+    }
+  } catch (e) { 
+    console.error('❌ Erro ao salvar categoria no localStorage:', e); 
+  }
+  
+  // Também chamar saveGame para sincronizar com cloud se disponível
+  try {
+    saveGame();
+  } catch (e) {
+    console.warn('saveGame falhou:', e);
+  }
+  
+  // Atualizar UI
   populateFinanceCategorySelect();
+  
+  // Selecionar a nova categoria (com emoji)
   const sel = document.getElementById('financeCategory');
-  if (sel) sel.value = (emoji ? emoji + ' ' : '') + name;
-  showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
+  const newLabel = `${emoji ? emoji + ' ' : ''}${name}`.trim();
+  if (sel) sel.value = newLabel;
+  
+  showToast('✅ Categoria criada: ' + newLabel);
+  
+  // Limpar campos do formulário
+  keyEl.value = '';
+  nameEl.value = '';
+  if (emojiEl) emojiEl.value = '';
+  
   // fechar inline
   const node = document.getElementById('inlineAddFinanceCategory');
   if (node) node.style.display = 'none';
+  // remover resize handler quando fechar
+  try { if (window._inlineFinanceResizeHandler) { window.removeEventListener('resize', window._inlineFinanceResizeHandler); window.removeEventListener('orientationchange', window._inlineFinanceResizeHandler); delete window._inlineFinanceResizeHandler; } } catch(e) {}
 }
 
 function cancelInlineCategory() {
   const node = document.getElementById('inlineAddFinanceCategory');
   if (node) node.style.display = 'none';
+  // remover resize handler quando fechar
+  try { if (window._inlineFinanceResizeHandler) { window.removeEventListener('resize', window._inlineFinanceResizeHandler); window.removeEventListener('orientationchange', window._inlineFinanceResizeHandler); delete window._inlineFinanceResizeHandler; } } catch(e) {}
 }
 
 // ligar botões inline (se existirem)
