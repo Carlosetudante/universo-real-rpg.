@@ -1,4 +1,4 @@
-// Universo Real - Frontend com Backend Integration
+﻿// Universo Real - Frontend com Backend Integration
 // API Base URL
 const API_URL = '/api';
 
@@ -10337,6 +10337,81 @@ esperanca: {
   ]
 },
 
+  // =========================
+  // TEMAS NOVOS
+  // =========================
+  decisoes: {
+    refs: ["Provérbios 3:5-6", "Tiago 1:5", "Salmos 32:8", "Provérbios 16:3", "Provérbios 11:14"],
+    summary: "Deus guia quem busca com humildade. Decisão sábia une oração, conselho, prudência e passos pequenos.",
+    practice: [
+      "Escreva 3 opções e os prós/contras de cada.",
+      "Ore pedindo sabedoria específica (não só 'me ajuda').",
+      "Peça conselho a alguém maduro e confiável."
+    ]
+  },
+  culpa: {
+    refs: ["Romanos 8:1", "1 João 1:9", "Salmos 51:10-12", "2 Coríntios 7:10", "Miqueias 7:18-19"],
+    summary: "Culpa pode ser alerta para arrependimento, mas em Cristo há perdão e restauração. Deus não te chama pra viver preso na vergonha.",
+    practice: [
+      "Confesse a Deus com honestidade (sem desculpas).",
+      "Faça reparos possíveis (se for seguro e sábio).",
+      "Troque autoacusação por passos de mudança."
+    ]
+  },
+  ansiedade_social: {
+    refs: ["Salmos 56:3", "Isaías 41:10", "2 Timóteo 1:7", "Mateus 11:28-30"],
+    summary: "Deus fortalece quando você se sente fraco. Coragem não é ausência de medo — é dar um passo com Deus ao lado.",
+    practice: [
+      "Faça uma exposição pequena: 1 conversa curta hoje.",
+      "Respiração 4-4-6 (inspira 4, segura 4, solta 6).",
+      "Ore: 'Senhor, me dá domínio próprio e paz.'"
+    ]
+  },
+  perseveranca: {
+    refs: ["Gálatas 6:9", "Tiago 1:2-4", "Hebreus 12:1-2", "Romanos 5:3-5"],
+    summary: "Deus forma caráter no processo. Persistir com propósito transforma você por dentro.",
+    practice: [
+      "Defina um hábito mínimo (2 minutos) para não parar.",
+      "Troque 'perfeito' por 'consistente'.",
+      "Relembre por que você começou."
+    ]
+  },
+  vicio: {
+    refs: ["1 Coríntios 10:13", "Romanos 6:12-14", "Mateus 26:41", "Salmos 119:9-11"],
+    summary: "A tentação tem saída. Deus te chama para vigilância, disciplina e apoio — e não para lutar sozinho.",
+    practice: [
+      "Identifique gatilho (hora/lugar/emoção).",
+      "Corte o acesso (bloqueio, distância, rotina).",
+      "Busque apoio (prestação de contas)."
+    ]
+  },
+  trabalho_e_preguica: {
+    refs: ["Provérbios 6:6-11", "Colossenses 3:23", "Provérbios 21:5", "2 Tessalonicenses 3:10-12"],
+    summary: "Trabalho é chamado e responsabilidade. A Bíblia incentiva diligência, foco e planejamento.",
+    practice: [
+      "Faça 1 tarefa difícil primeiro (10 min).",
+      "Planeje 3 prioridades do dia.",
+      "Evite multitarefa; conclua uma coisa por vez."
+    ]
+  },
+  relacionamentos: {
+    refs: ["Efésios 4:29-32", "Provérbios 15:1", "Colossenses 3:13-14", "1 Coríntios 13:4-7"],
+    summary: "Relacionamento saudável exige verdade com amor, perdão e domínio próprio. Palavras podem curar ou ferir.",
+    practice: [
+      "Fale de sentimentos sem acusar (eu sinto / eu preciso).",
+      "Peça perdão rápido e com sinceridade.",
+      "Pratique ouvir antes de responder."
+    ]
+  },
+  financas_dividas: {
+    refs: ["Provérbios 22:7", "Provérbios 21:5", "Romanos 13:8", "Lucas 14:28", "Hebreus 13:5"],
+    summary: "A Bíblia ensina prudência, planejamento e contentamento. Dívida prende; sabedoria abre caminho.",
+    practice: [
+      "Liste dívidas e negocie a maior taxa primeiro.",
+      "Faça orçamento simples (renda, fixos, variáveis, dívida).",
+      "Evite compra emocional (regra 24h)."
+    ]
+  },
   },
 
   // -------------------------
@@ -10914,37 +10989,35 @@ esperanca: {
   // Retorna: { book, chapter, verseStart, verseEnd, raw } ou null
   // -------------------------
   parseReference(input) {
-    const raw = String(input || "");
+    const raw = String(input || "").trim();
     const t = this.normalize(raw);
 
-    // padrões:
-    // 1) "1 joao 4:8" / "1joao 4:8" / "1 jo 4:8"
-    // 2) "joao 3:16-18"
-    // 3) "rm 8:28"
-    const refRegex = /^(\d{1}\s*)?([a-z\u00C0-\u017F]+)\s+(\d{1,3})\s*:\s*(\d{1,3})(?:\s*-\s*(\d{1,3}))?$/i;
+    // aceita:
+    // - "joao 3" (capítulo)
+    // - "joao 3:16"
+    // - "joao 3:16-18"
+    // - "1 joao 4:8" / "1joao 4:8" / "1 jo 4:8" / "i joao 4:8"
+    const refRegex = /^(?:(\d|i{1,3})\s*)?([a-z\u00C0-\u017F]+)\s+(\d{1,3})(?::\s*(\d{1,3})(?:\s*-\s*(\d{1,3}))?)?$/i;
     const m = t.match(refRegex);
     if (!m) return null;
 
-    const num = (m[1] || "").replace(/\s+/g, "").trim(); // "1"
+    const numRaw = (m[1] || "").trim(); // "1" ou "i/ii/iii"
     const bookRaw = (m[2] || "").trim();
     const chapter = parseInt(m[3], 10);
-    const verseStart = parseInt(m[4], 10);
+
+    // capítulo sem versículo: João 3
+    const verseStart = m[4] ? parseInt(m[4], 10) : null;
     const verseEnd = m[5] ? parseInt(m[5], 10) : null;
 
-    // tenta resolver livro com prefixo numérico (1 joão etc.)
-    // como seu bookMap não inclui "1 João", vamos manter "João" como livro base
-    // e colocar numPrefix no raw.
+    const numPrefix =
+      numRaw
+        ? (numRaw.match(/i{1,3}/i) ? ({ i: "1", ii: "2", iii: "3" }[numRaw.toLowerCase()] || null) : numRaw)
+        : null;
+
     const bookName = this.resolveBookName(bookRaw);
     if (!bookName) return null;
 
-    return {
-      raw,
-      numPrefix: num || null,
-      book: bookName,
-      chapter,
-      verseStart,
-      verseEnd
-    };
+    return { raw, numPrefix, book: bookName, chapter, verseStart, verseEnd };
   },
 
   // -------------------------
@@ -11029,16 +11102,18 @@ esperanca: {
   },
 
   formatReference(refObj) {
-    // Sem texto literal. Retorna referência formatada + dica do que fazer.
     const prefix = refObj.numPrefix ? `${refObj.numPrefix} ` : "";
-    const range = refObj.verseEnd ? `${refObj.verseStart}-${refObj.verseEnd}` : `${refObj.verseStart}`;
-    const pretty = `${prefix}${this.titleCase(refObj.book)} ${refObj.chapter}:${range}`;
+    const base = `${prefix}${this.titleCase(refObj.book)} ${refObj.chapter}`;
+
+    const pretty = (refObj.verseStart)
+      ? `${base}:${refObj.verseEnd ? `${refObj.verseStart}-${refObj.verseEnd}` : `${refObj.verseStart}`}`
+      : base;
 
     return `
       <div>
         <h3>${this.config.ui.okIcon} Referência detectada</h3>
         <p><strong>${this.escapeHtml(pretty)}</strong></p>
-        <p>${this.config.ui.tipIcon} Dica: se você quiser, me diga o <em>tema</em> (ex: ansiedade, perdão, fé) e eu conecto essa referência com outras passagens relacionadas.</p>
+        <p>${this.config.ui.tipIcon} Dica: diga o <em>tema</em> (ansiedade, fé, perdão...) e eu conecto com outras referências.</p>
       </div>
     `;
   },
@@ -11189,6 +11264,18 @@ esperanca: {
   async reply(userText = "") {
     const raw = String(userText || "");
     const t = this.normalize(raw);
+
+    // Detecta perguntas tipo: "versículo sobre ansiedade", "passagem sobre perdão"
+    if (t.includes("versiculo sobre") || t.includes("versículo sobre") || t.includes("passagem sobre") || t.includes("texto sobre")) {
+      const cleaned = t
+        .replace("versiculo sobre", "")
+        .replace("versículo sobre", "")
+        .replace("passagem sobre", "")
+        .replace("texto sobre", "")
+        .trim();
+      const topic = this.resolveTopic(cleaned);
+      if (topic) return this.formatTopic(topic);
+    }
 
     if (!t) return this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').");
 
