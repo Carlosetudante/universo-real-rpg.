@@ -90,37 +90,6 @@ window._insertSampleWorkDataForTesting = function() {
     console.log('[TEST] Inseridos', samples.length, 'registros de teste. Abra a aba Trabalho e chame renderWorkHistory() manualmente.');
   }
 };
-// Remove amostras de teste que foram marcadas com `_isTestSample` (útil para o botão de UI)
-window._removeSampleWorkDataForTesting = function() {
-  try {
-    if (typeof gameState === 'undefined' || gameState === null) window.gameState = {};
-    if (!Array.isArray(window.gameState.workLog)) window.gameState.workLog = [];
-    const before = window.gameState.workLog.length;
-    window.gameState.workLog = window.gameState.workLog.filter(r => !r._isTestSample);
-    const after = window.gameState.workLog.length;
-    console.log('[TEST] Removidas', before - after, 'amostras de teste.');
-    if (typeof saveGame === 'function') saveGame();
-    if (typeof renderWorkHistory === 'function') renderWorkHistory();
-  } catch (e) {
-    console.warn('[TEST] Falha ao remover amostras de teste:', e);
-  }
-};
-
-// Delegated click handler: detecta botões com o texto exato ou com classe `remove-test-samples`
-document.addEventListener('click', (ev) => {
-  try {
-    const btn = ev.target.closest && ev.target.closest('button');
-    if (!btn) return;
-    const txt = (btn.textContent || '').trim();
-    if (txt === 'Remover amostras de teste' || btn.classList.contains('remove-test-samples')) {
-      ev.preventDefault();
-      if (confirm && !confirm('Remover todas as amostras de teste? Esta ação não pode ser desfeita.')) return;
-      if (typeof window._removeSampleWorkDataForTesting === 'function') window._removeSampleWorkDataForTesting();
-    }
-  } catch (e) {
-    console.warn('Erro no handler de remoção de amostras:', e);
-  }
-});
 // Sistema de Som (Web Audio API) - Inicializado sob demanda
 let audioCtx = null;
 
@@ -710,12 +679,11 @@ const elements = {
   financeType: document.getElementById('financeType'),
   financeCategory: document.getElementById('financeCategory'),
   addFinanceCategoryBtn: document.getElementById('addFinanceCategoryBtn'),
-  addFinanceCategoryModal: document.getElementById('addFinanceCategoryModal'),
-  newFinanceCategoryKey: document.getElementById('newFinanceCategoryKey'),
-  nextFinanceCategoryBtn: document.getElementById('nextFinanceCategoryBtn'),
-  backFinanceCategoryBtn: document.getElementById('backFinanceCategoryBtn'),
-  newFinanceCategoryName: document.getElementById('newFinanceCategoryName'),
-  newFinanceCategoryEmoji: document.getElementById('newFinanceCategoryEmoji'),
+  removeFinanceCategoryBtn: document.getElementById('removeFinanceCategoryBtn'),
+  financeCategoryModal: document.getElementById('financeCategoryModal'),
+  financeCategoryNameInput: document.getElementById('financeCategoryNameInput'),
+  financeCategoryEmojiInput: document.getElementById('financeCategoryEmojiInput'),
+  financeCategoryNameMsg: document.getElementById('financeCategoryNameMsg'),
   saveFinanceCategoryBtn: document.getElementById('saveFinanceCategoryBtn'),
   cancelFinanceCategoryBtn: document.getElementById('cancelFinanceCategoryBtn'),
   addFinanceBtn: document.getElementById('addFinanceBtn'),
@@ -806,6 +774,16 @@ const elements = {
   workTimeHistoryList: document.getElementById('workTimeHistoryList'),
   workProductionHistoryList: document.getElementById('workProductionHistoryList'),
   workChart: document.getElementById('workChart'),
+  workLogEditModal: document.getElementById('workLogEditModal'),
+  workEditDate: document.getElementById('workEditDate'),
+  workEditTime: document.getElementById('workEditTime'),
+  workEditValue: document.getElementById('workEditValue'),
+  workEditValueLabel: document.getElementById('workEditValueLabel'),
+  workEditUnpaid: document.getElementById('workEditUnpaid'),
+  workEditNote: document.getElementById('workEditNote'),
+  workEditSaveBtn: document.getElementById('workEditSaveBtn'),
+  workEditDeleteBtn: document.getElementById('workEditDeleteBtn'),
+  workEditCancelBtn: document.getElementById('workEditCancelBtn'),
   
   // Chat (Oráculo)
   chatBtn: document.getElementById('chatBtn'),
@@ -1423,17 +1401,14 @@ function normalizeGameState(data) {
     zenMusic: null,
     gratitudeJournal: [],
     taskHistory: [],
-    expenseGroups: [], // Novos grupos de despesas
-    financeCategories: null // Categorias financeiras personalizadas (será inicializado por ensureFinanceCategories)
+    expenseGroups: [] // Novos grupos de despesas
   };
 
   // Mescla os dados importados com o padrão para preencher campos faltantes
   const merged = { ...defaultState, ...data };
   
   // Remove valores undefined/null que vieram do data e usa o default
-  // EXCETO para financeCategories que tem tratamento especial
   Object.keys(defaultState).forEach(key => {
-    if (key === 'financeCategories') return; // tratado separadamente
     if (merged[key] === undefined || merged[key] === null) {
       merged[key] = defaultState[key];
     }
@@ -1442,15 +1417,6 @@ function normalizeGameState(data) {
   // Garante a integridade dos atributos
   if (data.attributes) {
     merged.attributes = { ...defaultState.attributes, ...data.attributes };
-  }
-
-  // Preserva financeCategories se existir em data (array de categorias personalizadas)
-  // Só sobrescreve se data tiver um array válido
-  if (Array.isArray(data.financeCategories) && data.financeCategories.length > 0) {
-    merged.financeCategories = data.financeCategories;
-  } else {
-    // Deixa null para ensureFinanceCategories tratar depois
-    merged.financeCategories = null;
   }
   
   return merged;
@@ -2122,140 +2088,6 @@ function addTransaction() {
   showToast('💰 Transação registrada!');
 }
 
-// --- Categorias de Finanças (Nome + Emoji) ---
-function ensureFinanceCategories() {
-  // Se já tem categorias (incluindo personalizadas), não sobrescreve
-  if (gameState.financeCategories && Array.isArray(gameState.financeCategories) && gameState.financeCategories.length > 0) {
-    return;
-  }
-  
-  // Tenta recuperar do localStorage diretamente como fallback
-  try {
-    const username = getSession && getSession();
-    if (username) {
-      const users = JSON.parse(localStorage.getItem('ur_users') || '{}');
-      if (users[username] && users[username].character && Array.isArray(users[username].character.financeCategories) && users[username].character.financeCategories.length > 0) {
-        gameState.financeCategories = users[username].character.financeCategories;
-        console.log('📂 Categorias restauradas do localStorage:', gameState.financeCategories.length);
-        return;
-      }
-    }
-  } catch (e) { console.warn('Fallback de categorias falhou:', e); }
-  
-  // Se não tem nada, cria as padrão
-  gameState.financeCategories = [
-    { id: 'c_outros', name: 'Outros', emoji: '🗂️' },
-    { id: 'c_alimentacao', name: 'Alimentação', emoji: '🍽️' },
-    { id: 'c_transporte', name: 'Transporte', emoji: '🚌' },
-    { id: 'c_lazer', name: 'Lazer', emoji: '🎉' },
-    { id: 'c_contas', name: 'Contas', emoji: '💡' },
-    { id: 'c_salario', name: 'Salário', emoji: '💼' },
-    { id: 'c_extra', name: 'Extra', emoji: '✨' }
-  ];
-  saveGame();
-}
-
-function populateFinanceCategorySelect() {
-  ensureFinanceCategories();
-  const sel = document.getElementById('financeCategory');
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '';
-  gameState.financeCategories.forEach(cat => {
-    const label = `${cat.emoji || ''} ${cat.name}`.trim();
-    const opt = document.createElement('option');
-    opt.value = label;
-    opt.textContent = label;
-    sel.appendChild(opt);
-  });
-  // keep previous selection when possible
-  if (current) sel.value = current;
-
-  // Atualiza o botão de remover categoria (mostra apenas se a seleção atual for uma categoria criada pelo usuário)
-  try {
-    const deleteBtn = document.getElementById('deleteSelectedCategoryBtn');
-    const updateDeleteBtnState = () => {
-      if (!deleteBtn) return;
-      const selected = sel.value;
-      const matched = (gameState.financeCategories || []).find(cat => `${cat.emoji || ''} ${cat.name}`.trim() === selected);
-      if (matched && (matched.id || '').startsWith('c_')) {
-        deleteBtn.style.display = 'inline-flex';
-        deleteBtn.setAttribute('data-cat-id', matched.id);
-        deleteBtn.title = `Remover ${matched.name}`;
-      } else {
-        deleteBtn.style.display = 'none';
-        deleteBtn.removeAttribute('data-cat-id');
-      }
-    };
-
-    if (deleteBtn) {
-      // bind change on select to update button visibility
-      sel.removeEventListener('change', updateDeleteBtnState);
-      sel.addEventListener('change', updateDeleteBtnState);
-      // ensure initial state
-      updateDeleteBtnState();
-
-      // set click handler once
-      deleteBtn.removeEventListener('click', deleteBtn._handler || (() => {}));
-      const handler = (e) => {
-        const id = deleteBtn.getAttribute('data-cat-id');
-        if (!id) return;
-        const cat = (gameState.financeCategories || []).find(c => c.id === id);
-        if (!cat) return;
-        if (!confirm(`Remover categoria "${cat.name}"?`)) return;
-        gameState.financeCategories = (gameState.financeCategories || []).filter(c => c.id !== id);
-        saveGame();
-        populateFinanceCategorySelect();
-        showToast('✅ Categoria removida');
-      };
-      deleteBtn._handler = handler;
-      deleteBtn.addEventListener('click', handler);
-    }
-  } catch (e) { /* silencioso */ }
-}
-
-function openAddFinanceCategory() {
-  
-  const modal = document.getElementById('addFinanceCategoryModal');
-  const nameInput = document.getElementById('newFinanceCategoryName');
-  const emojiInput = document.getElementById('newFinanceCategoryEmoji');
-  if (!modal || !nameInput || !emojiInput) {
-    // Fallback para prompt se o modal não existir
-    const name = prompt('Nome da nova categoria: (ex: Pizzas)');
-    if (!name) return;
-    const emoji = prompt('Emoji para a categoria (ex: 🍕). Deixe vazio para nenhum.');
-    const id = `c_${Date.now()}`;
-    if (!gameState.financeCategories) gameState.financeCategories = [];
-    gameState.financeCategories.push({ id, name: name.trim(), emoji: (emoji || '').trim() });
-    saveGame();
-    populateFinanceCategorySelect();
-    showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
-    return;
-  }
-
-  // Abrir modal e focar no input
-  // Garantir que o fluxo abra no passo 1 (identificador)
-  const step1 = document.getElementById('catStep1');
-  const step2 = document.getElementById('catStep2');
-  const keyInput = document.getElementById('newFinanceCategoryKey');
-  const nameInputEl = document.getElementById('newFinanceCategoryName');
-  const emojiInputEl = document.getElementById('newFinanceCategoryEmoji');
-  if (step1) step1.style.display = 'block';
-  if (step2) step2.style.display = 'none';
-  if (nameInputEl) nameInputEl.value = '';
-  if (emojiInputEl) emojiInputEl.value = '';
-  if (keyInput) keyInput.value = '';
-  // If modal is inside a hidden parent (e.g., workDashboardSection hidden), move it to body so fixed positioning works
-    try {
-      if (modal && modal.closest && modal.closest('.hidden')) {
-        document.body.appendChild(modal);
-      }
-    } catch (e) { /* silencioso */ }
-    if (modal) modal.classList.add('active');
-    // Focus com pequeno delay para evitar conflitos com outros listeners
-    setTimeout(() => { try { if (keyInput) { keyInput.focus(); } } catch(e){/* silencioso */} }, 180);
-}
-
 async function removeTransaction(id) {
   if (confirm('Remover esta transação?')) {
     // Converte para o tipo correto para comparação
@@ -2292,6 +2124,116 @@ function setFinanceFilter(filter) {
   financeFilter = filter;
   financePage = 1;
   renderFinances();
+}
+
+// -------------------------------
+// Categorias financeiras personalizadas
+// -------------------------------
+const DEFAULT_FINANCE_CATEGORIES = [
+  'Outros',
+  'Alimentação',
+  'Transporte',
+  'Lazer',
+  'Contas',
+  'Salário',
+  'Extra'
+];
+
+function normalizeCategoryName(name) {
+  return (name || '').toString().trim().replace(/\s+/g, ' ');
+}
+
+function categoryExists(name) {
+  const trimmed = normalizeCategoryName(name);
+  if (!trimmed) return false;
+  const custom = getCustomFinanceCategories();
+  return DEFAULT_FINANCE_CATEGORIES.some(c => c.toLowerCase() === trimmed.toLowerCase()) ||
+    custom.some(c => c.name.toLowerCase() === trimmed.toLowerCase());
+}
+
+function validateCategoryNameLive() {
+  if (!elements.financeCategoryNameInput || !elements.financeCategoryNameMsg) return;
+  const value = normalizeCategoryName(elements.financeCategoryNameInput.value);
+  if (elements.saveFinanceCategoryBtn) elements.saveFinanceCategoryBtn.disabled = false;
+  if (!value) {
+    elements.financeCategoryNameMsg.textContent = 'Digite um nome para a categoria.';
+    elements.financeCategoryNameMsg.style.color = 'var(--warning, #fbbf24)';
+    if (elements.saveFinanceCategoryBtn) elements.saveFinanceCategoryBtn.disabled = true;
+    return;
+  }
+  if (categoryExists(value)) {
+    elements.financeCategoryNameMsg.textContent = 'Esta categoria já existe.';
+    elements.financeCategoryNameMsg.style.color = 'var(--danger, #f87171)';
+    if (elements.saveFinanceCategoryBtn) elements.saveFinanceCategoryBtn.disabled = true;
+    return;
+  }
+  elements.financeCategoryNameMsg.textContent = 'Nome disponível.';
+  elements.financeCategoryNameMsg.style.color = 'var(--success, #4ade80)';
+}
+
+function getCustomFinanceCategories() {
+  try {
+    const raw = localStorage.getItem('finance_categories_custom');
+    const arr = JSON.parse(raw || '[]');
+    if (!Array.isArray(arr)) return [];
+    // Migra formato antigo (array de strings) para objetos
+    if (arr.length > 0 && typeof arr[0] === 'string') {
+      return arr.filter(Boolean).map(name => ({ name: normalizeCategoryName(name), emoji: '' }));
+    }
+    return arr
+      .filter(item => item && typeof item.name === 'string')
+      .map(item => ({ name: normalizeCategoryName(item.name), emoji: (item.emoji || '').toString().trim() }));
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCustomFinanceCategories(list) {
+  try {
+    localStorage.setItem('finance_categories_custom', JSON.stringify(list));
+  } catch (e) {}
+}
+
+function populateFinanceCategorySelect() {
+  if (!elements.financeCategory) return;
+  const custom = getCustomFinanceCategories();
+  const all = [
+    ...DEFAULT_FINANCE_CATEGORIES.map(name => ({ name, emoji: '' })),
+    ...custom
+  ];
+
+  const current = elements.financeCategory.value;
+  elements.financeCategory.innerHTML = '';
+  all.forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat.name;
+    opt.textContent = cat.emoji ? `${cat.emoji} ${cat.name}` : cat.name;
+    elements.financeCategory.appendChild(opt);
+  });
+  if (current && all.some(c => c.name === current)) {
+    elements.financeCategory.value = current;
+  }
+  updateRemoveFinanceCategoryState();
+}
+
+function addFinanceCategory() {
+  const name = prompt('Nome da nova categoria:');
+  if (!name) return;
+  const trimmed = name.trim();
+  if (!trimmed) return;
+
+  const custom = getCustomFinanceCategories();
+  const exists = DEFAULT_FINANCE_CATEGORIES.some(c => c.toLowerCase() === trimmed.toLowerCase()) ||
+    custom.some(c => c.toLowerCase() === trimmed.toLowerCase());
+  if (exists) {
+    showToast('⚠️ Essa categoria já existe.');
+    return;
+  }
+  custom.push(trimmed);
+  saveCustomFinanceCategories(custom);
+  populateFinanceCategorySelect();
+  elements.financeCategory.value = trimmed;
+  showToast('✅ Categoria criada!');
 }
 
 function renderFinances() {
@@ -3601,6 +3543,12 @@ function renderWorkSingularity() {
         <input type="checkbox" id="workUnpaidInput" style="width: auto; cursor: pointer;">
         <label for="workUnpaidInput" style="margin: 0; font-size: 12px; cursor: pointer; opacity: 0.8;">Não remunerado (apenas registro)</label>
       </div>
+      <div class="form-row" style="margin-bottom: 15px;">
+        <div style="flex: 1;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">Observação (opcional)</label>
+          <input type="text" id="workNoteInput" placeholder="Ex: massa extra / erro corrigido">
+        </div>
+      </div>
       <button class="btn" onclick="addWorkRecord()" style="width: 100%; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">✅ Registrar Produção</button>
     </div>
   `;
@@ -3682,6 +3630,7 @@ window.addWorkRecord = function() {
   const input = document.getElementById('workInput');
   const dateInput = document.getElementById('workDateInput');
   const weekInput = document.getElementById('workWeekInput');
+  const noteInput = document.getElementById('workNoteInput');
   const unpaidInput = document.getElementById('workUnpaidInput');
   if (!input) return;
   
@@ -3734,6 +3683,7 @@ window.addWorkRecord = function() {
   const loggedFinancialValue = isUnpaid ? 0 : financialValue;
 
   gameState.workLog.push({
+    id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
     date: recordDate,
     timestamp: Date.now(),
     inputVal: val,
@@ -3742,7 +3692,8 @@ window.addWorkRecord = function() {
     duration: type === 'time_tracking' ? val * 3600000 : 0, // Converte horas para ms se for tempo
     isUnpaid: isUnpaid,
     week: week
-    , month: month
+    , month: month,
+    note: noteInput ? noteInput.value.trim() : ''
   });
 
   // Adicionar ao Financeiro (se gerou valor)
@@ -3772,6 +3723,7 @@ window.addWorkRecord = function() {
   }
 
   input.value = '';
+  if (noteInput) noteInput.value = '';
   if (unpaidInput) unpaidInput.checked = false;
   saveGame();
   renderWorkHistory();
@@ -3813,12 +3765,14 @@ window.finishWorkSession = function(startTime) {
   if (!gameState.workLog) gameState.workLog = [];
   
   gameState.workLog.push({
+    id: `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
     date: new Date().toISOString().split('T')[0],
     timestamp: now,
     inputVal: hours, // Armazena horas como valor de entrada
     financialVal: financialValue,
     type: 'time_tracking', // Tipo especial para logs de tempo
-    duration: duration
+    duration: duration,
+    note: ''
   });
 
   // Adicionar ao Financeiro (apenas se gerou valor financeiro)
@@ -3845,6 +3799,18 @@ window.finishWorkSession = function(startTime) {
 
 function renderWorkHistory() {
   if (!elements.workTimeHistoryList || !elements.workProductionHistoryList) return;
+
+  // Garante IDs para permitir ediÃ§Ã£o/remoÃ§Ã£o
+  let needsSave = false;
+  (gameState.workLog || []).forEach(item => {
+    if (!item.id) {
+      item.id = `w_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+      needsSave = true;
+    }
+  });
+  if (needsSave) {
+    try { saveGame(true); } catch (e) {}
+  }
   
   // Pega os últimos 50 registros para não pesar
   const log = (gameState.workLog || []).slice(-50);
@@ -3923,13 +3889,21 @@ function renderWorkHistory() {
           moneyDisplay = item.financialVal > 0 ? '+ R$ ' + item.financialVal.toFixed(2) : '';
         }
 
+        const noteHtml = item.note ? `<div style="font-size:11px; opacity:0.7; margin-top:2px;">📝 ${item.note}</div>` : '';
         groupHtml += `
-          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; margin-bottom: 6px; font-size: 13px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; margin-bottom: 6px; font-size: 13px; gap:10px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex:1;">
               <span style="font-size: 16px;">${icon}</span>
-              <span>${text}</span>
+              <div>
+                <div>${text}</div>
+                ${noteHtml}
+              </div>
             </div>
-            <div style="font-weight: 600; color: var(--success);">${moneyDisplay}</div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="font-weight: 600; color: var(--success);">${moneyDisplay}</div>
+              <button class="ghost" onclick="openWorkLogEditor('${item.id}')" title="Editar" style="padding:4px 8px;">✏️</button>
+              <button class="ghost" onclick="deleteWorkLogEntry('${item.id}')" title="Excluir" style="padding:4px 8px; color: var(--danger);">🗑️</button>
+            </div>
           </div>
         `;
       });
@@ -4080,13 +4054,39 @@ function renderWorkHistory() {
         const dateBadge = document.createElement('div'); dateBadge.style.cssText = 'min-width:44px; text-align:center; padding:6px 6px; border-radius:8px; background: rgba(0,0,0,0.18); font-family: monospace; font-size:12px;'; dateBadge.textContent = new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         const icon = document.createElement('div'); icon.style.cssText = 'width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.02); font-size:18px;';
         icon.textContent = item.type === 'pizzaria' ? '🍕' : (item.type === 'vendedor' ? '🤝' : (item.type === 'motorista' ? '🚖' : '📄'));
-        const txt = document.createElement('div'); txt.style.cssText = 'font-size:13px;'; txt.textContent = item.type === 'pizzaria' ? `${item.inputVal} massas` : `${item.inputVal}`;
-        left.appendChild(dateBadge); left.appendChild(icon); left.appendChild(txt);
+        const txtWrap = document.createElement('div');
+        txtWrap.style.cssText = 'font-size:13px;';
+        const mainTxt = document.createElement('div'); mainTxt.textContent = item.type === 'pizzaria' ? `${item.inputVal} massas` : `${item.inputVal}`;
+        txtWrap.appendChild(mainTxt);
+        if (item.note) {
+          const note = document.createElement('div');
+          note.style.cssText = 'font-size:11px; opacity:0.7; margin-top:2px;';
+          note.textContent = `📝 ${item.note}`;
+          txtWrap.appendChild(note);
+        }
+        left.appendChild(dateBadge); left.appendChild(icon); left.appendChild(txtWrap);
 
         const right = document.createElement('div'); right.style.cssText = 'text-align:right; min-width:90px;';
         right.innerHTML = item.isUnpaid ? '<div style="opacity:0.7; font-size:12px;">Não remunerado</div>' : (item.financialVal > 0 ? `<div style="font-weight:700; color:var(--success);">+ R$ ${item.financialVal.toFixed(2)}</div>` : '');
 
-        row.appendChild(left); row.appendChild(right);
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex; align-items:center; gap:6px;';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'ghost';
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Editar';
+        editBtn.style.padding = '4px 8px';
+        editBtn.onclick = () => openWorkLogEditor(item.id);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'ghost';
+        delBtn.textContent = '🗑️';
+        delBtn.title = 'Excluir';
+        delBtn.style.padding = '4px 8px';
+        delBtn.style.color = 'var(--danger)';
+        delBtn.onclick = () => deleteWorkLogEntry(item.id);
+        actions.appendChild(editBtn); actions.appendChild(delBtn);
+
+        row.appendChild(left); row.appendChild(right); row.appendChild(actions);
         details.appendChild(row);
       });
 
@@ -4101,6 +4101,121 @@ function renderWorkHistory() {
   // Renderizar as duas listas
   renderList(timeLogs, elements.workTimeHistoryList, 'Sem registros de ponto.');
   renderProductionList(prodLogs, elements.workProductionHistoryList, 'Sem registros de produção.');
+}
+
+let _editingWorkLogId = null;
+
+function calculateWorkFinancialValue(type, val, isUnpaid) {
+  if (isUnpaid) return 0;
+  const jobType = (gameState && gameState.job && gameState.job.type) ? gameState.job.type : 'pizzaria';
+  const rate = (gameState && gameState.job && gameState.job.config && gameState.job.config.rate) ? gameState.job.config.rate : 0;
+  if (type === 'time_tracking') {
+    // Para freelancer, calcula por hora
+    return jobType === 'freelancer' ? (val * rate) : 0;
+  }
+  if (type === 'pizzaria') return val * rate;
+  if (type === 'vendedor') return val * (rate / 100);
+  if (type === 'motorista') return val;
+  if (type === 'freelancer') return val;
+  return 0;
+}
+
+function recomputeWeekMonth(dateStr) {
+  if (!dateStr) return { week: null, month: null };
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return { week: null, month: null };
+  const day = parseInt(parts[2], 10);
+  let weekNum = Math.ceil(day / 7);
+  if (weekNum > 4) weekNum = 4;
+  return { week: String(weekNum), month: dateStr.slice(0, 7) };
+}
+
+function openWorkLogEditor(id) {
+  const item = (gameState.workLog || []).find(i => i.id === id);
+  if (!item) return;
+  _editingWorkLogId = id;
+  if (!elements.workLogEditModal) return;
+
+  const date = item.date || new Date(item.timestamp || Date.now()).toISOString().split('T')[0];
+  const time = item.timestamp ? new Date(item.timestamp).toTimeString().slice(0,5) : '08:00';
+
+  if (elements.workEditDate) elements.workEditDate.value = date;
+  if (elements.workEditTime) elements.workEditTime.value = time;
+  if (elements.workEditValue) elements.workEditValue.value = item.inputVal;
+  if (elements.workEditUnpaid) elements.workEditUnpaid.checked = !!item.isUnpaid;
+  if (elements.workEditNote) elements.workEditNote.value = item.note || '';
+  if (elements.workEditValueLabel) {
+    elements.workEditValueLabel.textContent = (item.type === 'time_tracking') ? 'Horas' : 'Quantidade';
+  }
+
+  elements.workLogEditModal.classList.add('active');
+}
+
+function closeWorkLogEditor() {
+  if (elements.workLogEditModal) elements.workLogEditModal.classList.remove('active');
+  _editingWorkLogId = null;
+}
+
+function saveWorkLogEdit() {
+  if (!_editingWorkLogId) return;
+  const item = (gameState.workLog || []).find(i => i.id === _editingWorkLogId);
+  if (!item) return;
+
+  const date = elements.workEditDate ? elements.workEditDate.value : item.date;
+  const time = elements.workEditTime ? elements.workEditTime.value : '08:00';
+  const val = elements.workEditValue ? parseFloat(elements.workEditValue.value || '0') : item.inputVal;
+  const isUnpaid = elements.workEditUnpaid ? elements.workEditUnpaid.checked : !!item.isUnpaid;
+  const note = elements.workEditNote ? elements.workEditNote.value.trim() : (item.note || '');
+
+  if (!date) return;
+  const ts = new Date(`${date}T${time}:00`).getTime();
+
+  item.date = date;
+  item.timestamp = isNaN(ts) ? item.timestamp : ts;
+  item.inputVal = val;
+  item.isUnpaid = isUnpaid;
+  item.note = note;
+
+  if (item.type === 'time_tracking') {
+    item.duration = val * 3600000;
+  }
+
+  const { week, month } = recomputeWeekMonth(date);
+  if (week) item.week = week;
+  if (month) item.month = month;
+
+  // Atualiza valor financeiro e lanÃ§amento associado
+  item.financialVal = calculateWorkFinancialValue(item.type, val, isUnpaid);
+  if (item.financeId && Array.isArray(gameState.finances)) {
+    const fin = gameState.finances.find(f => f.id === item.financeId);
+    if (fin) {
+      fin.value = item.financialVal;
+      fin.date = new Date(item.timestamp || Date.now()).toISOString();
+      if (item.type === 'pizzaria') fin.category = 'Produção';
+      if (item.type === 'time_tracking') fin.category = 'Salário';
+      fin.desc = `${gameState.job?.name || 'Trabalho'} - ${item.type === 'pizzaria' ? 'Produção' : 'Registro'}`;
+    }
+  }
+
+  saveGame();
+  renderWorkHistory();
+  renderWorkChart();
+  closeWorkLogEditor();
+  showToast('✅ Registro atualizado!');
+}
+
+function deleteWorkLogEntry(id) {
+  const item = (gameState.workLog || []).find(i => i.id === id);
+  if (!item) return;
+  if (!confirm('Remover este registro?')) return;
+  gameState.workLog = (gameState.workLog || []).filter(i => i.id !== id);
+  if (item.financeId && Array.isArray(gameState.finances)) {
+    gameState.finances = gameState.finances.filter(f => f.id !== item.financeId);
+  }
+  saveGame();
+  renderWorkHistory();
+  renderWorkChart();
+  showToast('🗑️ Registro removido!');
 }
 
 function renderWorkChart() {
@@ -4375,7 +4490,19 @@ function setTabBadge(tabId, show) {
 
 function updateUI() {
   // Debug temporário: registrar fontes possíveis de perfil (OracleMemory / localStorage)
-  // debug logging removed
+  try {
+    const dbg = { gameStatePresent: !!gameState };
+    dbg.oracleMemory = (typeof OracleMemory !== 'undefined') ? {
+      hasGetProfile: !!OracleMemory.getProfile,
+      sampleName: (OracleMemory.getProfile && OracleMemory.getProfile('name')) || null
+    } : null;
+    dbg.ur_last_user = localStorage.getItem('ur_last_user');
+    try { dbg.ur_users = localStorage.getItem('ur_users'); } catch (e) { dbg.ur_users = null; }
+    console.log('[debug][updateUI]', dbg);
+    if (window.OracleTelemetry && OracleTelemetry.log) OracleTelemetry.log('updateUI_debug', dbg);
+  } catch (e) {
+    console.warn('updateUI debug failed', e);
+  }
 
   // Se não houver gameState, tenta preencher com memórias locais (OracleMemory) antes de sair
   if (!gameState) {
@@ -4482,8 +4609,6 @@ function updateUI() {
   renderGratitudeJournal();
   renderDailyTasks();
   renderXpChart();
-  // Garantir categorias de finanças e popular select
-  try { populateFinanceCategorySelect(); } catch (e) { console.warn('Erro ao popular categorias:', e); }
   renderFinances();
   renderFinanceChart();
   renderFinancialGoal();
@@ -4567,373 +4692,120 @@ if (clearAllTasksBtn) {
   });
 }
 
+// -------------------------------
+// Finance category modal helpers
+// -------------------------------
+function openFinanceCategoryModal() {
+  if (!elements.financeCategoryModal || !elements.financeCategoryNameInput) {
+    return addFinanceCategoryLegacy();
+  }
+  elements.financeCategoryNameInput.value = '';
+  if (elements.financeCategoryEmojiInput) elements.financeCategoryEmojiInput.value = '';
+  if (elements.financeCategoryNameMsg) {
+    elements.financeCategoryNameMsg.textContent = 'Digite um nome para a categoria.';
+    elements.financeCategoryNameMsg.style.color = 'var(--warning, #fbbf24)';
+  }
+  if (elements.saveFinanceCategoryBtn) elements.saveFinanceCategoryBtn.disabled = true;
+  elements.financeCategoryModal.classList.add('active');
+  setTimeout(() => {
+    try { elements.financeCategoryNameInput.focus(); } catch (e) {}
+  }, 50);
+}
+
+function closeFinanceCategoryModal() {
+  if (elements.financeCategoryModal) {
+    elements.financeCategoryModal.classList.remove('active');
+  }
+}
+
+function addFinanceCategoryLegacy() {
+  const name = prompt('Nome da nova categoria:');
+  if (!name) return;
+  const trimmed = normalizeCategoryName(name);
+  if (!trimmed) return;
+  return addFinanceCategoryByName(trimmed);
+}
+
+function addFinanceCategoryByName(name, emoji = '') {
+  const trimmed = normalizeCategoryName(name);
+  if (!trimmed) return;
+
+  if (categoryExists(trimmed)) {
+    showToast('âš ï¸ Essa categoria jÃ¡ existe.');
+    return;
+  }
+  const custom = getCustomFinanceCategories();
+  const cleanEmoji = (emoji || '').toString().trim();
+  const display = cleanEmoji ? `${cleanEmoji} ${trimmed}` : trimmed;
+  custom.push({ name: trimmed, emoji: cleanEmoji });
+  saveCustomFinanceCategories(custom);
+  populateFinanceCategorySelect();
+  if (elements.financeCategory) elements.financeCategory.value = trimmed;
+  updateRemoveFinanceCategoryState();
+  showToast('âœ… Categoria criada: ' + display);
+}
+
+function saveFinanceCategoryFromModal() {
+  if (!elements.financeCategoryNameInput) return;
+  const name = elements.financeCategoryNameInput.value;
+  const emoji = elements.financeCategoryEmojiInput ? elements.financeCategoryEmojiInput.value.trim() : '';
+  if (!name || !name.trim()) return;
+  addFinanceCategoryByName(name, emoji);
+  closeFinanceCategoryModal();
+}
+
+function updateRemoveFinanceCategoryState() {
+  if (!elements.removeFinanceCategoryBtn || !elements.financeCategory) return;
+  const current = elements.financeCategory.value;
+  const isDefault = DEFAULT_FINANCE_CATEGORIES.some(c => c.toLowerCase() === (current || '').toLowerCase());
+  elements.removeFinanceCategoryBtn.disabled = isDefault || !current;
+  elements.removeFinanceCategoryBtn.style.opacity = elements.removeFinanceCategoryBtn.disabled ? '0.5' : '1';
+}
+
+function removeFinanceCategory() {
+  if (!elements.financeCategory) return;
+  const current = elements.financeCategory.value;
+  if (!current) return;
+  const isDefault = DEFAULT_FINANCE_CATEGORIES.some(c => c.toLowerCase() === current.toLowerCase());
+  if (isDefault) {
+    showToast('âš ï¸ NÃ£o Ã© possÃ­vel remover categoria padrÃ£o.');
+    return;
+  }
+  if (!confirm(`Remover categoria \"${current}\"?`)) return;
+  const custom = getCustomFinanceCategories().filter(c => c.name.toLowerCase() !== current.toLowerCase());
+  saveCustomFinanceCategories(custom);
+  populateFinanceCategorySelect();
+  updateRemoveFinanceCategoryState();
+  showToast('âœ… Categoria removida!');
+}
+
+function addFinanceCategory() {
+  openFinanceCategoryModal();
+}
+
 if (elements.viewTaskHistoryBtn) elements.viewTaskHistoryBtn.addEventListener('click', () => {
   renderTaskHistory();
   elements.taskHistoryModal.classList.add('active');
 });
+if (elements.addFinanceCategoryBtn) elements.addFinanceCategoryBtn.addEventListener('click', addFinanceCategory);
+if (elements.removeFinanceCategoryBtn) elements.removeFinanceCategoryBtn.addEventListener('click', removeFinanceCategory);
+if (elements.saveFinanceCategoryBtn) elements.saveFinanceCategoryBtn.addEventListener('click', saveFinanceCategoryFromModal);
+if (elements.cancelFinanceCategoryBtn) elements.cancelFinanceCategoryBtn.addEventListener('click', closeFinanceCategoryModal);
+if (elements.financeCategoryNameInput) elements.financeCategoryNameInput.addEventListener('input', validateCategoryNameLive);
+if (elements.financeCategoryNameInput) elements.financeCategoryNameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') saveFinanceCategoryFromModal();
+});
+if (elements.financeCategory) {
+  elements.financeCategory.addEventListener('change', updateRemoveFinanceCategoryState);
+  updateRemoveFinanceCategoryState();
+}
+if (elements.workEditSaveBtn) elements.workEditSaveBtn.addEventListener('click', saveWorkLogEdit);
+if (elements.workEditCancelBtn) elements.workEditCancelBtn.addEventListener('click', closeWorkLogEditor);
+if (elements.workEditDeleteBtn) elements.workEditDeleteBtn.addEventListener('click', () => {
+  if (_editingWorkLogId) deleteWorkLogEntry(_editingWorkLogId);
+  closeWorkLogEditor();
+});
 if (elements.addFinanceBtn) elements.addFinanceBtn.addEventListener('click', addTransaction);
-// Abre formulário inline de criação de categoria (fallback confiável)
-if (elements.addFinanceCategoryBtn) {
-  elements.addFinanceCategoryBtn.addEventListener('click', (ev) => {
-    try { ev.stopPropagation(); ev.preventDefault(); } catch(e){}
-    try {
-      openInlineAddFinanceCategory();
-    } catch (err) {
-      // fallback final: tenta abrir prompt/modal
-      openAddFinanceCategory();
-    }
-  });
-}
-// Modal: fluxo em 2 passos para criar categoria (key -> nome)
-const _modalAddCat = document.getElementById('addFinanceCategoryModal');
-const _keyInput = document.getElementById('newFinanceCategoryKey');
-const _nextBtn = document.getElementById('nextFinanceCategoryBtn');
-const _backBtn = document.getElementById('backFinanceCategoryBtn');
-const _saveCatBtn = document.getElementById('saveFinanceCategoryBtn');
-const _cancelCatBtn = document.getElementById('cancelFinanceCategoryBtn');
-const _catNameInput = document.getElementById('newFinanceCategoryName');
-const _catEmojiInput = document.getElementById('newFinanceCategoryEmoji');
-const _step1 = document.getElementById('catStep1');
-const _step2 = document.getElementById('catStep2');
-
-// debug guard removed (clean handlers used)
-
-const slugify = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-_]/g,'');
-
-// --- Inline category creator (simple, replaces modal for reliability) ---
-function openInlineAddFinanceCategory() {
-  const node = document.getElementById('inlineAddFinanceCategory');
-  const key = document.getElementById('inlineCategoryKey');
-  const name = document.getElementById('inlineCategoryName');
-  if (!node) { console.warn('inlineAddFinanceCategory node not found'); openAddFinanceCategory(); return; }
-  // Garantir que o painel esteja diretamente no body para evitar que
-  // transforms em elementos-ancestrais quebrem o posicionamento `fixed`.
-  if (node.parentNode !== document.body) document.body.appendChild(node);
-
-  // Mostrar o painel próximo ao botão '+' quando possível.
-  node.style.display = 'block';
-  node.style.position = 'fixed';
-  node.style.transform = 'none';
-  node.style.visibility = 'hidden';
-  node.style.left = '0px';
-  node.style.top = '0px';
-  node.style.zIndex = '9999';
-  // sizing responsivo: largura máxima e altura máxima baseada na viewport
-  node.style.width = 'min(520px, 92vw)';
-  node.style.maxWidth = 'min(520px, 92vw)';
-  node.style.boxSizing = 'border-box';
-  node.style.height = 'auto';
-  node.style.maxHeight = 'calc(100vh - 40px)';
-  node.style.overflow = 'auto';
-  node.style.padding = node.style.padding || '10px';
-
-  // medir tamanho do painel (agora que está exibido, porém invisível)
-  const rect = node.getBoundingClientRect();
-  const nodeW = rect.width || Math.min(520, window.innerWidth * 0.92);
-  const nodeH = rect.height || Math.min(300, window.innerHeight - 40);
-  // função para posicionar/ajustar o painel (chamada também no resize)
-  const SMALL_VIEWPORT_WIDTH = 520;
-  const btn = document.getElementById('addFinanceCategoryBtn');
-  const adjustPosition = () => {
-    // recalcular medidas após aplicar largura responsiva
-    node.style.width = 'min(520px, 92vw)';
-    const rectNow = node.getBoundingClientRect();
-    const nodeWnow = rectNow.width || Math.min(520, window.innerWidth * 0.92);
-    const nodeHnow = Math.min(rectNow.height || 300, window.innerHeight - 40);
-
-    if (window.innerWidth <= SMALL_VIEWPORT_WIDTH) {
-      node.style.left = '50%';
-      node.style.top = '50%';
-      node.style.transform = 'translate(-50%,-50%)';
-      node.style.maxWidth = '92vw';
-      node.style.maxHeight = 'calc(100vh - 40px)';
-      node.style.visibility = 'visible';
-      return;
-    }
-
-    // preferir direita do botão
-    let left = 8;
-    let top = 8;
-    if (btn) {
-      const b = btn.getBoundingClientRect();
-      left = Math.round(b.right + 8);
-      top = Math.round(b.top);
-      if (left + nodeWnow > window.innerWidth - 8) {
-        left = Math.round(b.left - nodeWnow - 8);
-      }
-      if (left < 8 || left + nodeWnow > window.innerWidth - 8) {
-        left = Math.round(Math.max(8, Math.min(b.left, window.innerWidth - nodeWnow - 8)));
-        top = Math.round(b.bottom + 8);
-      }
-      if (top + nodeHnow > window.innerHeight - 8) {
-        top = Math.round(Math.max(8, window.innerHeight - nodeHnow - 8));
-      }
-    }
-
-    node.style.transform = 'none';
-    node.style.left = left + 'px';
-    node.style.top = top + 'px';
-    node.style.visibility = 'visible';
-  };
-
-  // executar ajuste inicial
-  adjustPosition();
-
-  // adiciona listener de resize para reajustar dinamicamente
-  try {
-    // remove handler antigo se existir
-    if (window._inlineFinanceResizeHandler) window.removeEventListener('resize', window._inlineFinanceResizeHandler);
-  } catch (e) {}
-  window._inlineFinanceResizeHandler = () => { try { if (node && node.style.display !== 'none') adjustPosition(); } catch(e){} };
-  window.addEventListener('resize', window._inlineFinanceResizeHandler);
-  window.addEventListener('orientationchange', window._inlineFinanceResizeHandler);
-
-  // garantir que o emoji picker mantenha-se visível
-  const picker = document.getElementById('inlineEmojiPicker');
-  if (picker) picker.style.zIndex = '10000';
-
-  if (key) { key.value = ''; key.focus(); }
-  if (name) name.value = '';
-}
-
-function trySaveInlineCategory() {
-  const keyEl = document.getElementById('inlineCategoryKey');
-  const nameEl = document.getElementById('inlineCategoryName');
-  const emojiEl = document.getElementById('inlineCategoryEmoji');
-  if (!keyEl || !nameEl) { showToast('⚠️ Erro interno: elementos não encontrados.'); return; }
-  const rawKey = (keyEl.value || '').trim();
-  const name = (nameEl.value || '').trim();
-  const emoji = (emojiEl && emojiEl.value) ? emojiEl.value.trim() : '';
-  if (!rawKey) { showToast('⚠️ Informe um identificador (ex: casa).'); keyEl.focus(); return; }
-  if (!name) { showToast('⚠️ Informe um nome para a categoria.'); nameEl.focus(); return; }
-  const key = slugify(rawKey);
-  if (!gameState.financeCategories) gameState.financeCategories = [];
-  const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === key.toLowerCase() || (c.id || '') === 'c_' + key);
-  const existsName = gameState.financeCategories.some(c => (c.name || '').toLowerCase() === name.toLowerCase());
-  if (existsKey) { showToast('⚠️ Identificador já em uso.'); keyEl.focus(); return; }
-  if (existsName) { showToast('⚠️ Já existe uma categoria com esse nome.'); nameEl.focus(); return; }
-  const id = `c_${key}`;
-  const newCat = { id, key, name, emoji };
-  gameState.financeCategories.push(newCat);
-  
-  console.log('📝 Nova categoria criada:', newCat);
-  console.log('📂 Total de categorias:', gameState.financeCategories.length);
-  
-  // Salvar diretamente no localStorage PRIMEIRO (garantir persistência independente do saveGame)
-  try {
-    const username = getSession ? getSession() : null;
-    if (username) {
-      let users = JSON.parse(localStorage.getItem('ur_users') || '{}');
-      if (!users[username]) users[username] = { character: {} };
-      if (!users[username].character) users[username].character = {};
-      users[username].character.financeCategories = gameState.financeCategories;
-      localStorage.setItem('ur_users', JSON.stringify(users));
-      console.log('✅ Categoria salva no localStorage com sucesso!');
-    } else {
-      console.warn('⚠️ Sem sessão ativa, salvando apenas no gameState');
-    }
-  } catch (e) { 
-    console.error('❌ Erro ao salvar categoria no localStorage:', e); 
-  }
-  
-  // Também chamar saveGame para sincronizar com cloud se disponível
-  try {
-    saveGame();
-  } catch (e) {
-    console.warn('saveGame falhou:', e);
-  }
-  
-  // Atualizar UI
-  populateFinanceCategorySelect();
-  
-  // Selecionar a nova categoria (com emoji)
-  const sel = document.getElementById('financeCategory');
-  const newLabel = `${emoji ? emoji + ' ' : ''}${name}`.trim();
-  if (sel) sel.value = newLabel;
-  
-  showToast('✅ Categoria criada: ' + newLabel);
-  
-  // Limpar campos do formulário
-  keyEl.value = '';
-  nameEl.value = '';
-  if (emojiEl) emojiEl.value = '';
-  
-  // fechar inline
-  const node = document.getElementById('inlineAddFinanceCategory');
-  if (node) node.style.display = 'none';
-  // remover resize handler quando fechar
-  try { if (window._inlineFinanceResizeHandler) { window.removeEventListener('resize', window._inlineFinanceResizeHandler); window.removeEventListener('orientationchange', window._inlineFinanceResizeHandler); delete window._inlineFinanceResizeHandler; } } catch(e) {}
-}
-
-function cancelInlineCategory() {
-  const node = document.getElementById('inlineAddFinanceCategory');
-  if (node) node.style.display = 'none';
-  // remover resize handler quando fechar
-  try { if (window._inlineFinanceResizeHandler) { window.removeEventListener('resize', window._inlineFinanceResizeHandler); window.removeEventListener('orientationchange', window._inlineFinanceResizeHandler); delete window._inlineFinanceResizeHandler; } } catch(e) {}
-}
-
-// ligar botões inline (se existirem)
-try {
-  const saveInlineBtn = document.getElementById('saveInlineCategoryBtn');
-  const cancelInlineBtn = document.getElementById('cancelInlineCategoryBtn');
-  if (saveInlineBtn) saveInlineBtn.addEventListener('click', trySaveInlineCategory);
-  if (cancelInlineBtn) cancelInlineBtn.addEventListener('click', cancelInlineCategory);
-  // Enter key on name field salva
-  const inlineName = document.getElementById('inlineCategoryName');
-  if (inlineName) inlineName.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySaveInlineCategory(); });
-} catch (e) { console.warn('Erro ao inicializar inline category handlers', e); }
-
-// Emoji picker handlers for inline creator
-try {
-  const emojiBtn = document.getElementById('inlineEmojiBtn');
-  const emojiPicker = document.getElementById('inlineEmojiPicker');
-  const emojiInput = document.getElementById('inlineCategoryEmoji');
-  if (emojiBtn && emojiPicker) {
-    emojiBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      emojiPicker.style.display = (emojiPicker.style.display === 'block') ? 'none' : 'block';
-    });
-    // click on emoji option
-    emojiPicker.addEventListener('click', (e) => {
-      const btn = e.target.closest && e.target.closest('.emoji-option');
-      if (!btn) return;
-      const val = (btn.textContent || '').trim();
-      if (emojiInput) emojiInput.value = val;
-      // close picker
-      emojiPicker.style.display = 'none';
-      // focus name field for workflow
-      const nameEl = document.getElementById('inlineCategoryName');
-      if (nameEl) nameEl.focus();
-    });
-
-    // close picker clicking outside
-    document.addEventListener('click', (e) => {
-      if (!emojiPicker) return;
-      const targetInside = emojiPicker.contains(e.target) || (emojiBtn && emojiBtn.contains(e.target));
-      if (!targetInside) emojiPicker.style.display = 'none';
-    });
-
-    // esc to close
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && emojiPicker && emojiPicker.style.display === 'block') emojiPicker.style.display = 'none'; });
-  }
-} catch (err) { console.warn('Erro ao inicializar emoji picker inline', err); }
-
-// Next: valida chave e avança
-if (_nextBtn && _keyInput) {
-  _nextBtn.addEventListener('click', () => {
-    const raw = (_keyInput.value || '').trim();
-    if (!raw) { showToast('⚠️ Informe um identificador curto (ex: casa, uber).'); return; }
-    const key = slugify(raw);
-    if (!key) { showToast('⚠️ Identificador inválido. Use letras/números.'); return; }
-    if (!gameState.financeCategories) gameState.financeCategories = [];
-    const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === key.toLowerCase() || (c.id || '') === 'c_' + key);
-    if (existsKey) { showToast('⚠️ Já existe uma categoria com esse identificador.'); return; }
-    // Avança para step2
-    if (_step1) _step1.style.display = 'none';
-    if (_step2) _step2.style.display = 'block';
-    if (_catNameInput) { _catNameInput.value = ''; _catNameInput.focus(); }
-    // Guarda key temporariamente no modal dataset
-    if (_modalAddCat) _modalAddCat.dataset.pendingKey = key;
-  });
-}
-
-// Safety-bind: ensure the add finance category button always opens the inline creator
-try {
-  const bindAddBtn = () => {
-    const btn = document.getElementById('addFinanceCategoryBtn');
-    if (!btn) return;
-    if (btn._boundToInline) return;
-    const h = (ev) => {
-      try { ev && ev.stopPropagation(); ev && ev.preventDefault(); } catch (e) {}
-      // addFinanceCategoryBtn clicked
-      try { openInlineAddFinanceCategory(); } catch (err) { console.warn('fallback openAddFinanceCategory', err); openAddFinanceCategory(); }
-    };
-    btn.addEventListener('click', h);
-    btn._boundToInline = true;
-  };
-  // Try bind now and on DOMContentLoaded as a fallback
-  bindAddBtn();
-  document.addEventListener('DOMContentLoaded', bindAddBtn);
-} catch (e) { /* silencioso */ }
-
-// Back: volta para step1
-if (_backBtn) {
-  _backBtn.addEventListener('click', () => {
-    if (_step2) _step2.style.display = 'none';
-    if (_step1) _step1.style.display = 'block';
-    if (_keyInput) _keyInput.focus();
-  });
-}
-
-// Save: valida nome e salva com a key previamente informada
-if (_saveCatBtn && _catNameInput) {
-  const trySaveCategory = () => {
-    const pendingKey = (_modalAddCat && _modalAddCat.dataset.pendingKey) ? _modalAddCat.dataset.pendingKey : slugify(_keyInput && _keyInput.value);
-    const name = (_catNameInput.value || '').trim();
-    const emoji = (_catEmojiInput && _catEmojiInput.value) ? _catEmojiInput.value.trim() : '';
-    if (!pendingKey) { showToast('⚠️ Identificador ausente. Volte e informe o identificador.'); return false; }
-    if (!name) { showToast('⚠️ Informe um nome para a categoria.'); return false; }
-    if (!gameState.financeCategories) gameState.financeCategories = [];
-    const existsName = gameState.financeCategories.some(c => (c.name || '').toLowerCase() === name.toLowerCase());
-    if (existsName) { showToast('⚠️ Já existe uma categoria com esse nome.'); return false; }
-    const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === pendingKey.toLowerCase() || (c.id || '') === 'c_' + pendingKey);
-    if (existsKey) { showToast('⚠️ Identificador já em uso, escolha outro.'); return false; }
-
-    const id = `c_${pendingKey}`;
-    gameState.financeCategories.push({ id, key: pendingKey, name, emoji });
-    saveGame();
-    populateFinanceCategorySelect();
-    // Seleciona a nova categoria automaticamente
-    const sel = document.getElementById('financeCategory');
-    if (sel) {
-      const label = (emoji ? emoji + ' ' : '') + name;
-      sel.value = label;
-    }
-    showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
-    if (_modalAddCat) {
-      _modalAddCat.classList.remove('active');
-      delete _modalAddCat.dataset.pendingKey;
-    }
-    // reset steps
-    if (_step2) _step2.style.display = 'none';
-    if (_step1) _step1.style.display = 'block';
-    return true;
-  };
-
-  _saveCatBtn.addEventListener('click', trySaveCategory);
-  // Habilitar/Desabilitar botão conforme input
-  const updateSaveState = () => {
-    const v = (_catNameInput.value || '').trim();
-    _saveCatBtn.disabled = !v;
-  };
-  _catNameInput.addEventListener('input', updateSaveState);
-  updateSaveState();
-}
-
-if (_cancelCatBtn) {
-  _cancelCatBtn.addEventListener('click', () => {
-    if (_modalAddCat) {
-      _modalAddCat.classList.remove('active');
-      delete _modalAddCat.dataset.pendingKey;
-    }
-    if (_step2) _step2.style.display = 'none';
-    if (_step1) _step1.style.display = 'block';
-  });
-}
-
-// Fecha modal ao clicar fora do conteúdo
-if (_modalAddCat) {
-  _modalAddCat.addEventListener('click', (e) => {
-    if (e.target === _modalAddCat) {
-      _modalAddCat.classList.remove('active');
-      delete _modalAddCat.dataset.pendingKey;
-      if (_step2) _step2.style.display = 'none';
-      if (_step1) _step1.style.display = 'block';
-    }
-  });
-  // Fecha com Esc
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (_modalAddCat && _modalAddCat.classList.contains('active')) { _modalAddCat.classList.remove('active'); delete _modalAddCat.dataset.pendingKey; if (_step2) _step2.style.display = 'none'; if (_step1) _step1.style.display = 'block'; } } });
-}
 if (elements.financeValue) elements.financeValue.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') addTransaction();
 });
@@ -12631,6 +12503,7 @@ if (elements.editAura) {
 // Inicialização Principal
 window.addEventListener('DOMContentLoaded', () => {
   console.log('🎮 Universo Real carregado com sucesso!');
+  populateFinanceCategorySelect();
   
   // Inicializa o Oráculo (com try/catch para capturar erros em tempo de execução)
   setTimeout(() => {

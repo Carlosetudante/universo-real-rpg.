@@ -376,7 +376,7 @@ body {
     .btn {
       background: linear-gradient(180deg, var(--accent), var(--accent-hover));
       color: #111;
-      padding: 10px 9px;
+      padding: 12px 18px;
       border-radius: 10px;
       font-weight: 700;
       cursor: pointer;
@@ -397,149 +397,7 @@ body {
     .btn:active {
       transform: translateY(0);
     }
-        /* ===== CHIPS DE CATEGORIA FINANCEIRA ===== */
-/* Força centralização fixa do painel inline de criação de categorias financeiras.
-   Resolve casos onde o painel aparecia deslocado/cortado à esquerda.
-*/
-#inlineAddFinanceCategory {
-  /* posição controlada via JS: por padrão é fixed sem translate
-     para permitir posicionamento relativo ao botão de '+'. */
-  position: fixed !important;
-  width: min(520px, 92%) !important;
-  max-width: 520px !important;
-  max-height: calc(100vh - 40px) !important;
-  overflow: auto !important;
-  z-index: 9999 !important;
-  display: none; /* controlado por JS */
-  background: var(--card-bg, #061226);
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 12px;
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
-}
-
-/* Emoji picker above the panel when open */
-#inlineEmojiPicker {
-  z-index: 10001 !important;
-}
-
-@media (max-width: 520px) {
-  #inlineAddFinanceCategory {
-    width: calc(94vw) !important;
-    left: 50% !important;
-    top: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    border-radius: 10px;
-    padding: 10px;
-  }
-}
-        /* Container já existe em index.html: #financeCategoryControls */
-        #financeCategoryControls {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          align-items: center;
-          margin-top: 8px;
-        }
-
-        .category-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: linear-gradient(180deg, rgb(255 255 255 / 3%), rgb(255 255 255 / 1%));
-          border: 1px solid rgba(255,255,255,0.06);
-          padding: 6px 8px;
-          border-radius: 999px;
-          font-size: 13px;
-          color: #eaf6ff;
-          box-shadow: 0 6px 18px rgb(0 0 0 / 45%);
-          transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
-          cursor: default;
-          user-select: none;
-        }
-
-        .category-chip:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 30px rgb(0 0 0 / 55%);
-        }
-
-        .category-chip .emoji {
-          font-size: 14px;
-          line-height: 1;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-          box-shadow: inset 0 -2px 6px rgba(0,0,0,0.25);
-        }
-
-        .category-chip .label {
-          max-width: 140px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          opacity: 0.95;
-        }
-
-        .category-chip .remove-btn {
-          background: transparent;
-          border: none;
-          color: rgba(255,255,255,0.7);
-          margin-left: 4px;
-          cursor: pointer;
-          font-size: 14px;
-          line-height: 1;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 3px;
-          border-radius: 6px;
-          transition: background .12s ease, color .12s ease, transform .12s ease;
-        }
-
-        .category-chip .remove-btn:hover {
-          background: rgba(255,255,255,0.04);
-          color: var(--danger);
-          transform: translateY(-1px);
-        }
-
-        /* Distinção visual para categorias criadas pelo usuário (id começa com c_) */
-        .category-chip.user-created {
-          background: linear-gradient(180deg, rgba(100,116,139,0.06), rgba(255,255,255,0.01));
-          border: 1px solid rgba(130,140,150,0.08);
-        }
-
-        /* Responsivo: melhora a quebra em telas pequenas */
-        @media (max-width: 520px) {
-          .category-chip { font-size: 12px; padding: 6px; }
-          .category-chip .label { max-width: 100px; }
-          #inlineAddFinanceCategory { width: 100%; }
-        }
-
-        /* Botão pequeno de remoção ao lado do select */
-        #deleteSelectedCategoryBtn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 34px;
-          height: 34px;
-          border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.04);
-          background: transparent;
-          color: rgba(255,255,255,0.75);
-          cursor: pointer;
-          transition: background .12s ease, color .12s ease, transform .12s ease;
-        }
-
-        #deleteSelectedCategoryBtn:hover {
-          background: rgba(255,255,255,0.03);
-          color: var(--danger);
-          transform: translateY(-2px);
-        }
-
+    
     /* Otimização para toque em mobile (remove delay de clique) */
     button, .btn, .icon-btn, .tab-btn, .task-item, .bill-item, .shop-item {
       touch-action: manipulation;
@@ -1554,6 +1412,21 @@ body.zen-mode-active .container {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   filter: drop-shadow(0 0 5px rgb(255 221 87 / 30%));
+}
+
+/* Modal de Categoria Financeira */
+#financeCategoryModal .modal-content {
+  max-width: 420px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+}
+#financeCategoryModal .form-row label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+#financeCategoryModal input[type="text"] {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .modal-content .form-row {
@@ -3744,114 +3617,6 @@ input.success {
   box-shadow: 0 10px 22px rgba(255, 221, 87, 0.28);
 }
 
-.bible-search-container {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.bible-search-input {
-  flex: 1;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.2);
-  color: #fff;
-  font-size: 14px;
-}
-
-.bible-search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 221, 87, 0.1);
-}
-
-.bible-reader {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  margin-top: 15px;
-  animation: fade-in 0.3s ease;
-}
-
-.bible-reader-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.bible-reader-controls {
-  display: flex;
-  gap: 8px;
-}
-
-.bible-text-content {
-  padding: 20px;
-  max-height: 60vh;
-  overflow-y: auto;
-  font-family: 'Georgia', serif; /* Fonte melhor para leitura */
-  line-height: 1.8;
-  font-size: 1.1rem;
-  color: #e6eef8;
-}
-
-.bible-verse {
-  margin-bottom: 12px;
-  display: block;
-}
-
-.verse-number {
-  font-weight: bold;
-  color: var(--accent);
-  font-size: 0.75em;
-  margin-right: 6px;
-  vertical-align: super;
-  opacity: 0.8;
-}
-
-.verse-text {
-  display: inline;
-}
-
-.bible-search-result {
-  padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.bible-search-result:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.result-ref {
-  font-weight: bold;
-  color: var(--accent);
-  font-size: 0.9rem;
-  margin-bottom: 4px;
-}
-
-.result-text {
-  font-size: 0.9rem;
-  opacity: 0.8;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.result-text mark {
-  background: rgba(255, 221, 87, 0.3);
-  color: #fff;
-  padding: 0 2px;
-  border-radius: 2px;
-}
-
 .bible-pdf-tools {
   display: flex;
   flex-direction: column;
@@ -4234,59 +3999,3 @@ body.logged-in{padding-bottom:56px}
   body.logged-in{padding-bottom:0}
 }
 
-/* Inline Finance Category creator: posição fixa, sombra, transição e overflow seguro */
-#inlineAddFinanceCategory {
-  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-  border: 1px solid rgba(255,255,255,0.06);
-  padding: 10px;
-  border-radius: 10px;
-  box-shadow: 0 12px 40px rgba(2,6,23,0.7);
-  backdrop-filter: blur(6px);
-  transition: opacity 200ms ease, transform 200ms ease;
-  opacity: 1;
-  max-width: 520px;
-  width: auto;
-}
-
-#inlineAddFinanceCategory.hide {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px) scale(0.995);
-}
-
-#inlineAddFinanceCategory > div { gap: 8px; display:flex; align-items:center; }
-
-#inlineAddFinanceCategory input[type="text"] {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid rgba(255,255,255,0.04);
-  color: inherit;
-  padding: 8px 10px;
-  border-radius: 8px;
-  height: 36px;
-}
-
-#inlineAddFinanceCategory .emoji-option { 
-  background: transparent; 
-  border: none; 
-  cursor: pointer; 
-  padding: 6px; 
-  font-size: 1.3rem; 
-  border-radius: 6px;
-  transition: background 0.15s, transform 0.1s;
-}
-#inlineAddFinanceCategory .emoji-option:hover {
-  background: rgba(255,255,255,0.1);
-  transform: scale(1.15);
-}
-#inlineAddFinanceCategory .emoji-option:active {
-  transform: scale(0.95);
-}
-
-/* Emoji picker positioning fallback when panel is fixed */
-#inlineEmojiPicker { z-index: 10000; }
-
-@media(max-width:520px){
-  #inlineAddFinanceCategory { left: 8px !important; right: 8px !important; max-width: none; }
-  #inlineAddFinanceCategory input[type="text"]{ width: 100%; }
-  #inlineAddFinanceCategory > div{ flex-direction: column; align-items: stretch; gap: 6px; }
-}

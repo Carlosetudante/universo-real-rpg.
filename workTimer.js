@@ -7,21 +7,17 @@ const WorkTimer = {
   startBtn: null,
   stopBtn: null,
   floatingWidget: null,
-  _initialized: false,
-  _listenersAttached: false,
 
   init() {
-    if (this._initialized) return;
     // Tenta encontrar os elementos do timer principal (index.html)
     this.displayElement = document.getElementById('workTimerDisplay');
     this.startBtn = document.getElementById('startWorkBtn');
     this.stopBtn = document.getElementById('stopWorkBtn');
 
     // Se os botões existem, configura os listeners
-    if (this.startBtn && this.stopBtn && !this._listenersAttached) {
+    if (this.startBtn && this.stopBtn) {
       this.startBtn.addEventListener('click', () => this.start());
       this.stopBtn.addEventListener('click', () => this.stop());
-      this._listenersAttached = true;
     }
 
     // Cria o widget flutuante APENAS se há um timer ativo E não estamos na página com o timer principal
@@ -34,7 +30,7 @@ const WorkTimer = {
     this.updateDisplay();
 
     // Se há um timer ativo, inicia o intervalo
-    if (hasActiveTimer && !this.intervalId) {
+    if (hasActiveTimer) {
       this.intervalId = setInterval(() => this.updateDisplay(), 1000);
     }
 
@@ -239,9 +235,6 @@ const WorkTimer = {
     if (floatingStopBtn) {
       floatingStopBtn.addEventListener('click', () => this.stop());
     }
-
-    // Marca como inicializado para evitar re-inicializações
-    this._initialized = true;
   },
 
   formatTime(ms) {
@@ -318,22 +311,18 @@ const WorkTimer = {
   },
 
   start() {
-    // Evita iniciar se já estiver rodando
-    if (this.isRunning()) return;
-
-    const startTs = Date.now();
-    localStorage.setItem('work_start_time', startTs.toString());
-
+    localStorage.setItem('work_start_time', Date.now().toString());
+    
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
-
+    
     this.intervalId = setInterval(() => this.updateDisplay(), 1000);
     this.updateDisplay();
-
+    
     // Dispara um evento customizado para outras partes do app
     window.dispatchEvent(new CustomEvent('workTimerStarted', { 
-      detail: { startTime: startTs } 
+      detail: { startTime: Date.now() } 
     }));
   },
 

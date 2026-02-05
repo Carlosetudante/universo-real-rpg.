@@ -17,14 +17,6 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1/dist/transformers.min.js"></script>
-  <script type="module">
-    import { createBiblePDFModule } from './js/bible_pdf_module.js';
-    window.createBiblePDFModule = createBiblePDFModule;
-  </script>
-  <script>
-    // Configuração do Worker do PDF.js
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-  </script>
 </head>
 <body>
   <!-- Splash Screen (Tela de Abertura) -->
@@ -289,6 +281,7 @@
         <nav class="app-nav">
           <button class="nav-item active tab-btn" data-tab="hero"><span class="nav-icon">🦸</span> Herói</button>
           <button class="nav-item tab-btn" data-tab="quests"><span class="nav-icon">📜</span> Missões</button>
+          <button class="nav-item tab-btn" data-tab="bible"><span class="nav-icon">✝️</span> Bíblia</button>
           <button class="nav-item tab-btn" data-tab="social"><span class="nav-icon">❤️</span> Social</button>
           <button class="nav-item tab-btn" data-tab="dom"><span class="nav-icon">💼</span> Trabalho</button>
         </nav>
@@ -470,138 +463,18 @@
                 <option value="expense">Despesa</option>
                 <option value="income">Receita</option>
               </select>
-              <div style="display:flex; gap:8px; align-items:center; width:100%;">
-                <select id="financeCategory" style="flex: 1;">
-                  <option value="Outros">Outros</option>
-                  <option value="Alimentação">Alimentação</option>
-                  <option value="Transporte">Transporte</option>
-                  <option value="Lazer">Lazer</option>
-                  <option value="Contas">Contas</option>
-                  <option value="Salário">Salário</option>
-                  <option value="Extra">Extra</option>
-                </select>
-                <button class="ghost" id="addFinanceCategoryBtn" title="Criar categoria">➕</button>
-                <!-- botão para remover a categoria selecionada (aparece apenas para categorias criadas pelo usuário) -->
-                <button class="ghost" id="deleteSelectedCategoryBtn" title="Remover categoria" style="display:none; margin-left:6px;">✖</button>
-                <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
-              </div>
-              <!-- Inline: Criar Categoria Financeira -->
-              <div id="inlineAddFinanceCategory" style="display:none; position:fixed; z-index:10000; left:50%; top:50%; transform:translate(-50%,-50%); width:min(480px, 90vw); max-width:90vw; box-sizing:border-box; background:var(--card-bg, #0a1628); border:1px solid rgba(255,255,255,0.12); border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.5); padding:16px;">
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                  <div style="font-weight:600; font-size:1rem; color:#fff; margin-bottom:4px;">➕ Nova Categoria</div>
-                  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                    <input type="text" id="inlineCategoryKey" placeholder="ID (ex: casa)" style="flex:1; min-width:100px;">
-                    <input type="text" id="inlineCategoryName" placeholder="Nome (ex: Casa)" style="flex:1; min-width:120px;">
-                    <div style="display:flex; gap:4px; align-items:center;">
-                      <input type="text" id="inlineCategoryEmoji" placeholder="🏠" style="width:50px; text-align:center;">
-                      <button class="ghost" id="inlineEmojiBtn" title="Escolher emoji" style="padding:8px;">😊</button>
-                    </div>
-                  </div>
-                  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
-                    <button class="ghost" id="cancelInlineCategoryBtn" style="padding:8px 16px;">Cancelar</button>
-                    <button class="btn" id="saveInlineCategoryBtn" style="padding:8px 16px;">Salvar</button>
-                  </div>
-                </div>
-                <div id="inlineEmojiPicker" style="display:none; position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:8px; background:var(--card-bg, #0a1628); border:1px solid rgba(255,255,255,0.12); padding:12px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.6); z-index:10001; max-height:300px; overflow-y:auto;">
-                  <div style="display:flex; gap:4px; flex-wrap:wrap; max-width:320px; justify-content:center;">
-                    <!-- Dinheiro e Finanças -->
-                    <button class="emoji-option" type="button">💰</button>
-                    <button class="emoji-option" type="button">💵</button>
-                    <button class="emoji-option" type="button">💳</button>
-                    <button class="emoji-option" type="button">🏦</button>
-                    <button class="emoji-option" type="button">💎</button>
-                    <button class="emoji-option" type="button">🪙</button>
-                    <button class="emoji-option" type="button">📈</button>
-                    <button class="emoji-option" type="button">📉</button>
-                    <button class="emoji-option" type="button">🧾</button>
-                    <button class="emoji-option" type="button">🛒</button>
-                    <!-- Casa e Moradia -->
-                    <button class="emoji-option" type="button">🏠</button>
-                    <button class="emoji-option" type="button">🏡</button>
-                    <button class="emoji-option" type="button">🏢</button>
-                    <button class="emoji-option" type="button">🔑</button>
-                    <button class="emoji-option" type="button">🛋️</button>
-                    <button class="emoji-option" type="button">🛏️</button>
-                    <button class="emoji-option" type="button">🚿</button>
-                    <button class="emoji-option" type="button">💡</button>
-                    <button class="emoji-option" type="button">🔌</button>
-                    <button class="emoji-option" type="button">📺</button>
-                    <!-- Transporte -->
-                    <button class="emoji-option" type="button">🚗</button>
-                    <button class="emoji-option" type="button">🚕</button>
-                    <button class="emoji-option" type="button">🚌</button>
-                    <button class="emoji-option" type="button">🚇</button>
-                    <button class="emoji-option" type="button">✈️</button>
-                    <button class="emoji-option" type="button">⛽</button>
-                    <button class="emoji-option" type="button">🚲</button>
-                    <button class="emoji-option" type="button">🛵</button>
-                    <button class="emoji-option" type="button">🚙</button>
-                    <button class="emoji-option" type="button">🅿️</button>
-                    <!-- Alimentação -->
-                    <button class="emoji-option" type="button">🍽️</button>
-                    <button class="emoji-option" type="button">🍕</button>
-                    <button class="emoji-option" type="button">🍔</button>
-                    <button class="emoji-option" type="button">🍟</button>
-                    <button class="emoji-option" type="button">🍣</button>
-                    <button class="emoji-option" type="button">🥗</button>
-                    <button class="emoji-option" type="button">🍺</button>
-                    <button class="emoji-option" type="button">☕</button>
-                    <button class="emoji-option" type="button">🧃</button>
-                    <button class="emoji-option" type="button">🍰</button>
-                    <!-- Saúde -->
-                    <button class="emoji-option" type="button">💊</button>
-                    <button class="emoji-option" type="button">🏥</button>
-                    <button class="emoji-option" type="button">🩺</button>
-                    <button class="emoji-option" type="button">💉</button>
-                    <button class="emoji-option" type="button">🦷</button>
-                    <button class="emoji-option" type="button">👓</button>
-                    <button class="emoji-option" type="button">🏋️</button>
-                    <button class="emoji-option" type="button">🧘</button>
-                    <!-- Lazer e Entretenimento -->
-                    <button class="emoji-option" type="button">🎉</button>
-                    <button class="emoji-option" type="button">🎬</button>
-                    <button class="emoji-option" type="button">🎮</button>
-                    <button class="emoji-option" type="button">🎵</button>
-                    <button class="emoji-option" type="button">📚</button>
-                    <button class="emoji-option" type="button">🎁</button>
-                    <button class="emoji-option" type="button">🎨</button>
-                    <button class="emoji-option" type="button">⚽</button>
-                    <button class="emoji-option" type="button">🏖️</button>
-                    <button class="emoji-option" type="button">🎢</button>
-                    <!-- Educação e Trabalho -->
-                    <button class="emoji-option" type="button">📖</button>
-                    <button class="emoji-option" type="button">🎓</button>
-                    <button class="emoji-option" type="button">💼</button>
-                    <button class="emoji-option" type="button">💻</button>
-                    <button class="emoji-option" type="button">📱</button>
-                    <button class="emoji-option" type="button">🖨️</button>
-                    <button class="emoji-option" type="button">✏️</button>
-                    <button class="emoji-option" type="button">📝</button>
-                    <!-- Vestuário e Beleza -->
-                    <button class="emoji-option" type="button">👕</button>
-                    <button class="emoji-option" type="button">👗</button>
-                    <button class="emoji-option" type="button">👟</button>
-                    <button class="emoji-option" type="button">👜</button>
-                    <button class="emoji-option" type="button">💄</button>
-                    <button class="emoji-option" type="button">💇</button>
-                    <!-- Pets -->
-                    <button class="emoji-option" type="button">🐕</button>
-                    <button class="emoji-option" type="button">🐈</button>
-                    <button class="emoji-option" type="button">🐾</button>
-                    <!-- Outros -->
-                    <button class="emoji-option" type="button">✨</button>
-                    <button class="emoji-option" type="button">⭐</button>
-                    <button class="emoji-option" type="button">❤️</button>
-                    <button class="emoji-option" type="button">🗂️</button>
-                    <button class="emoji-option" type="button">📦</button>
-                    <button class="emoji-option" type="button">🔧</button>
-                    <button class="emoji-option" type="button">🛠️</button>
-                    <button class="emoji-option" type="button">📞</button>
-                    <button class="emoji-option" type="button">📧</button>
-                    <button class="emoji-option" type="button">🌐</button>
-                  </div>
-                </div>
-              </div>
+              <select id="financeCategory" style="flex: 1;">
+                <option value="Outros">Outros</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Contas">Contas</option>
+                <option value="Salário">Salário</option>
+                <option value="Extra">Extra</option>
+              </select>
+              <button class="ghost" id="addFinanceCategoryBtn" style="width:auto; padding: 8px 10px;" title="Adicionar categoria">➕</button>
+              <button class="ghost" id="removeFinanceCategoryBtn" style="width:auto; padding: 8px 10px;" title="Remover categoria">-</button>
+              <button class="btn" id="addFinanceBtn" style="width: auto;">+</button>
             </div>
 
             <!-- Meta Financeira -->
@@ -774,8 +647,6 @@
                 <canvas id="workChart"></canvas>
               </div>
             </div>
-
-              <!-- Inline moved to Finances tab to match the + button (was under Work) -->
           </div>
         </div>
 
@@ -1009,8 +880,69 @@
     <button class="nav-btn" data-view="home" aria-label="Home">🏠<span class="nav-label">Início</span></button>
     <button class="nav-btn" data-view="oraculo" aria-label="Oráculo">🤖<span class="nav-label">Oráculo</span></button>
     <button class="nav-btn" data-view="tarefas" aria-label="Tarefas">✅<span class="nav-label">Tarefas</span></button>
+    <button class="nav-btn" data-view="bible" aria-label="Bíblia">✝️<span class="nav-label">Bíblia</span></button>
     <button class="nav-btn more-btn" id="mobileNavMoreBtn" aria-label="Mais">⋮<span class="nav-label">Mais</span></button>
   </nav>
 
+    <!-- Modal: Categorias Financeiras -->
+    <div class="modal" id="financeCategoryModal">
+      <div class="modal-content">
+        <h2>Nova Categoria</h2>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Nome</label>
+            <input type="text" id="financeCategoryNameInput" placeholder="Ex: Educacao">
+            <div class="small" id="financeCategoryNameMsg" style="margin-top:6px; opacity:.7;"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Emoji (opcional)</label>
+            <input type="text" id="financeCategoryEmojiInput" placeholder="Ex: 📚">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top: 16px;">
+          <button class="btn" id="saveFinanceCategoryBtn">Salvar</button>
+          <button class="ghost" id="cancelFinanceCategoryBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
+    <!-- Modal: Editar Registro de Trabalho -->
+    <div class="modal" id="workLogEditModal">
+      <div class="modal-content">
+        <h2>Editar Registro</h2>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Data</label>
+            <input type="date" id="workEditDate">
+          </div>
+          <div style="flex:1">
+            <label>Hora</label>
+            <input type="time" id="workEditTime">
+          </div>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label id="workEditValueLabel">Quantidade</label>
+            <input type="number" id="workEditValue" placeholder="0">
+          </div>
+        </div>
+        <div style="margin-bottom: 12px; display:flex; align-items:center; gap:8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px;">
+          <input type="checkbox" id="workEditUnpaid" style="width:auto; cursor:pointer;">
+          <label for="workEditUnpaid" style="margin:0; font-size:12px; opacity:0.8;">Não remunerado</label>
+        </div>
+        <div class="form-row">
+          <div style="flex:1">
+            <label>Observação</label>
+            <input type="text" id="workEditNote" placeholder="Observação...">
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top: 16px;">
+          <button class="btn" id="workEditSaveBtn">Salvar</button>
+          <button class="ghost" id="workEditDeleteBtn" style="color: var(--danger);">Excluir</button>
+          <button class="ghost" id="workEditCancelBtn">Cancelar</button>
+        </div>
+      </div>
+    </div>
 </body>
 </html>
