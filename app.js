@@ -8,6 +8,18 @@ window.OracleConfig = window.OracleConfig || {
   telemetry: true,        // liga log básico
   telemetrySample: 1.0    // 1.0 = logar tudo, 0.2 = 20%
 };
+// Se o usuário pediu inserção explícita, disparar inserção uma vez ao carregar (delay curto)
+if (!window._workTestInsertedImmediate) {
+  window._workTestInsertedImmediate = true;
+  setTimeout(() => {
+    try {
+      if (typeof window._insertSampleWorkDataForTesting === 'function') {
+        window._insertSampleWorkDataForTesting();
+        console.log('[TEST] Inserção automática de amostras executada.');
+      }
+    } catch (e) { console.warn('[TEST] Falha ao inserir amostras automaticamente:', e); }
+  }, 250);
+}
 
 // Telemetria leve (console + localStorage)
 window.OracleTelemetry = window.OracleTelemetry || {
@@ -33,6 +45,82 @@ window.OracleTelemetry = window.OracleTelemetry || {
     } catch (_) {}
   }
 };
+
+// ---------- Helper de teste: insere dados de produção de massas para validar agrupamento por mês/semana
+window._insertSampleWorkDataForTesting = function() {
+  if (typeof gameState === 'undefined' || gameState === null) window.gameState = {};
+  if (!window.gameState.workLog) window.gameState.workLog = [];
+
+  // Limpa amostras anteriores marcadas como test (mantém registros reais)
+  window.gameState.workLog = window.gameState.workLog.filter(r => !r._isTestSample);
+
+  const samples = [
+    // Mês 2026-01 (testar semanas 1..4)
+    { date: '2026-01-03', inputVal: 10, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '1', month: '2026-01' },
+    { date: '2026-01-05', inputVal: 8, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '1', month: '2026-01' },
+    { date: '2026-01-10', inputVal: 12, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '2', month: '2026-01' },
+    { date: '2026-01-12', inputVal: 7, type: 'pizzaria', isUnpaid: true, financialVal: 0, week: '2', month: '2026-01' },
+    { date: '2026-01-18', inputVal: 15, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '3', month: '2026-01' },
+    { date: '2026-01-21', inputVal: 9, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '3', month: '2026-01' },
+    { date: '2026-01-25', inputVal: 20, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '4', month: '2026-01' },
+    { date: '2026-01-30', inputVal: 5, type: 'pizzaria', isUnpaid: true, financialVal: 0, week: '4', month: '2026-01' },
+    // Mês 2026-02 (para verificar filtro)
+    { date: '2026-02-02', inputVal: 11, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '1', month: '2026-02' },
+    { date: '2026-02-09', inputVal: 14, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '2', month: '2026-02' },
+    { date: '2026-02-16', inputVal: 6, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '3', month: '2026-02' },
+    { date: '2026-02-24', inputVal: 13, type: 'pizzaria', isUnpaid: false, financialVal: 0, week: '4', month: '2026-02' }
+  ];
+
+  const now = Date.now();
+  samples.forEach(s => {
+    window.gameState.workLog.push(Object.assign({
+      timestamp: Date.parse(s.date) || now,
+      _isTestSample: true
+    }, s));
+  });
+
+  if (typeof renderWorkHistory === 'function') {
+    try {
+      renderWorkHistory();
+      console.log('[TEST] Inseridos', samples.length, 'registros de teste e renderWorkHistory() chamado.');
+    } catch (e) {
+      console.warn('[TEST] Inseridos amostras, mas renderWorkHistory() falhou:', e);
+    }
+  } else {
+    console.log('[TEST] Inseridos', samples.length, 'registros de teste. Abra a aba Trabalho e chame renderWorkHistory() manualmente.');
+  }
+};
+// Remove amostras de teste que foram marcadas com `_isTestSample` (útil para o botão de UI)
+window._removeSampleWorkDataForTesting = function() {
+  try {
+    if (typeof gameState === 'undefined' || gameState === null) window.gameState = {};
+    if (!Array.isArray(window.gameState.workLog)) window.gameState.workLog = [];
+    const before = window.gameState.workLog.length;
+    window.gameState.workLog = window.gameState.workLog.filter(r => !r._isTestSample);
+    const after = window.gameState.workLog.length;
+    console.log('[TEST] Removidas', before - after, 'amostras de teste.');
+    if (typeof saveGame === 'function') saveGame();
+    if (typeof renderWorkHistory === 'function') renderWorkHistory();
+  } catch (e) {
+    console.warn('[TEST] Falha ao remover amostras de teste:', e);
+  }
+};
+
+// Delegated click handler: detecta botões com o texto exato ou com classe `remove-test-samples`
+document.addEventListener('click', (ev) => {
+  try {
+    const btn = ev.target.closest && ev.target.closest('button');
+    if (!btn) return;
+    const txt = (btn.textContent || '').trim();
+    if (txt === 'Remover amostras de teste' || btn.classList.contains('remove-test-samples')) {
+      ev.preventDefault();
+      if (confirm && !confirm('Remover todas as amostras de teste? Esta ação não pode ser desfeita.')) return;
+      if (typeof window._removeSampleWorkDataForTesting === 'function') window._removeSampleWorkDataForTesting();
+    }
+  } catch (e) {
+    console.warn('Erro no handler de remoção de amostras:', e);
+  }
+});
 // Sistema de Som (Web Audio API) - Inicializado sob demanda
 let audioCtx = null;
 
@@ -621,6 +709,15 @@ const elements = {
   financeValue: document.getElementById('financeValue'),
   financeType: document.getElementById('financeType'),
   financeCategory: document.getElementById('financeCategory'),
+  addFinanceCategoryBtn: document.getElementById('addFinanceCategoryBtn'),
+  addFinanceCategoryModal: document.getElementById('addFinanceCategoryModal'),
+  newFinanceCategoryKey: document.getElementById('newFinanceCategoryKey'),
+  nextFinanceCategoryBtn: document.getElementById('nextFinanceCategoryBtn'),
+  backFinanceCategoryBtn: document.getElementById('backFinanceCategoryBtn'),
+  newFinanceCategoryName: document.getElementById('newFinanceCategoryName'),
+  newFinanceCategoryEmoji: document.getElementById('newFinanceCategoryEmoji'),
+  saveFinanceCategoryBtn: document.getElementById('saveFinanceCategoryBtn'),
+  cancelFinanceCategoryBtn: document.getElementById('cancelFinanceCategoryBtn'),
   addFinanceBtn: document.getElementById('addFinanceBtn'),
   financeList: document.getElementById('financeList'),
   financeBalance: document.getElementById('financeBalance'),
@@ -2013,6 +2110,123 @@ function addTransaction() {
   showToast('💰 Transação registrada!');
 }
 
+// --- Categorias de Finanças (Nome + Emoji) ---
+function ensureFinanceCategories() {
+  if (!gameState.financeCategories) {
+    gameState.financeCategories = [
+      { id: 'c_outros', name: 'Outros', emoji: '🗂️' },
+      { id: 'c_alimentacao', name: 'Alimentação', emoji: '🍽️' },
+      { id: 'c_transporte', name: 'Transporte', emoji: '🚌' },
+      { id: 'c_lazer', name: 'Lazer', emoji: '🎉' },
+      { id: 'c_contas', name: 'Contas', emoji: '💡' },
+      { id: 'c_salario', name: 'Salário', emoji: '💼' },
+      { id: 'c_extra', name: 'Extra', emoji: '✨' }
+    ];
+    saveGame();
+  }
+}
+
+function populateFinanceCategorySelect() {
+  ensureFinanceCategories();
+  const sel = document.getElementById('financeCategory');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '';
+  gameState.financeCategories.forEach(cat => {
+    const label = `${cat.emoji || ''} ${cat.name}`.trim();
+    const opt = document.createElement('option');
+    opt.value = label;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  // keep previous selection when possible
+  if (current) sel.value = current;
+
+  // Atualiza o botão de remover categoria (mostra apenas se a seleção atual for uma categoria criada pelo usuário)
+  try {
+    const deleteBtn = document.getElementById('deleteSelectedCategoryBtn');
+    const updateDeleteBtnState = () => {
+      if (!deleteBtn) return;
+      const selected = sel.value;
+      const matched = (gameState.financeCategories || []).find(cat => `${cat.emoji || ''} ${cat.name}`.trim() === selected);
+      if (matched && (matched.id || '').startsWith('c_')) {
+        deleteBtn.style.display = 'inline-flex';
+        deleteBtn.setAttribute('data-cat-id', matched.id);
+        deleteBtn.title = `Remover ${matched.name}`;
+      } else {
+        deleteBtn.style.display = 'none';
+        deleteBtn.removeAttribute('data-cat-id');
+      }
+    };
+
+    if (deleteBtn) {
+      // bind change on select to update button visibility
+      sel.removeEventListener('change', updateDeleteBtnState);
+      sel.addEventListener('change', updateDeleteBtnState);
+      // ensure initial state
+      updateDeleteBtnState();
+
+      // set click handler once
+      deleteBtn.removeEventListener('click', deleteBtn._handler || (() => {}));
+      const handler = (e) => {
+        const id = deleteBtn.getAttribute('data-cat-id');
+        if (!id) return;
+        const cat = (gameState.financeCategories || []).find(c => c.id === id);
+        if (!cat) return;
+        if (!confirm(`Remover categoria "${cat.name}"?`)) return;
+        gameState.financeCategories = (gameState.financeCategories || []).filter(c => c.id !== id);
+        saveGame();
+        populateFinanceCategorySelect();
+        showToast('✅ Categoria removida');
+      };
+      deleteBtn._handler = handler;
+      deleteBtn.addEventListener('click', handler);
+    }
+  } catch (e) { /* silencioso */ }
+}
+
+function openAddFinanceCategory() {
+  
+  const modal = document.getElementById('addFinanceCategoryModal');
+  const nameInput = document.getElementById('newFinanceCategoryName');
+  const emojiInput = document.getElementById('newFinanceCategoryEmoji');
+  if (!modal || !nameInput || !emojiInput) {
+    // Fallback para prompt se o modal não existir
+    const name = prompt('Nome da nova categoria: (ex: Pizzas)');
+    if (!name) return;
+    const emoji = prompt('Emoji para a categoria (ex: 🍕). Deixe vazio para nenhum.');
+    const id = `c_${Date.now()}`;
+    if (!gameState.financeCategories) gameState.financeCategories = [];
+    gameState.financeCategories.push({ id, name: name.trim(), emoji: (emoji || '').trim() });
+    saveGame();
+    populateFinanceCategorySelect();
+    showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
+    return;
+  }
+
+  // Abrir modal e focar no input
+  // Garantir que o fluxo abra no passo 1 (identificador)
+  const step1 = document.getElementById('catStep1');
+  const step2 = document.getElementById('catStep2');
+  const keyInput = document.getElementById('newFinanceCategoryKey');
+  const nameInputEl = document.getElementById('newFinanceCategoryName');
+  const emojiInputEl = document.getElementById('newFinanceCategoryEmoji');
+  if (step1) step1.style.display = 'block';
+  if (step2) step2.style.display = 'none';
+  if (nameInputEl) nameInputEl.value = '';
+  if (emojiInputEl) emojiInputEl.value = '';
+  if (keyInput) keyInput.value = '';
+  // If modal is inside a hidden parent (e.g., workDashboardSection hidden), move it to body so fixed positioning works
+    try {
+      if (modal && modal.closest && modal.closest('.hidden')) {
+        document.body.appendChild(modal);
+      }
+    } catch (e) { /* silencioso */ }
+    if (modal) modal.classList.add('active');
+    // Focus com pequeno delay para evitar conflitos com outros listeners
+    setTimeout(() => { try { if (keyInput) { keyInput.focus(); } } catch(e){/* silencioso */} }, 180);
+}
+
 async function removeTransaction(id) {
   if (confirm('Remover esta transação?')) {
     // Converte para o tipo correto para comparação
@@ -3340,6 +3554,13 @@ function renderWorkSingularity() {
             <option value="4" ${currentWeek === 4 ? 'selected' : ''}>Semana 4</option>
           </select>
         </div>
+        <div style="flex: 1;">
+          <label style="font-size: 11px; opacity: 0.7; margin-bottom: 4px; display: block;">Mês</label>
+          <div style="display:flex; justify-content:center; align-items:center;">
+            <div id="workMonthDisplay" role="button" tabindex="0" style="padding:8px 14px; border-radius:8px; background: rgba(255,255,255,0.02); font-weight:600; cursor:pointer;">${(new Date(today)).toLocaleString('pt-BR',{month:'short', year:'numeric'})}</div>
+            <input type="month" id="workMonthInput" value="${today.slice(0,7)}" style="display:none;">
+          </div>
+        </div>
       </div>
       <div class="form-row" style="margin-bottom: 15px;">
         <div style="flex: 1;">
@@ -3354,6 +3575,45 @@ function renderWorkSingularity() {
       <button class="btn" onclick="addWorkRecord()" style="width: 100%; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">✅ Registrar Produção</button>
     </div>
   `;
+
+  // Configurações do controle de mês (prev/next + display)
+  (function attachMonthControls() {
+    const monthInputEl = document.getElementById('workMonthInput');
+    const monthDisplayEl = document.getElementById('workMonthDisplay');
+
+    const formatMonthLabel = (ym) => {
+      if (!ym) return 'Todos os meses';
+      try {
+        const [yy, mm] = ym.split('-').map(Number);
+        const d = new Date(yy, (mm || 1) - 1, 1);
+        const label = d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      } catch (e) { return ym || '';
+      }
+    };
+
+    const updateDisplay = () => {
+      const val = monthInputEl && monthInputEl.value ? monthInputEl.value : '';
+      if (monthDisplayEl) monthDisplayEl.textContent = formatMonthLabel(val);
+    };
+
+    // Clique no rótulo abre o seletor nativo do month input
+    if (monthDisplayEl) {
+      monthDisplayEl.addEventListener('click', () => {
+        if (!monthInputEl) return;
+        // showPicker existe em alguns navegadores modernos
+        if (typeof monthInputEl.showPicker === 'function') {
+          monthInputEl.showPicker();
+        } else {
+          monthInputEl.click();
+        }
+      });
+      monthDisplayEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); monthDisplayEl.click(); } });
+    }
+
+    if (monthInputEl) monthInputEl.addEventListener('change', updateDisplay);
+    setTimeout(updateDisplay, 50);
+  })();
 }
 
 // Função para selecionar a semana automaticamente baseada na data
@@ -3371,6 +3631,11 @@ window.autoSelectWeek = function() {
   if (week > 4) week = 4;
 
   weekSelect.value = week;
+  // Atualiza também o seletor de mês para manter coerência
+  const monthInput = document.getElementById('workMonthInput');
+  if (monthInput) {
+    monthInput.value = dateInput.value.slice(0,7);
+  }
 };
 
 window.saveWorkConfig = function() {
@@ -3404,6 +3669,8 @@ window.addWorkRecord = function() {
   let desc = '';
   const isUnpaid = unpaidInput ? unpaidInput.checked : false;
   const week = weekInput ? weekInput.value : null;
+  const monthInput = document.getElementById('workMonthInput');
+  const month = monthInput && monthInput.value ? monthInput.value : (recordDate ? recordDate.slice(0,7) : null);
 
   // Lógica de Singularidade
   if (type === 'time_tracking') {
@@ -3446,19 +3713,33 @@ window.addWorkRecord = function() {
     duration: type === 'time_tracking' ? val * 3600000 : 0, // Converte horas para ms se for tempo
     isUnpaid: isUnpaid,
     week: week
+    , month: month
   });
 
   // Adicionar ao Financeiro (se gerou valor)
   if (loggedFinancialValue > 0) {
     if (!gameState.finances) gameState.finances = [];
-    gameState.finances.push({
+    // Categoria mais específica para produção de massas
+    const category = (type === 'pizzaria') ? 'Produção' : 'Extra';
+    const financeEntry = {
       id: Date.now(),
       desc: `${gameState.job.name} - ${desc}`,
       value: loggedFinancialValue,
       type: 'income',
-      category: 'Extra', // Poderia ser Salário, mas Extra é mais seguro para variáveis
+      category: category,
       date: new Date().toISOString()
-    });
+    };
+    gameState.finances.push(financeEntry);
+
+    // Anexa referência do lançamento financeiro ao registro de produção
+    try {
+      const idx = gameState.workLog.length - 1;
+      if (idx >= 0) {
+        gameState.workLog[idx].financeId = financeEntry.id;
+      }
+    } catch (e) {
+      console.warn('Falha ao anexar financeId ao workLog:', e);
+    }
   }
 
   input.value = '';
@@ -3632,135 +3913,159 @@ function renderWorkHistory() {
   // Renderizar Lista de Produção (Agrupada por Semana)
   const renderProductionList = (items, container, emptyMsg) => {
     container.innerHTML = '';
+
+    // Top: filtro com visual mais agradável
+    // Preserva o valor selecionado anteriormente (pode ser string vazia para 'limpar')
+    const prevSelected = (window._workHistorySelectedMonth !== undefined && window._workHistorySelectedMonth !== null)
+      ? window._workHistorySelectedMonth
+      : (document.getElementById('workHistoryMonthFilter') ? document.getElementById('workHistoryMonthFilter').value : null);
+    const filterBar = document.createElement('div');
+    filterBar.style.cssText = 'display:flex; gap:10px; align-items:center; margin-bottom:12px; padding:8px; background: rgba(255,255,255,0.02); border-radius:10px; border:1px solid rgba(255,255,255,0.04);';
+    const lbl = document.createElement('label'); lbl.style.cssText = 'font-size:13px; opacity:0.85;'; lbl.textContent = 'Filtrar mês:';
+    const monthInput = document.createElement('input'); monthInput.type = 'month'; monthInput.id = 'workHistoryMonthFilter';
+    // Default para o mês: se não houver seleção anterior, tenta inferir a partir do último registro disponível
+    let defaultMonth = new Date().toISOString().slice(0,7);
+    if ((prevSelected === null || prevSelected === '') && Array.isArray(items) && items.length) {
+      // procura o último item que tenha month ou date
+      const last = items.slice().reverse().find(it => it.month || it.date);
+      if (last) {
+        if (last.month) defaultMonth = (last.month || '').slice(0,7) || defaultMonth;
+        else if (last.date) defaultMonth = (last.date || '').slice(0,7) || defaultMonth;
+      }
+    }
+    monthInput.value = (prevSelected !== null && prevSelected !== '') ? prevSelected : defaultMonth;
+    monthInput.style.display = 'none';
+
+    // Helper para formatar rótulo do mês (ex: "Fev 2026")
+    const formatMonthLabel = (ym) => {
+      if (!ym) return 'Todos os meses';
+      try {
+        const [yy, mm] = ym.split('-').map(Number);
+        const d = new Date(yy, (mm || 1) - 1, 1);
+        const label = d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+        return label.charAt(0).toUpperCase() + label.slice(1);
+      } catch (e) { return ym; }
+    };
+
+    // Controle visual: rótulo central clicável que abre o seletor nativo de mês
+    const monthDisplay = document.createElement('div');
+    monthDisplay.style.cssText = 'min-width:170px; text-align:center; cursor:pointer; user-select:none; padding:6px 10px; border-radius:8px; background: rgba(255,255,255,0.02); font-weight:600;';
+    monthDisplay.textContent = formatMonthLabel(monthInput.value);
+
+    const applyBtn = document.createElement('button'); applyBtn.className = 'ghost'; applyBtn.textContent = 'Aplicar'; applyBtn.style.fontSize = '12px';
+    const clearBtn = document.createElement('button'); clearBtn.className = 'ghost'; clearBtn.textContent = 'Limpar'; clearBtn.style.fontSize = '12px';
+
+    // Ao clicar no rótulo, abre o seletor nativo (se disponível)
+    monthDisplay.onclick = () => { if (typeof monthInput.showPicker === 'function') monthInput.showPicker(); else monthInput.click(); };
+
+    // Sincroniza rótulo quando o input realmente mudar e persiste seleção globalmente
+    monthInput.onchange = () => {
+      monthDisplay.textContent = formatMonthLabel(monthInput.value);
+      window._workHistorySelectedMonth = monthInput.value || '';
+    };
+
+    applyBtn.onclick = () => {
+      // garante que a seleção atual esteja persistida antes de re-renderizar
+      window._workHistorySelectedMonth = monthInput.value || '';
+      renderWorkHistory();
+    };
+    clearBtn.onclick = () => {
+      monthInput.value = '';
+      monthDisplay.textContent = formatMonthLabel('');
+      window._workHistorySelectedMonth = '';
+      renderWorkHistory();
+    };
+
+    filterBar.appendChild(lbl); filterBar.appendChild(monthDisplay); filterBar.appendChild(monthInput); filterBar.appendChild(applyBtn); filterBar.appendChild(clearBtn);
+    container.appendChild(filterBar);
+
+    const historyFilterEl = document.getElementById('workHistoryMonthFilter');
+    const selectedMonth = historyFilterEl && historyFilterEl.value ? historyFilterEl.value : null; // format YYYY-MM
+
     if (items.length === 0) {
-      container.innerHTML = `<div class="small" style="opacity:0.5; text-align: center; padding: 10px;">${emptyMsg}</div>`;
-      return;
+      const no = document.createElement('div'); no.className = 'small'; no.style.cssText = 'opacity:0.5; text-align:center; padding:10px;'; no.textContent = emptyMsg; container.appendChild(no); return;
     }
 
+    // Filtra e agrupa como antes
+    const filteredItems = selectedMonth ? items.filter(it => (it.month && it.month.startsWith(selectedMonth)) || (it.date && it.date.startsWith(selectedMonth))) : items;
     const groups = {};
-    items.forEach(item => {
-      // Agrupar por Semana se existir, senão joga em "Outros"
-      const key = item.week ? `Semana ${item.week}` : 'Outros';
+    filteredItems.forEach(item => {
+      let key = 'Outros';
+      if (item.date) {
+        const parts = item.date.split('-');
+        if (parts.length === 3) {
+          const day = parseInt(parts[2], 10);
+          let weekNum = Math.ceil(day / 7);
+          if (weekNum > 4) weekNum = 4;
+          key = `Semana ${weekNum}`;
+        }
+      }
       if (!groups[key]) groups[key] = [];
       groups[key].push(item);
     });
 
-    // Ordenar chaves: Semana 5 -> Semana 1 -> Outros
     const sortedKeys = Object.keys(groups).sort((a, b) => {
-      if (a === 'Outros') return 1;
-      if (b === 'Outros') return -1;
-      return b.localeCompare(a);
+      if (a === 'Outros') return 1; if (b === 'Outros') return -1; return a.localeCompare(b);
     });
 
-    // Helper para toggle (expandir/recolher)
-    if (!window.toggleWeekDetails) {
-      window.toggleWeekDetails = function(id) {
-        const el = document.getElementById(id);
-        if (el) {
-           const isHidden = el.style.display === 'none';
-           el.style.display = isHidden ? 'block' : 'none';
-           const arrow = document.getElementById(`arrow-${id}`);
-           if (arrow) arrow.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-        }
-      };
-    }
-
+    // Render cada grupo como cartão
     sortedKeys.forEach((key, index) => {
       const groupItems = groups[key];
-      // Ordenar itens dentro da semana por data (mais recente primeiro)
       groupItems.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-      // Calcular totais da semana
-      let totalQty = 0;
-      let paidQty = 0;
-      let unpaidQty = 0;
-      
-      groupItems.forEach(i => {
-        const val = i.inputVal || 0;
-        totalQty += val;
-        if (i.isUnpaid) unpaidQty += val;
-        else paidQty += val;
-      });
+      let totalQty = 0, paidQty = 0, unpaidQty = 0;
+      groupItems.forEach(i => { const val = i.inputVal || 0; totalQty += val; if (i.isUnpaid) unpaidQty += val; else paidQty += val; });
 
-      const type = gameState.job.type || 'pizzaria';
-      const def = JOB_TYPES[type];
+      const def = JOB_TYPES[gameState.job.type || 'pizzaria'];
       const unit = def ? def.unit : 'unidades';
 
-      const groupDiv = document.createElement('div');
-      groupDiv.style.marginBottom = '10px';
-      groupDiv.style.background = 'rgba(255,255,255,0.03)';
-      groupDiv.style.borderRadius = '8px';
-      groupDiv.style.overflow = 'hidden';
-      
-      const detailsId = `week-details-${index}`;
-      
-      // Cabeçalho Clicável
-      let headerHtml = `
-        <div onclick="toggleWeekDetails('${detailsId}')" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05);">
-          <div>
-            <div style="font-weight: 700; color: var(--accent); font-size: 13px;">${key}</div>
-            <div style="font-size: 11px; opacity: 0.7;">Total: ${paidQty} ${unit}</div>
-          </div>
-          <div style="font-size: 12px; opacity: 0.5; transition: transform 0.3s;" id="arrow-${detailsId}">▼</div>
-        </div>
-      `;
+      const card = document.createElement('div');
+      card.style.cssText = 'margin-bottom:12px; background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); border-radius:10px; border:1px solid rgba(255,255,255,0.04); overflow:hidden;';
 
-      // Área de Detalhes (Oculta por padrão)
-      let detailsHtml = `<div id="${detailsId}" style="display: none; padding: 10px; border-top: 1px solid rgba(255,255,255,0.05);">`;
-      
-      // Resumo da Semana
-      detailsHtml += `
-        <div style="margin-bottom: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px; font-size: 12px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-            <span>Remunerado:</span>
-            <span style="color: var(--success); font-weight:bold;">${paidQty} ${unit}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between;">
-            <span>Não remunerado:</span>
-            <span style="opacity:0.7;">${unpaidQty} ${unit}</span>
-          </div>
-        </div>
-      `;
+      const header = document.createElement('div');
+      header.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer;';
+      const left = document.createElement('div');
+      const title = document.createElement('div'); title.style.cssText = 'font-weight:700; color:var(--accent);'; title.textContent = key;
+      const subtitle = document.createElement('div'); subtitle.style.cssText = 'font-size:12px; opacity:0.75; margin-top:2px;'; subtitle.textContent = `Total: ${paidQty} ${unit} • ${unpaidQty} não remunerado`;
+      left.appendChild(title); left.appendChild(subtitle);
 
-      // Lista de Itens
+      const right = document.createElement('div');
+      const badge = document.createElement('div'); badge.style.cssText = 'background: rgba(74, 222, 128, 0.12); color: var(--success); padding:6px 10px; border-radius:999px; font-weight:700;'; badge.textContent = `${paidQty} ${unit}`;
+      right.appendChild(badge);
+
+      header.appendChild(left); header.appendChild(right);
+      card.appendChild(header);
+
+      const details = document.createElement('div'); details.id = `week-details-${index}`; details.style.cssText = 'display:none; padding:10px; border-top:1px solid rgba(255,255,255,0.04); background: linear-gradient(180deg, rgba(0,0,0,0.02), transparent);';
+
+      const summaryBox = document.createElement('div'); summaryBox.style.cssText = 'display:flex; gap:12px; margin-bottom:10px;';
+      const paidBox = document.createElement('div'); paidBox.style.cssText = 'flex:1; padding:8px; background: rgba(0,0,0,0.15); border-radius:8px;'; paidBox.innerHTML = `<div style="font-size:12px; opacity:0.8;">Remunerado</div><div style="font-weight:700; font-size:14px;">${paidQty} ${unit}</div>`;
+      const unpaidBox = document.createElement('div'); unpaidBox.style.cssText = 'flex:1; padding:8px; background: rgba(255,255,255,0.02); border-radius:8px;'; unpaidBox.innerHTML = `<div style="font-size:12px; opacity:0.8;">Não remunerado</div><div style="font-weight:700; font-size:14px;">${unpaidQty} ${unit}</div>`;
+      summaryBox.appendChild(paidBox); summaryBox.appendChild(unpaidBox);
+      details.appendChild(summaryBox);
+
       groupItems.forEach(item => {
-        let text = '';
-        let icon = '📄';
-        const itemType = item.type || gameState.job.type || 'pizzaria';
-        const dateStr = new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.03);';
+        const left = document.createElement('div'); left.style.cssText = 'display:flex; align-items:center; gap:10px;';
+        const dateBadge = document.createElement('div'); dateBadge.style.cssText = 'min-width:44px; text-align:center; padding:6px 6px; border-radius:8px; background: rgba(0,0,0,0.18); font-family: monospace; font-size:12px;'; dateBadge.textContent = new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const icon = document.createElement('div'); icon.style.cssText = 'width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:8px; background: rgba(255,255,255,0.02); font-size:18px;';
+        icon.textContent = item.type === 'pizzaria' ? '🍕' : (item.type === 'vendedor' ? '🤝' : (item.type === 'motorista' ? '🚖' : '📄'));
+        const txt = document.createElement('div'); txt.style.cssText = 'font-size:13px;'; txt.textContent = item.type === 'pizzaria' ? `${item.inputVal} massas` : `${item.inputVal}`;
+        left.appendChild(dateBadge); left.appendChild(icon); left.appendChild(txt);
 
-        if (itemType === 'pizzaria') {
-           text = `Total: ${item.inputVal} massas`;
-           icon = '🍕';
-        } else if (itemType === 'vendedor') {
-           text = `Venda: R$ ${item.inputVal}`;
-           icon = '🤝';
-        } else if (itemType === 'motorista') {
-           text = `Corrida: R$ ${item.inputVal}`;
-           icon = '🚖';
-        } else {
-           text = `Registro: ${item.inputVal}`;
-        }
+        const right = document.createElement('div'); right.style.cssText = 'text-align:right; min-width:90px;';
+        right.innerHTML = item.isUnpaid ? '<div style="opacity:0.7; font-size:12px;">Não remunerado</div>' : (item.financialVal > 0 ? `<div style="font-weight:700; color:var(--success);">+ R$ ${item.financialVal.toFixed(2)}</div>` : '');
 
-        let moneyDisplay = item.isUnpaid 
-          ? '<span style="opacity:0.6; font-size:11px; font-style:italic;">Não remunerado</span>' 
-          : (item.financialVal > 0 ? '+ R$ ' + item.financialVal.toFixed(2) : '');
-
-        detailsHtml += `
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 10px; opacity: 0.5; font-family: monospace; min-width: 35px;">${dateStr}</span>
-              <span>${text}</span>
-            </div>
-            <div style="font-weight: 600; color: var(--success);">${moneyDisplay}</div>
-          </div>
-        `;
+        row.appendChild(left); row.appendChild(right);
+        details.appendChild(row);
       });
-      
-      detailsHtml += `</div>`; // Fecha div de detalhes
 
-      groupDiv.innerHTML = headerHtml + detailsHtml;
-      container.appendChild(groupDiv);
+      card.appendChild(details);
+      // Toggle ao clicar no header
+      header.addEventListener('click', () => { details.style.display = details.style.display === 'none' ? 'block' : 'none'; });
+
+      container.appendChild(card);
     });
   };
 
@@ -4041,19 +4346,7 @@ function setTabBadge(tabId, show) {
 
 function updateUI() {
   // Debug temporário: registrar fontes possíveis de perfil (OracleMemory / localStorage)
-  try {
-    const dbg = { gameStatePresent: !!gameState };
-    dbg.oracleMemory = (typeof OracleMemory !== 'undefined') ? {
-      hasGetProfile: !!OracleMemory.getProfile,
-      sampleName: (OracleMemory.getProfile && OracleMemory.getProfile('name')) || null
-    } : null;
-    dbg.ur_last_user = localStorage.getItem('ur_last_user');
-    try { dbg.ur_users = localStorage.getItem('ur_users'); } catch (e) { dbg.ur_users = null; }
-    console.log('[debug][updateUI]', dbg);
-    if (window.OracleTelemetry && OracleTelemetry.log) OracleTelemetry.log('updateUI_debug', dbg);
-  } catch (e) {
-    console.warn('updateUI debug failed', e);
-  }
+  // debug logging removed
 
   // Se não houver gameState, tenta preencher com memórias locais (OracleMemory) antes de sair
   if (!gameState) {
@@ -4160,6 +4453,8 @@ function updateUI() {
   renderGratitudeJournal();
   renderDailyTasks();
   renderXpChart();
+  // Garantir categorias de finanças e popular select
+  try { populateFinanceCategorySelect(); } catch (e) { console.warn('Erro ao popular categorias:', e); }
   renderFinances();
   renderFinanceChart();
   renderFinancialGoal();
@@ -4248,6 +4543,255 @@ if (elements.viewTaskHistoryBtn) elements.viewTaskHistoryBtn.addEventListener('c
   elements.taskHistoryModal.classList.add('active');
 });
 if (elements.addFinanceBtn) elements.addFinanceBtn.addEventListener('click', addTransaction);
+// Abre formulário inline de criação de categoria (fallback confiável)
+if (elements.addFinanceCategoryBtn) {
+  elements.addFinanceCategoryBtn.addEventListener('click', (ev) => {
+    try { ev.stopPropagation(); ev.preventDefault(); } catch(e){}
+    try {
+      openInlineAddFinanceCategory();
+    } catch (err) {
+      // fallback final: tenta abrir prompt/modal
+      openAddFinanceCategory();
+    }
+  });
+}
+// Modal: fluxo em 2 passos para criar categoria (key -> nome)
+const _modalAddCat = document.getElementById('addFinanceCategoryModal');
+const _keyInput = document.getElementById('newFinanceCategoryKey');
+const _nextBtn = document.getElementById('nextFinanceCategoryBtn');
+const _backBtn = document.getElementById('backFinanceCategoryBtn');
+const _saveCatBtn = document.getElementById('saveFinanceCategoryBtn');
+const _cancelCatBtn = document.getElementById('cancelFinanceCategoryBtn');
+const _catNameInput = document.getElementById('newFinanceCategoryName');
+const _catEmojiInput = document.getElementById('newFinanceCategoryEmoji');
+const _step1 = document.getElementById('catStep1');
+const _step2 = document.getElementById('catStep2');
+
+// debug guard removed (clean handlers used)
+
+const slugify = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-_]/g,'');
+
+// --- Inline category creator (simple, replaces modal for reliability) ---
+function openInlineAddFinanceCategory() {
+  const node = document.getElementById('inlineAddFinanceCategory');
+  const key = document.getElementById('inlineCategoryKey');
+  const name = document.getElementById('inlineCategoryName');
+  if (!node) { console.warn('inlineAddFinanceCategory node not found'); openAddFinanceCategory(); return; }
+  // Mostrar como fixed e centralizar na viewport para evitar cortes laterais
+  node.style.display = 'block';
+  node.style.position = 'fixed';
+  node.style.left = '50%';
+  node.style.top = '50%';
+  node.style.transform = 'translate(-50%,-50%)';
+  node.style.zIndex = '9999';
+  node.style.maxWidth = 'min(92%, 520px)';
+  node.style.maxHeight = 'calc(100vh - 40px)';
+  node.style.overflow = 'auto';
+  node.style.padding = node.style.padding || '10px';
+
+  // garantir que o emoji picker mantenha-se visível
+  const picker = document.getElementById('inlineEmojiPicker');
+  if (picker) picker.style.zIndex = '10000';
+
+  if (key) { key.value = ''; key.focus(); }
+  if (name) name.value = '';
+}
+
+function trySaveInlineCategory() {
+  const keyEl = document.getElementById('inlineCategoryKey');
+  const nameEl = document.getElementById('inlineCategoryName');
+  const emojiEl = document.getElementById('inlineCategoryEmoji');
+  if (!keyEl || !nameEl) { showToast('⚠️ Erro interno: elementos não encontrados.'); return; }
+  const rawKey = (keyEl.value || '').trim();
+  const name = (nameEl.value || '').trim();
+  const emoji = (emojiEl && emojiEl.value) ? emojiEl.value.trim() : '';
+  if (!rawKey) { showToast('⚠️ Informe um identificador (ex: casa).'); keyEl.focus(); return; }
+  if (!name) { showToast('⚠️ Informe um nome para a categoria.'); nameEl.focus(); return; }
+  const key = slugify(rawKey);
+  if (!gameState.financeCategories) gameState.financeCategories = [];
+  const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === key.toLowerCase() || (c.id || '') === 'c_' + key);
+  const existsName = gameState.financeCategories.some(c => (c.name || '').toLowerCase() === name.toLowerCase());
+  if (existsKey) { showToast('⚠️ Identificador já em uso.'); keyEl.focus(); return; }
+  if (existsName) { showToast('⚠️ Já existe uma categoria com esse nome.'); nameEl.focus(); return; }
+  const id = `c_${key}`;
+  gameState.financeCategories.push({ id, key, name, emoji });
+  saveGame();
+  populateFinanceCategorySelect();
+  const sel = document.getElementById('financeCategory');
+  if (sel) sel.value = (emoji ? emoji + ' ' : '') + name;
+  showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
+  // fechar inline
+  const node = document.getElementById('inlineAddFinanceCategory');
+  if (node) node.style.display = 'none';
+}
+
+function cancelInlineCategory() {
+  const node = document.getElementById('inlineAddFinanceCategory');
+  if (node) node.style.display = 'none';
+}
+
+// ligar botões inline (se existirem)
+try {
+  const saveInlineBtn = document.getElementById('saveInlineCategoryBtn');
+  const cancelInlineBtn = document.getElementById('cancelInlineCategoryBtn');
+  if (saveInlineBtn) saveInlineBtn.addEventListener('click', trySaveInlineCategory);
+  if (cancelInlineBtn) cancelInlineBtn.addEventListener('click', cancelInlineCategory);
+  // Enter key on name field salva
+  const inlineName = document.getElementById('inlineCategoryName');
+  if (inlineName) inlineName.addEventListener('keydown', (e) => { if (e.key === 'Enter') trySaveInlineCategory(); });
+} catch (e) { console.warn('Erro ao inicializar inline category handlers', e); }
+
+// Emoji picker handlers for inline creator
+try {
+  const emojiBtn = document.getElementById('inlineEmojiBtn');
+  const emojiPicker = document.getElementById('inlineEmojiPicker');
+  const emojiInput = document.getElementById('inlineCategoryEmoji');
+  if (emojiBtn && emojiPicker) {
+    emojiBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      emojiPicker.style.display = (emojiPicker.style.display === 'block') ? 'none' : 'block';
+    });
+    // click on emoji option
+    emojiPicker.addEventListener('click', (e) => {
+      const btn = e.target.closest && e.target.closest('.emoji-option');
+      if (!btn) return;
+      const val = (btn.textContent || '').trim();
+      if (emojiInput) emojiInput.value = val;
+      // close picker
+      emojiPicker.style.display = 'none';
+      // focus name field for workflow
+      const nameEl = document.getElementById('inlineCategoryName');
+      if (nameEl) nameEl.focus();
+    });
+
+    // close picker clicking outside
+    document.addEventListener('click', (e) => {
+      if (!emojiPicker) return;
+      const targetInside = emojiPicker.contains(e.target) || (emojiBtn && emojiBtn.contains(e.target));
+      if (!targetInside) emojiPicker.style.display = 'none';
+    });
+
+    // esc to close
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && emojiPicker && emojiPicker.style.display === 'block') emojiPicker.style.display = 'none'; });
+  }
+} catch (err) { console.warn('Erro ao inicializar emoji picker inline', err); }
+
+// Next: valida chave e avança
+if (_nextBtn && _keyInput) {
+  _nextBtn.addEventListener('click', () => {
+    const raw = (_keyInput.value || '').trim();
+    if (!raw) { showToast('⚠️ Informe um identificador curto (ex: casa, uber).'); return; }
+    const key = slugify(raw);
+    if (!key) { showToast('⚠️ Identificador inválido. Use letras/números.'); return; }
+    if (!gameState.financeCategories) gameState.financeCategories = [];
+    const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === key.toLowerCase() || (c.id || '') === 'c_' + key);
+    if (existsKey) { showToast('⚠️ Já existe uma categoria com esse identificador.'); return; }
+    // Avança para step2
+    if (_step1) _step1.style.display = 'none';
+    if (_step2) _step2.style.display = 'block';
+    if (_catNameInput) { _catNameInput.value = ''; _catNameInput.focus(); }
+    // Guarda key temporariamente no modal dataset
+    if (_modalAddCat) _modalAddCat.dataset.pendingKey = key;
+  });
+}
+
+// Safety-bind: ensure the add finance category button always opens the inline creator
+try {
+  const bindAddBtn = () => {
+    const btn = document.getElementById('addFinanceCategoryBtn');
+    if (!btn) return;
+    if (btn._boundToInline) return;
+    const h = (ev) => {
+      try { ev && ev.stopPropagation(); ev && ev.preventDefault(); } catch (e) {}
+      // addFinanceCategoryBtn clicked
+      try { openInlineAddFinanceCategory(); } catch (err) { console.warn('fallback openAddFinanceCategory', err); openAddFinanceCategory(); }
+    };
+    btn.addEventListener('click', h);
+    btn._boundToInline = true;
+  };
+  // Try bind now and on DOMContentLoaded as a fallback
+  bindAddBtn();
+  document.addEventListener('DOMContentLoaded', bindAddBtn);
+} catch (e) { /* silencioso */ }
+
+// Back: volta para step1
+if (_backBtn) {
+  _backBtn.addEventListener('click', () => {
+    if (_step2) _step2.style.display = 'none';
+    if (_step1) _step1.style.display = 'block';
+    if (_keyInput) _keyInput.focus();
+  });
+}
+
+// Save: valida nome e salva com a key previamente informada
+if (_saveCatBtn && _catNameInput) {
+  const trySaveCategory = () => {
+    const pendingKey = (_modalAddCat && _modalAddCat.dataset.pendingKey) ? _modalAddCat.dataset.pendingKey : slugify(_keyInput && _keyInput.value);
+    const name = (_catNameInput.value || '').trim();
+    const emoji = (_catEmojiInput && _catEmojiInput.value) ? _catEmojiInput.value.trim() : '';
+    if (!pendingKey) { showToast('⚠️ Identificador ausente. Volte e informe o identificador.'); return false; }
+    if (!name) { showToast('⚠️ Informe um nome para a categoria.'); return false; }
+    if (!gameState.financeCategories) gameState.financeCategories = [];
+    const existsName = gameState.financeCategories.some(c => (c.name || '').toLowerCase() === name.toLowerCase());
+    if (existsName) { showToast('⚠️ Já existe uma categoria com esse nome.'); return false; }
+    const existsKey = gameState.financeCategories.some(c => (c.key || '').toLowerCase() === pendingKey.toLowerCase() || (c.id || '') === 'c_' + pendingKey);
+    if (existsKey) { showToast('⚠️ Identificador já em uso, escolha outro.'); return false; }
+
+    const id = `c_${pendingKey}`;
+    gameState.financeCategories.push({ id, key: pendingKey, name, emoji });
+    saveGame();
+    populateFinanceCategorySelect();
+    // Seleciona a nova categoria automaticamente
+    const sel = document.getElementById('financeCategory');
+    if (sel) {
+      const label = (emoji ? emoji + ' ' : '') + name;
+      sel.value = label;
+    }
+    showToast('✅ Categoria criada: ' + (emoji ? emoji + ' ' : '') + name);
+    if (_modalAddCat) {
+      _modalAddCat.classList.remove('active');
+      delete _modalAddCat.dataset.pendingKey;
+    }
+    // reset steps
+    if (_step2) _step2.style.display = 'none';
+    if (_step1) _step1.style.display = 'block';
+    return true;
+  };
+
+  _saveCatBtn.addEventListener('click', trySaveCategory);
+  // Habilitar/Desabilitar botão conforme input
+  const updateSaveState = () => {
+    const v = (_catNameInput.value || '').trim();
+    _saveCatBtn.disabled = !v;
+  };
+  _catNameInput.addEventListener('input', updateSaveState);
+  updateSaveState();
+}
+
+if (_cancelCatBtn) {
+  _cancelCatBtn.addEventListener('click', () => {
+    if (_modalAddCat) {
+      _modalAddCat.classList.remove('active');
+      delete _modalAddCat.dataset.pendingKey;
+    }
+    if (_step2) _step2.style.display = 'none';
+    if (_step1) _step1.style.display = 'block';
+  });
+}
+
+// Fecha modal ao clicar fora do conteúdo
+if (_modalAddCat) {
+  _modalAddCat.addEventListener('click', (e) => {
+    if (e.target === _modalAddCat) {
+      _modalAddCat.classList.remove('active');
+      delete _modalAddCat.dataset.pendingKey;
+      if (_step2) _step2.style.display = 'none';
+      if (_step1) _step1.style.display = 'block';
+    }
+  });
+  // Fecha com Esc
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (_modalAddCat && _modalAddCat.classList.contains('active')) { _modalAddCat.classList.remove('active'); delete _modalAddCat.dataset.pendingKey; if (_step2) _step2.style.display = 'none'; if (_step1) _step1.style.display = 'block'; } } });
+}
 if (elements.financeValue) elements.financeValue.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') addTransaction();
 });
@@ -6442,6 +6986,10 @@ const OracleChat = {
     const financeEducationResult = this.handleFinanceEducation(lowerInput);
     if (financeEducationResult) return financeEducationResult;
     
+    // 1.7 PERGUNTAS BÍBLICAS (Novo Módulo PDF)
+    const bibleResult = await this.handleBibleQueries(lowerInput);
+    if (bibleResult) return bibleResult;
+
     // 2. USA O SISTEMA NLU PARA DETECTAR INTENÇÃO AUTOMATICAMENTE (Restante)
     if (nluResult.intent !== 'unknown' && nluResult.confidence > 0.5) {
       const intentResponse = this.executeIntent(nluResult);
@@ -6473,6 +7021,21 @@ const OracleChat = {
     return this.getSmartDefault(lowerInput);
   },
   
+  // === SISTEMA BÍBLICO ===
+  async handleBibleQueries(text) {
+    // Gatilhos simples para identificar intenção bíblica
+    if (text.match(/(bíblia|biblia|versículo|versiculo|capítulo|capitulo|salmo|evangelho|deus|jesus|fé|oração|orar|amém|testamento|gênesis|apocalipse)/i) ||
+        text.match(/^(quem foi|o que diz|onde está|onde fala sobre) .+/i)) {
+        
+        if (typeof BibleAssistant !== 'undefined') {
+            const resp = await BibleAssistant.reply(text);
+            // Só retorna se encontrou algo útil (ignora mensagem de "não encontrado" padrão para deixar o fallback agir se quiser)
+            if (resp && !resp.includes("Não consegui identificar")) return resp;
+        }
+    }
+    return null;
+  },
+
   // === SISTEMA DE GERAÇÃO DE IMAGENS ===
   handleImageGeneration(lowerInput, originalInput) {
     // Detecta pedidos de imagem
@@ -8860,7 +9423,7 @@ const OracleChat = {
     if (memories.length > 0) {
       return `Lembro que você me disse: "<em>${memories[0].text}</em>". Isso ajuda, ${treatment}? 🤔`;
     }
-    
+
     // Sistema de sabedoria contextual
     const wisdomResponse = this.getContextualWisdom(input);
     if (wisdomResponse) return wisdomResponse;
@@ -9139,178 +9702,627 @@ const BibleAssistant = {
     "novos mandamentos": ["mandamento novo", "novo mandamento", "amar uns aos outros", "amar ao próximo", "mandamentos de jesus"],
   },
 
-  // -------------------------
-  // BASE DE CONHECIMENTO POR TÓPICOS
-  // refs: referências
-  // summary: ideia geral (sem citação literal)
-  // practice: prática sugerida (oração/ação)
-  // -------------------------
+  // ===========================================
+  // BIBLEASSISTANT — TOPICMAP MAX (REFERÊNCIAS)
+  // Cole dentro de BibleAssistant.topicMap
+  // ===========================================
   topicMap: {
-    ansiedade: {
-      refs: ["Filipenses 4:6-7", "1 Pedro 5:7", "Mateus 6:25-34", "Salmos 94:19", "Salmos 55:22"],
-      summary: "Deus convida você a trocar a ansiedade por oração, entrega e confiança. A paz vem como guarda do coração e da mente.",
-      practice: [
-        "Transforme preocupação em oração objetiva (o que você quer pedir?).",
-        "Anote 3 coisas fora do seu controle e entregue a Deus conscientemente.",
-        "Respire fundo e repita: 'Eu confio no cuidado de Deus hoje.'"
-      ]
-    },
-    medo: {
-      refs: ["Isaías 41:10", "Salmos 23:4", "2 Timóteo 1:7", "Salmos 27:1", "Josué 1:9"],
-      summary: "O medo perde força quando você lembra quem está com você. Coragem bíblica não é ausência de medo, é fé em meio a ele.",
-      practice: [
-        "Nomeie o medo (o que exatamente você teme?).",
-        "Ore pedindo força e clareza para dar o próximo passo pequeno.",
-        "Evite decisões grandes no pico do medo; primeiro acalme o coração."
-      ]
-    },
-    amor: {
-      refs: ["1 Coríntios 13:4-7", "João 3:16", "1 João 4:8", "Romanos 8:38-39", "Provérbios 10:12"],
-      summary: "O amor bíblico é atitude: paciente, bondoso, firme, que perdoa e busca o bem do outro.",
-      practice: [
-        "Escolha uma ação concreta de amor hoje (mensagem, ajuda, perdão).",
-        "Evite revidar no impulso; responda com mansidão.",
-        "Ore por alguém difícil (isso muda você por dentro)."
-      ]
-    },
-    dinheiro: {
-      refs: ["Hebreus 13:5", "1 Timóteo 6:10", "Provérbios 22:7", "Mateus 6:24", "Eclesiastes 5:10", "Provérbios 21:5"],
-      summary: "Dinheiro é ferramenta, não senhor. Contentamento, prudência e generosidade protegem o coração.",
-      practice: [
-        "Faça um plano simples: renda, gastos fixos, dívidas, prioridade do mês.",
-        "Evite compras emocionais: espere 24h antes de decidir.",
-        "Separe um valor (mesmo pequeno) para generosidade."
-      ]
-    },
-    tristeza: {
-      refs: ["Salmos 34:18", "Mateus 5:4", "Apocalipse 21:4", "Salmos 147:3", "João 16:22"],
-      summary: "Deus se aproxima do coração quebrado. A tristeza não é o fim da história; há consolo e esperança.",
-      practice: [
-        "Fale com Deus sem filtro (lamento é bíblico).",
-        "Procure uma pessoa de confiança; isolamento piora.",
-        "Durma e coma minimamente bem: corpo e alma se afetam."
-      ]
-    },
-    proposito: {
-      refs: ["Jeremias 29:11", "Efésios 2:10", "Romanos 8:28", "Provérbios 19:21", "Eclesiastes 3:1"],
-      summary: "Propósito não é só 'grande missão'; é fidelidade diária, passos guiados por Deus e boas obras preparadas.",
-      practice: [
-        "Pergunte: 'Que bem eu posso fazer hoje, com o que tenho agora?'",
-        "Escreva 1 dom + 1 dor + 1 oportunidade → uma direção possível.",
-        "Peça sabedoria para o próximo passo, não para o mapa inteiro."
-      ]
-    },
-    perdao: {
-      refs: ["1 João 1:9", "Mateus 6:14-15", "Efésios 4:32", "Colossenses 3:13", "Miqueias 7:18"],
-      summary: "Perdão não é negar a dor, é soltar a dívida moral e deixar Deus tratar justiça e cura.",
-      practice: [
-        "Confesse a Deus o que te feriu e o que você sente de verdade.",
-        "Decida não alimentar vingança (perdão é um processo).",
-        "Se for seguro, estabeleça limites saudáveis."
-      ]
-    },
-    fe: {
-      refs: ["Hebreus 11:1", "Marcos 11:22-24", "Romanos 10:17", "Tiago 2:14-26", "2 Coríntios 5:7", "Marcos 9:24"],
-      summary: "Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva gera frutos, não só discurso.",
-      practice: [
-        "Leia um trecho curto e aplique 1 coisa prática hoje.",
-        "Ore: 'Senhor, eu creio; ajuda minha incredulidade.'",
-        "Aproxime-se de uma comunidade/irmãos na fé."
-      ]
-    },
-    esperanca: {
-      refs: ["Romanos 15:13", "Isaías 40:31", "Lamentações 3:21-23", "Salmos 39:7", "1 Pedro 1:3"],
-      summary: "Esperança bíblica não é otimismo vazio: é certeza de que Deus é fiel e renova suas misericórdias.",
-      practice: [
-        "Troque 'nunca vai mudar' por 'um dia de cada vez'.",
-        "Liste 3 evidências de cuidado de Deus no passado.",
-        "Faça uma oração curta de esperança pela manhã."
-      ]
-    },
-    paz: {
-      refs: ["João 14:27", "Filipenses 4:7", "Isaías 26:3", "Mateus 5:9", "Salmos 29:11"],
-      summary: "A paz de Cristo não depende do caos externo; ela vem da confiança e do foco em Deus.",
-      practice: [
-        "Diminua estímulos por 15 min (silêncio).",
-        "Ore e entregue o que te agita.",
-        "Faça a próxima coisa certa, sem antecipar o amanhã."
-      ]
-    },
-    sabedoria: {
-      refs: ["Tiago 1:5", "Provérbios 1:7", "Provérbios 3:13-18", "Colossenses 2:2-3", "Provérbios 11:14"],
-      summary: "Sabedoria começa no temor do Senhor e cresce com conselho, prudência e discernimento.",
-      practice: [
-        "Peça sabedoria específica (não genérica).",
-        "Consulte alguém maduro antes de decisão grande.",
-        "Pergunte: isso me aproxima de Deus ou só do ego?"
-      ]
-    },
-    gratidao: {
-      refs: ["1 Tessalonicenses 5:18", "Salmos 107:1", "Colossenses 3:17", "Salmos 118:24", "Filipenses 4:4"],
-      summary: "Gratidão reposiciona o coração: você passa a enxergar o bem mesmo em tempos difíceis.",
-      practice: [
-        "Anote 3 motivos reais de gratidão agora.",
-        "Agradeça uma pessoa diretamente.",
-        "Louvor em voz baixa muda o clima interno."
-      ]
-    },
 
-    // Tópicos novos (bem úteis)
-    tentacao: {
-      refs: ["1 Coríntios 10:13", "Tiago 1:13-15", "Mateus 26:41", "Salmos 119:9-11"],
-      summary: "Tentação é real, mas Deus dá escape. Vigilância, oração e Palavra fortalecem.",
-      practice: [
-        "Identifique gatilhos (horário, lugar, emoção).",
-        "Corte o caminho do pecado antes da queda.",
-        "Peça ajuda (prestação de contas) se for vício recorrente."
-      ]
-    },
-    raiva: {
-      refs: ["Efésios 4:26-27", "Provérbios 15:1", "Tiago 1:19-20", "Romanos 12:19"],
-      summary: "Raiva pode virar pecado quando domina. A Bíblia ensina mansidão, autocontrole e justiça nas mãos de Deus.",
-      practice: [
-        "Espere 10 minutos antes de responder.",
-        "Fale firme sem ferir (verdade com amor).",
-        "Entregue a vingança a Deus."
-      ]
-    },
-    solidao: {
-      refs: ["Salmos 68:6", "Hebreus 13:5", "Mateus 28:20", "Salmos 23:1-4"],
-      summary: "Deus não abandona. Ele também cria família espiritual e laços reais para sustentar você.",
-      practice: [
-        "Procure um grupo/comunidade (não caminhe só).",
-        "Mande mensagem para 1 pessoa hoje.",
-        "Ore pedindo conexões saudáveis."
-      ]
-    },
-    paciencia: {
-      refs: ["Gálatas 5:22-23", "Romanos 5:3-5", "Tiago 1:2-4", "Salmos 37:7"],
-      summary: "Paciência é fruto do Espírito e é forjada em processo, não em atalhos.",
-      practice: [
-        "Troque pressa por consistência.",
-        "Aceite o 'processo' como parte do crescimento.",
-        "Faça pequenas escolhas certas repetidas."
-      ]
-    },
-    casamento: {
-      refs: ["Efésios 5:25-33", "1 Coríntios 13:4-7", "Colossenses 3:13-14", "Provérbios 15:1"],
-      summary: "Relacionamento saudável exige amor sacrificial, perdão, conversa honesta e mansidão.",
-      practice: [
-        "Ouça para entender, não para vencer.",
-        "Peça perdão rápido, sem justificar demais.",
-        "Conversem sobre expectativas e limites."
-      ]
-    }
-    ,
-    "novos mandamentos": {
-      refs: ["João 13:34-35", "João 15:12", "1 João 4:7-8"],
-      summary: "O 'mandamento novo' de Jesus resume-se em amar: amar a Deus e amar ao próximo com dedicação prática. Esse amor é a marca dos seus discípulos.",
-      practice: [
-        "Pratique um ato concreto de amor hoje (ouvir, perdoar, ajudar).",
-        "Peça perdão onde for necessário e ofereça perdão quando possível.",
-        "Sirva alguém sem esperar reconhecimento; observe como isso muda seu coração."
-      ]
-    }
+  // =========================
+  // ANSIEDADE / PREOCUPAÇÃO
+  // =========================
+  ansiedade: {
+    refs: [
+      "Filipenses 4:6-7", "1 Pedro 5:7", "Mateus 6:25-34", "Salmos 55:22", "Salmos 94:19",
+      "João 14:27", "Isaías 26:3", "Salmos 46:1-3", "Provérbios 3:5-6", "2 Tessalonicenses 3:16",
+      "Salmos 23:1-4", "Mateus 11:28-30", "Romanos 8:6", "Isaías 41:10", "Salmos 34:4"
+    ],
+    summary: "Deus chama você a trocar preocupação por oração, entrega e confiança. A paz de Deus guarda mente e coração.",
+    practice: [
+      "Transforme a preocupação em oração específica (o que você quer pedir hoje?).",
+      "Liste o que está fora do seu controle e entregue conscientemente.",
+      "Faça um passo pequeno (o próximo passo real), sem tentar resolver tudo de uma vez."
+    ]
+  },
+
+  // =========================
+  // MEDO / CORAGEM
+  // =========================
+  medo: {
+    refs: [
+      "Isaías 41:10", "Josué 1:9", "Salmos 23:4", "Salmos 27:1", "2 Timóteo 1:7",
+      "Salmos 56:3-4", "Deuteronômio 31:6", "Isaías 43:1-2", "Salmos 118:6", "João 16:33",
+      "Romanos 8:31", "Provérbios 29:25", "Salmos 91:1-2", "1 João 4:18", "Salmos 46:10"
+    ],
+    summary: "Coragem bíblica não é ausência de medo; é confiar na presença de Deus e dar o próximo passo com fé.",
+    practice: [
+      "Nomeie o medo com clareza (o que exatamente você teme?).",
+      "Tome um passo pequeno e real hoje (1 ação).",
+      "Evite decisões grandes no pico do medo; primeiro acalme o coração."
+    ]
+  },
+
+  // =========================
+  // TRISTEZA / DEPRESSÃO / LUTO
+  // =========================
+  tristeza: {
+    refs: [
+      "Salmos 34:18", "Mateus 5:4", "Apocalipse 21:4", "Salmos 147:3", "João 16:22",
+      "Salmos 42:5", "2 Coríntios 1:3-4", "Isaías 53:3-5", "Salmos 30:5", "Romanos 15:13",
+      "Lamentações 3:21-23", "Salmos 23:4", "1 Pedro 5:10", "Isaías 61:1-3", "Salmos 139:7-10"
+    ],
+    summary: "Deus se aproxima do coração quebrado. Há consolo, cuidado e esperança, mesmo no vale.",
+    practice: [
+      "Faça uma oração sincera (lamento também é bíblico).",
+      "Fale com uma pessoa de confiança (isolamento piora).",
+      "Cuide do básico do corpo (sono, comida, água)."
+    ]
+  },
+
+  // =========================
+  // PAZ / DESCANSO
+  // =========================
+  paz: {
+    refs: [
+      "João 14:27", "Filipenses 4:7", "Isaías 26:3", "Salmos 29:11", "Colossenses 3:15",
+      "Mateus 11:28-30", "Salmos 4:8", "Romanos 5:1", "2 Tessalonicenses 3:16", "Salmos 23:1-3",
+      "Salmos 46:10", "Provérbios 14:30", "Hebreus 4:9-11", "1 Pedro 5:7", "João 16:33"
+    ],
+    summary: "A paz de Cristo não depende do caos externo; ela vem da confiança em Deus e do descanso nele.",
+    practice: [
+      "Reduza estímulos por 10–15 minutos (silêncio).",
+      "Entregue a Deus o que não está no seu controle.",
+      "Faça a próxima coisa certa sem antecipar o amanhã."
+    ]
+  },
+
+  // =========================
+  // PROPÓSITO / DIREÇÃO / VOCAÇÃO
+  // =========================
+  proposito: {
+    refs: [
+      "Jeremias 29:11", "Efésios 2:10", "Romanos 8:28", "Provérbios 19:21", "Eclesiastes 3:1",
+      "Provérbios 3:5-6", "Tiago 1:5", "Salmos 32:8", "Colossenses 3:23-24", "Mateus 6:33",
+      "1 Coríntios 10:31", "Miquéias 6:8", "Filipenses 1:6", "Isaías 41:10", "Salmos 37:4-5"
+    ],
+    summary: "Propósito não é só 'grande missão'. É fidelidade diária, passos guiados por Deus e boas obras preparadas.",
+    practice: [
+      "Pergunte: 'Que bem eu posso fazer hoje com o que tenho agora?'",
+      "Defina um próximo passo simples (1 ação).",
+      "Peça sabedoria para o próximo passo, não para o mapa inteiro."
+    ]
+  },
+
+  // =========================
+  // FÉ / DÚVIDA / CONFIANÇA
+  // =========================
+  fe: {
+    refs: [
+      "Hebreus 11:1", "Romanos 10:17", "Marcos 9:24", "2 Coríntios 5:7", "Tiago 2:14-17",
+      "Marcos 11:22-24", "João 20:29", "Provérbios 3:5-6", "Salmos 37:5", "Isaías 26:3",
+      "João 15:5", "Filipenses 4:13", "Romanos 8:28", "Hebreus 12:1-2", "Salmos 23:1"
+    ],
+    summary: "Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva se traduz em prática.",
+    practice: [
+      "Leia um trecho curto e aplique 1 coisa hoje.",
+      "Ore: 'Eu creio; ajuda minha incredulidade.'",
+      "Busque comunhão/apoio — fé também cresce em comunidade."
+    ]
+  },
+
+  // =========================
+  // SABEDORIA / DECISÕES
+  // =========================
+  sabedoria: {
+    refs: [
+      "Tiago 1:5", "Provérbios 1:7", "Provérbios 3:13-18", "Provérbios 11:14", "Provérbios 15:22",
+      "Provérbios 16:3", "Provérbios 16:9", "Salmos 119:105", "Colossenses 1:9-10", "Efésios 5:15-17",
+      "Salmos 32:8", "Provérbios 2:1-6", "Eclesiastes 7:12", "Provérbios 4:7", "Provérbios 14:15"
+    ],
+    summary: "Sabedoria vem de Deus e aparece em prudência, conselho, discernimento e vida alinhada com o bem.",
+    practice: [
+      "Peça sabedoria específica (sobre qual decisão?).",
+      "Converse com alguém maduro e confiável.",
+      "Evite pressa — planeje e aja com prudência."
+    ]
+  },
+
+  // =========================
+  // PERDÃO / CULPA / ARREPENDIMENTO
+  // =========================
+  perdao: {
+    refs: [
+      "1 João 1:9", "Mateus 6:14-15", "Efésios 4:32", "Colossenses 3:13", "Miquéias 7:18-19",
+      "Salmos 51:10-12", "Romanos 8:1", "2 Coríntios 7:10", "Lucas 15:11-24", "Salmos 103:12",
+      "Isaías 1:18", "Provérbios 28:13", "Mateus 18:21-22", "Romanos 12:19", "Hebreus 8:12"
+    ],
+    summary: "Perdão não é negar a dor; é soltar a dívida moral e permitir que Deus trate justiça e cura.",
+    practice: [
+      "Confesse com sinceridade (sem desculpas).",
+      "Decida não alimentar vingança (perdão pode ser processo).",
+      "Se for seguro, estabeleça limites saudáveis."
+    ]
+  },
+
+  // =========================
+  // AMOR / RELACIONAMENTOS / FAMÍLIA
+  // =========================
+  amor: {
+    refs: [
+      "1 Coríntios 13:4-7", "João 13:34-35", "1 João 4:7-8", "Romanos 5:8", "Provérbios 10:12",
+      "Efésios 4:29-32", "Colossenses 3:12-14", "Provérbios 15:1", "Romanos 12:9-10", "Mateus 22:37-39",
+      "1 Pedro 4:8", "Filipenses 2:3-4", "Gálatas 5:22-23", "Romanos 12:18", "Provérbios 17:17"
+    ],
+    summary: "Amor bíblico é atitude: paciente, bondoso, firme, que busca o bem do outro e pratica perdão.",
+    practice: [
+      "Escolha 1 ato concreto de amor hoje.",
+      "Evite revidar no impulso; responda com mansidão.",
+      "Pratique ouvir antes de falar."
+    ]
+  },
+
+  familia: {
+    refs: [
+      "Efésios 6:1-4", "Colossenses 3:18-21", "Provérbios 22:6", "Salmos 127:3-5", "1 Timóteo 5:8",
+      "Provérbios 15:1", "Efésios 4:32", "Josué 24:15", "Salmos 128:1-4", "Provérbios 17:6",
+      "Êxodo 20:12", "1 Coríntios 13:4-7", "Colossenses 3:13-14", "Romanos 12:10", "Provérbios 14:1"
+    ],
+    summary: "Família é lugar de cuidado, disciplina amorosa, honra e perdão. Deus chama para construir paz e responsabilidade.",
+    practice: [
+      "Pratique uma conversa sem acusações (eu sinto / eu preciso).",
+      "Peça perdão rápido quando errar.",
+      "Defina limites saudáveis e mantenha respeito."
+    ]
+  },
+
+  casamento: {
+    refs: [
+      "Efésios 5:25-33", "1 Coríntios 13:4-7", "Colossenses 3:13-14", "Provérbios 15:1", "Gênesis 2:24",
+      "1 Pedro 3:7", "Eclesiastes 4:9-12", "Provérbios 18:22", "Mateus 19:6", "Cantares 8:6-7",
+      "Efésios 4:2-3", "Romanos 12:18", "Tiago 1:19", "Provérbios 21:9", "Provérbios 31:10-12"
+    ],
+    summary: "Relacionamento saudável envolve amor sacrificial, perdão, diálogo, honra e mansidão.",
+    practice: [
+      "Ouça para entender, não para vencer.",
+      "Acerte expectativas e limites com clareza.",
+      "Faça um gesto simples de cuidado hoje."
+    ]
+  },
+
+  // =========================
+  // DINHEIRO / FINANÇAS / DÍVIDAS
+  // =========================
+  dinheiro: {
+    refs: [
+      "Provérbios 21:5", "Provérbios 22:7", "Lucas 14:28", "Hebreus 13:5", "1 Timóteo 6:6-10",
+      "Mateus 6:24", "Eclesiastes 5:10", "Provérbios 13:11", "Provérbios 27:23-24", "Romanos 13:8",
+      "Provérbios 3:9-10", "2 Coríntios 9:6-8", "Provérbios 11:24-25", "Provérbios 15:16", "Salmos 37:21"
+    ],
+    summary: "Dinheiro é ferramenta, não senhor. A Bíblia ensina prudência, planejamento, contentamento e generosidade.",
+    practice: [
+      "Faça um orçamento simples: renda, fixos, variáveis, dívidas.",
+      "Regra 24h antes de comprar (evita compra emocional).",
+      "Planeje pagar primeiro a dívida com maior juros/taxa."
+    ]
+  },
+
+  // =========================
+  // TRABALHO / DILIGÊNCIA / PREGUIÇA
+  // =========================
+  trabalho: {
+    refs: [
+      "Colossenses 3:23-24", "Provérbios 6:6-11", "Provérbios 21:5", "2 Tessalonicenses 3:10-12", "Provérbios 10:4",
+      "Provérbios 12:11", "Provérbios 14:23", "Eclesiastes 9:10", "Provérbios 13:4", "Provérbios 22:29",
+      "Efésios 4:28", "1 Tessalonicenses 4:11-12", "Provérbios 16:3", "Provérbios 24:30-34", "Gálatas 6:9"
+    ],
+    summary: "Trabalho é responsabilidade e chamado. Diligência e planejamento geram fruto; preguiça gera escassez.",
+    practice: [
+      "Defina 3 prioridades do dia.",
+      "Comece por 10 minutos na tarefa mais importante.",
+      "Evite multitarefa: conclua uma coisa por vez."
+    ]
+  },
+
+  // =========================
+  // TENTAÇÃO / VÍCIO / PECADO
+  // =========================
+  tentacao: {
+    refs: [
+      "1 Coríntios 10:13", "Tiago 1:13-15", "Mateus 26:41", "Salmos 119:9-11", "Romanos 6:12-14",
+      "Gálatas 5:16", "2 Timóteo 2:22", "Provérbios 4:23", "Mateus 5:29-30", "Romanos 13:14",
+      "Efésios 6:10-11", "1 Pedro 5:8-9", "Provérbios 5:1-8", "Tito 2:11-12", "Salmos 101:3"
+    ],
+    summary: "Tentação é real, mas Deus dá escape. Vigilância, oração e Palavra fortalecem o coração.",
+    practice: [
+      "Identifique gatilhos (hora, lugar, emoção).",
+      "Corte o acesso antes da queda (mudança de ambiente/rotina).",
+      "Busque apoio confiável (não lute sozinho)."
+    ]
+  },
+
+  // =========================
+  // RAIVA / RESSENTIMENTO / VINGANÇA
+  // =========================
+  raiva: {
+    refs: [
+      "Tiago 1:19-20", "Efésios 4:26-27", "Provérbios 15:1", "Romanos 12:19", "Provérbios 29:11",
+      "Provérbios 16:32", "Eclesiastes 7:9", "Mateus 5:22", "Colossenses 3:8", "Provérbios 14:29",
+      "Romanos 12:18", "1 Pedro 3:9", "Gálatas 5:22-23", "Provérbios 19:11", "Salmos 37:8"
+    ],
+    summary: "Raiva domina quando o coração perde o controle. Deus chama para domínio próprio, mansidão e justiça nas mãos dele.",
+    practice: [
+      "Espere 10 minutos antes de responder.",
+      "Escreva o que você sente antes de falar.",
+      "Procure resolver com verdade e amor, não com feridas."
+    ]
+  },
+
+  // =========================
+  // SOLIDÃO / REJEIÇÃO
+  // =========================
+  solidao: {
+    refs: [
+      "Hebreus 13:5", "Mateus 28:20", "Salmos 68:6", "Salmos 23:1-4", "Salmos 139:7-10",
+      "Isaías 41:10", "João 14:18", "Romanos 8:38-39", "Salmos 34:18", "1 Pedro 5:7",
+      "Salmos 27:10", "João 15:15", "Eclesiastes 4:9-10", "Provérbios 17:17", "Filipenses 4:19"
+    ],
+    summary: "Deus não abandona. Ele sustenta e também cria laços e comunidade para você não caminhar só.",
+    practice: [
+      "Fale com 1 pessoa hoje (mensagem simples).",
+      "Busque uma comunidade/grupo saudável.",
+      "Ore pedindo conexões e amizades maduras."
+    ]
+  },
+
+  // =========================
+  // ESPERANÇA / FUTURO
+  // =========================
+  esperanca: {
+    refs: [
+      "Romanos 15:13", "Isaías 40:31", "Lamentações 3:21-23", "1 Pedro 1:3", "Salmos 39:7",
+      "Jeremias 29:11", "Romanos 8:28", "Salmos 27:13-14", "2 Coríntios 4:16-18", "Hebreus 10:23",
+      "Romanos 5:3-5", "Apocalipse 21:4", "Salmos 42:11", "Isaías 43:18-19", "Salmos 23:6"
+    ],
+    summary: "Esperança bíblica não é otimismo vazio; é confiança no caráter fiel de Deus e na sua condução do futuro.",
+    practice: [
+      "Liste 3 evidências de cuidado de Deus no passado.",
+      "Faça uma oração curta de esperança pela manhã.",
+      "Troque 'nunca' por 'um dia de cada vez'."
+    ]
+  },
+
+  // =========================
+  // GRATIDÃO
+  // =========================
+  gratidao: {
+    refs: [
+      "1 Tessalonicenses 5:18", "Colossenses 3:17", "Salmos 107:1", "Salmos 118:24", "Filipenses 4:4",
+      "Salmos 136:1", "Tiago 1:17", "Salmos 103:2-5", "Efésios 5:20", "1 Crônicas 16:34",
+      "Romanos 1:21", "Hebreus 12:28", "Salmos 50:14", "Colossenses 2:7", "2 Coríntios 9:15"
+    ],
+    summary: "Gratidão reposiciona o coração e treina seus olhos para perceber o bem de Deus no cotidiano.",
+    practice: [
+      "Anote 3 motivos reais de gratidão agora.",
+      "Agradeça uma pessoa diretamente.",
+      "Faça uma oração curta de gratidão antes de dormir."
+    ]
+  },
+
+orgulho: {
+  refs: [
+    "Provérbios 16:18", "Tiago 4:6", "1 Pedro 5:5-6", "Filipenses 2:3-4", "Provérbios 11:2",
+    "Provérbios 18:12", "Lucas 18:9-14", "Miquéias 6:8", "Romanos 12:3", "Gálatas 6:3",
+    "Provérbios 27:2", "Isaías 66:2"
+  ],
+  summary: "Orgulho derruba porque coloca o ego no centro. Humildade abre caminho para sabedoria, graça e restauração.",
+  practice: [
+    "Reconheça um erro sem justificar demais.",
+    "Sirva alguém em silêncio (sem buscar aplauso).",
+    "Peça conselho antes de decidir algo grande."
+  ]
+},
+
+humildade: {
+  refs: [
+    "Miquéias 6:8", "Filipenses 2:5-8", "Tiago 4:10", "1 Pedro 5:6", "Provérbios 3:34",
+    "Provérbios 15:33", "Mateus 23:12", "Colossenses 3:12", "Isaías 66:2", "Salmos 25:9"
+  ],
+  summary: "Humildade é força sob controle: aprender, admitir limites e viver com mansidão.",
+  practice: [
+    "Pergunte: 'o que posso aprender com isso?'",
+    "Seja rápido para ouvir e lento para falar (Tiago 1).",
+    "Treine gratidão — ela reduz o ego."
+  ]
+},
+
+injustica: {
+  refs: [
+    "Miquéias 6:8", "Isaías 1:17", "Provérbios 31:8-9", "Salmos 82:3-4", "Amós 5:24",
+    "Romanos 12:19", "Mateus 5:6", "Tiago 5:1-6", "Isaías 58:6-10", "Provérbios 21:3"
+  ],
+  summary: "Deus ama justiça e chama seu povo a defender o fraco, agir com retidão e não pagar mal com mal.",
+  practice: [
+    "Faça o que é certo mesmo quando ninguém vê.",
+    "Ajude alguém vulnerável de forma prática.",
+    "Evite vingança — busque justiça com sabedoria."
+  ]
+},
+
+culpa: {
+  refs: [
+    "Romanos 8:1", "1 João 1:9", "Salmos 51:10-12", "Salmos 103:12", "Miquéias 7:18-19",
+    "Isaías 1:18", "Provérbios 28:13", "2 Coríntios 7:10", "Hebreus 8:12", "Lucas 15:11-24"
+  ],
+  summary: "Em Cristo há perdão e recomeço. Culpa pode levar ao arrependimento; vergonha paralisa.",
+  practice: [
+    "Confesse a Deus com honestidade (1Jo 1).",
+    "Corrija o que for possível (reparação).",
+    "Troque autocondenação por passos de mudança."
+  ]
+},
+
+vergonha: {
+  refs: [
+    "Romanos 10:11", "Isaías 54:4", "Hebreus 12:2", "Salmos 34:5", "João 8:10-11",
+    "2 Coríntios 5:17", "Salmos 103:12", "Apocalipse 12:10-11"
+  ],
+  summary: "Deus não te chama para viver marcado pelo passado. Ele chama para restauração, identidade e nova vida.",
+  practice: [
+    "Separe 'eu errei' de 'eu sou lixo'.",
+    "Busque apoio seguro (não isole).",
+    "Construa hábitos que provam o novo caminho."
+  ]
+},
+
+ansiedade_social: {
+  refs: [
+    "Salmos 56:3-4", "Isaías 41:10", "2 Timóteo 1:7", "Mateus 11:28-30", "Filipenses 4:6-7",
+    "Provérbios 29:25", "Romanos 8:15", "Salmos 27:1"
+  ],
+  summary: "Deus fortalece o coração e dá domínio próprio. Um passo por vez, com paz.",
+  practice: [
+    "Faça 1 exposição pequena por dia (1 conversa curta).",
+    "Respiração + oração curta antes de socializar.",
+    "Troque 'e se der errado' por 'vou tentar 1 passo'."
+  ]
+},
+
+raiva: {
+  refs: [
+    "Tiago 1:19-20", "Efésios 4:26-27", "Provérbios 15:1", "Provérbios 16:32", "Romanos 12:19",
+    "Provérbios 29:11", "Eclesiastes 7:9", "Colossenses 3:8", "Provérbios 14:29", "Salmos 37:8"
+  ],
+  summary: "Raiva pode virar destruição quando domina. Deus chama para mansidão e domínio próprio.",
+  practice: [
+    "Espere 10 minutos antes de responder.",
+    "Escreva o que você sente antes de falar.",
+    "Procure resolver com verdade e amor."
+  ]
+},
+
+perdao_a_si: {
+  refs: [
+    "Romanos 8:1", "1 João 1:9", "Salmos 103:12", "2 Coríntios 5:17", "Filipenses 3:13-14",
+    "Isaías 43:18-19", "Miquéias 7:18-19"
+  ],
+  summary: "Se Deus perdoa e restaura, você precisa aprender a caminhar no perdão e no recomeço.",
+  practice: [
+    "Confesse, aprenda, e avance (não repita o ciclo).",
+    "Troque culpa por responsabilidade e ação.",
+    "Crie um plano para não cair no mesmo."
+  ]
+},
+
+vicio: {
+  refs: [
+    "1 Coríntios 10:13", "Romanos 6:12-14", "Gálatas 5:16", "Mateus 26:41", "Salmos 119:9-11",
+    "2 Timóteo 2:22", "Provérbios 4:23", "Romanos 13:14", "Efésios 6:10-11", "1 Pedro 5:8-9",
+    "Tito 2:11-12", "Salmos 101:3"
+  ],
+  summary: "Deus dá escape e força. Vício se vence com vigilância, cortes práticos e apoio real.",
+  practice: [
+    "Corte gatilhos (apps, horários, lugares).",
+    "Troque hábito por outro saudável (substituição).",
+    "Procure prestação de contas (não lute sozinho)."
+  ]
+},
+
+pureza: {
+  refs: [
+    "1 Tessalonicenses 4:3-5", "1 Coríntios 6:18-20", "Mateus 5:27-30", "Salmos 119:9-11", "Jó 31:1",
+    "Provérbios 4:23", "Filipenses 4:8", "2 Timóteo 2:22", "Romanos 12:1-2"
+  ],
+  summary: "Pureza bíblica é coração e caminho. Deus chama para santidade e mente renovada.",
+  practice: [
+    "Proteja olhos e mente (Filipenses 4:8).",
+    "Fuja do que te derruba (2Tm 2:22).",
+    "Reforce rotina: sono, treino, trabalho, leitura."
+  ]
+},
+
+pornografia: {
+  refs: [
+    "Mateus 5:27-30", "1 Coríntios 6:18-20", "1 Tessalonicenses 4:3-5", "Jó 31:1", "Salmos 101:3",
+    "Provérbios 4:23", "Romanos 13:14", "Tiago 1:13-15", "Gálatas 5:16", "2 Timóteo 2:22"
+  ],
+  summary: "Esse pecado cresce no segredo. A saída envolve cortar acesso, renovar mente e buscar ajuda real.",
+  practice: [
+    "Bloqueios + remover gatilhos (corte radical).",
+    "Prestação de contas com alguém confiável.",
+    "Substitua por hábitos fortes (esporte, foco, sono)."
+  ]
+},
+
+oracao: {
+  refs: [
+    "Mateus 6:6-13", "Filipenses 4:6-7", "1 Tessalonicenses 5:17", "Jeremias 33:3", "Tiago 5:16",
+    "Salmos 145:18", "Hebreus 4:16", "Marcos 11:24", "Colossenses 4:2", "Lucas 18:1"
+  ],
+  summary: "Oração é relacionamento com Deus: entrega, pedido, gratidão e direção.",
+  practice: [
+    "Ore curto e real (1–3 minutos) todo dia.",
+    "Transforme ansiedade em pedido específico.",
+    "Termine com confiança: 'seja feita tua vontade'."
+  ]
+},
+
+jejum: {
+  refs: [
+    "Mateus 6:16-18", "Isaías 58:6-10", "Joel 2:12-13", "Atos 13:2-3", "Mateus 4:1-4"
+  ],
+  summary: "Jejum é humilhação e foco em Deus — não show. Ele fortalece disciplina e dependência.",
+  practice: [
+    "Faça jejum com propósito (orar por algo específico).",
+    "Combine com leitura e oração.",
+    "Pratique misericórdia e generosidade junto."
+  ]
+},
+
+disciplina: {
+  refs: [
+    "Provérbios 12:1", "Provérbios 13:4", "Provérbios 21:5", "1 Coríntios 9:24-27", "Hebreus 12:11",
+    "2 Timóteo 1:7", "Provérbios 6:6-11", "Gálatas 6:9"
+  ],
+  summary: "Disciplina cria liberdade. Deus usa constância para formar caráter e fruto.",
+  practice: [
+    "Hábito mínimo diário (2–5 min).",
+    "Corte distrações na raiz.",
+    "Recompense o processo, não só o resultado."
+  ]
+},
+
+decisoes: {
+  refs: [
+    "Provérbios 3:5-6", "Tiago 1:5", "Salmos 32:8", "Provérbios 11:14", "Provérbios 15:22",
+    "Provérbios 16:3", "Provérbios 16:9", "Efésios 5:15-17", "Colossenses 1:9-10", "Salmos 119:105"
+  ],
+  summary: "Deus guia quem busca com humildade: oração, Palavra, conselho e prudência.",
+  practice: [
+    "Escreva opções + prós e contras.",
+    "Peça conselho e ore por direção.",
+    "Dê 1 passo pequeno — não precisa ver tudo."
+  ]
+},
+
+propósito: {
+  refs: [
+    "Efésios 2:10", "Romanos 8:28", "Provérbios 19:21", "Mateus 6:33", "Colossenses 3:23-24",
+    "1 Coríntios 10:31", "Miquéias 6:8", "Filipenses 1:6", "Salmos 37:4-5", "Jeremias 29:11"
+  ],
+  summary: "Propósito é viver para Deus no cotidiano: fidelidade, boas obras, caráter e missão.",
+  practice: [
+    "Faça o bem hoje com o que você tem.",
+    "Escolha 1 meta e caminhe com constância.",
+    "Pare de esperar perfeição para começar."
+  ]
+},
+
+// ===== FINANÇAS: MAIS FORTE =====
+financas_dividas: {
+  refs: [
+    "Provérbios 22:7", "Provérbios 21:5", "Lucas 14:28", "Romanos 13:8", "Hebreus 13:5",
+    "1 Timóteo 6:6-10", "Mateus 6:24", "Provérbios 13:11", "Provérbios 27:23-24", "Provérbios 11:24-25",
+    "Provérbios 15:16", "Eclesiastes 5:10", "Provérbios 28:20", "Provérbios 3:9-10", "2 Coríntios 9:6-8"
+  ],
+  summary: "Dinheiro é ferramenta. A Bíblia ensina planejamento, trabalho fiel, contentamento e generosidade. Dívida escraviza — prudência liberta.",
+  practice: [
+    "Liste dívidas e pague primeiro a de maior juros.",
+    "Orçamento simples (renda / fixos / variáveis / dívida).",
+    "Regra 24h antes de comprar (combate impulso)."
+  ]
+},
+
+generosidade: {
+  refs: [
+    "2 Coríntios 9:6-8", "Provérbios 11:24-25", "Atos 20:35", "Lucas 6:38", "Provérbios 19:17",
+    "Mateus 6:19-21", "1 Timóteo 6:17-19", "Provérbios 3:9-10", "Deuteronômio 15:7-11", "Provérbios 22:9"
+  ],
+  summary: "Generosidade cura o coração da avareza e treina confiança em Deus. Ela também abençoa pessoas de verdade.",
+  practice: [
+    "Separe um valor fixo para doar/ajudar.",
+    "Doe com alegria, não por culpa.",
+    "Seja generoso também com tempo e serviço."
+  ]
+},
+
+ganancia: {
+  refs: [
+    "Lucas 12:15", "1 Timóteo 6:9-10", "Hebreus 13:5", "Eclesiastes 5:10", "Provérbios 28:22",
+    "Mateus 6:24", "Provérbios 15:16", "Provérbios 23:4-5", "Provérbios 11:28"
+  ],
+  summary: "Ganância promete segurança, mas prende o coração. Deus chama para contentamento e justiça.",
+  practice: [
+    "Defina 'o suficiente' (limite saudável).",
+    "Evite comparar sua vida com a dos outros.",
+    "Pratique gratidão diária."
+  ]
+},
+
+trabalho: {
+  refs: [
+    "Colossenses 3:23-24", "Provérbios 6:6-11", "Provérbios 21:5", "Provérbios 14:23", "2 Tessalonicenses 3:10-12",
+    "Provérbios 10:4", "Provérbios 12:11", "Provérbios 13:4", "Provérbios 22:29", "Eclesiastes 9:10"
+  ],
+  summary: "Diligência e planejamento geram fruto. Deus chama para constância e responsabilidade.",
+  practice: [
+    "3 prioridades do dia.",
+    "10 minutos na tarefa mais importante.",
+    "Corte distrações e finalize uma coisa por vez."
+  ]
+},
+
+amizade: {
+  refs: [
+    "Provérbios 17:17", "Provérbios 27:17", "Eclesiastes 4:9-10", "João 15:13-15", "Provérbios 13:20",
+    "Provérbios 18:24", "1 Coríntios 15:33", "Provérbios 27:9", "Romanos 12:10"
+  ],
+  summary: "Amizades moldam destino. Deus chama para lealdade, correção amorosa e boas companhias.",
+  practice: [
+    "Aproxime-se de quem te puxa para o bem.",
+    "Seja fiel e verdadeiro (sem humilhar).",
+    "Corte relações que te destroem."
+  ]
+},
+
+inveja: {
+  refs: [
+    "Provérbios 14:30", "Tiago 3:14-16", "Gálatas 5:26", "Provérbios 23:17", "Salmos 37:1-2",
+    "Filipenses 4:11-13"
+  ],
+  summary: "Inveja corrói por dentro. Contentamento e gratidão curam o coração.",
+  practice: [
+    "Pare de se comparar (isso rouba paz).",
+    "Treine gratidão (3 itens por dia).",
+    "Celebre o bem do outro (maturidade)."
+  ]
+},
+
+ansiedade: {
+  refs: [
+    "Filipenses 4:6-7", "1 Pedro 5:7", "Mateus 6:25-34", "Salmos 55:22", "Isaías 26:3",
+    "João 14:27", "Salmos 46:10", "Salmos 94:19", "Isaías 41:10", "Mateus 11:28-30"
+  ],
+  summary: "Troque preocupação por oração e entrega. A paz de Deus guarda mente e coração.",
+  practice: [
+    "Ore pedindo algo específico (não genérico).",
+    "Defina o próximo passo pequeno.",
+    "Durma melhor: mente cansada amplifica ansiedade."
+  ]
+},
+
+esperanca: {
+  refs: [
+    "Romanos 15:13", "Isaías 40:31", "Lamentações 3:21-23", "1 Pedro 1:3", "Salmos 27:13-14",
+    "Romanos 8:28", "Apocalipse 21:4", "Hebreus 10:23", "Salmos 42:11", "Isaías 43:18-19"
+  ],
+  summary: "Esperança bíblica é confiança na fidelidade de Deus e no futuro sob sua mão.",
+  practice: [
+    "Um dia de cada vez.",
+    "Lembre vitórias passadas.",
+    "Faça uma oração curta pela manhã."
+  ]
+},
+
   },
 
   // -------------------------
@@ -10339,219 +11351,6 @@ const BIBLE_BOOKS = [
 
 // Função para injetar a aba Bíblia na interface
 function injectBibleTab() {
-  let biblePdfDoc = null;
-  let biblePdfPage = 1;
-  let biblePdfRendering = false;
-  let biblePdfPageCache = new Map();
-  let biblePdfSearchToken = 0;
-  let bibleSemanticEnabled = false;
-  let bibleEmbedder = null;
-  let bibleEmbedderPromise = null;
-
-  const normalizeText = (str) => String(str || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-
-  const extractSearchTerms = (query) => {
-    const stop = new Set(['de','da','do','dos','das','para','por','com','sem','uma','um','uns','umas','que','qual','quais','como','porque','por que','sobre','na','no','nas','nos','a','o','os','as','em','e','ou','se','eu','voce','você','meu','minha','meus','minhas','sua','seu','suas','seus']);
-    const raw = normalizeText(query).replace(/[^a-z0-9:\s]/g, ' ').split(/\s+/).filter(Boolean);
-    const terms = raw.filter(w => w.length >= 4 && !stop.has(w));
-    return terms.slice(0, 3);
-  };
-
-  const ensurePdf = async () => {
-    if (biblePdfDoc) return biblePdfDoc;
-    const statusEl = document.getElementById('biblePdfStatus');
-    try {
-      const pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
-      if (!pdfjsLib) throw new Error('PDF.js não carregado');
-      // Em file:// alguns navegadores bloqueiam o worker do PDF.js
-      if (window.location.protocol === 'file:') {
-        pdfjsLib.disableWorker = true;
-      }
-      if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-      }
-      if (statusEl) statusEl.textContent = 'Carregando Bíblia...';
-      let loadingTask = pdfjsLib.getDocument('biblia_de_estudo_de_genebra.pdf');
-      try {
-        biblePdfDoc = await loadingTask.promise;
-      } catch (err) {
-        // fallback: tenta sem worker caso tenha falhado
-        pdfjsLib.disableWorker = true;
-        loadingTask = pdfjsLib.getDocument('biblia_de_estudo_de_genebra.pdf');
-        biblePdfDoc = await loadingTask.promise;
-      }
-      if (statusEl) statusEl.textContent = `Bíblia carregada (${biblePdfDoc.numPages} páginas).`;
-      return biblePdfDoc;
-    } catch (err) {
-      if (statusEl) statusEl.textContent = 'Não foi possível carregar o PDF da Bíblia.';
-      throw err;
-    }
-  };
-
-  const loadEmbedder = async () => {
-    if (bibleEmbedder) return bibleEmbedder;
-    if (bibleEmbedderPromise) return bibleEmbedderPromise;
-    const t = window.transformers;
-    if (!t || !t.pipeline) {
-      throw new Error('Transformers.js não carregado');
-    }
-    if (t.env) {
-      t.env.allowRemoteModels = true;
-      t.env.useBrowserCache = true;
-      t.env.allowLocalModels = false;
-    }
-    const statusEl = document.getElementById('biblePdfStatus');
-    if (statusEl) statusEl.textContent = 'Carregando IA de busca inteligente...';
-    if (window.location.protocol === 'file:') {
-      if (statusEl) statusEl.textContent = 'Para busca inteligente, abra o site via servidor local (não file://).';
-    }
-    bibleEmbedderPromise = t.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true });
-    bibleEmbedder = await bibleEmbedderPromise;
-    if (statusEl) statusEl.textContent = 'Busca inteligente ativada.';
-    return bibleEmbedder;
-  };
-
-  const embedText = async (text) => {
-    const model = await loadEmbedder();
-    const output = await model(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data || []);
-  };
-
-  const cosineSimilarity = (a, b) => {
-    if (!a || !b || a.length !== b.length) return 0;
-    let sum = 0;
-    for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
-    return sum;
-  };
-
-  const getPageText = async (pageNum) => {
-    if (biblePdfPageCache.has(pageNum)) return biblePdfPageCache.get(pageNum);
-    const pdf = await ensurePdf();
-    const page = await pdf.getPage(pageNum);
-    const content = await page.getTextContent();
-    const text = content.items.map(i => i.str).join(' ');
-    const normalized = normalizeText(text);
-    const result = { raw: text, normalized };
-    biblePdfPageCache.set(pageNum, result);
-    return result;
-  };
-
-  const renderPdfPage = async (pageNum) => {
-    if (biblePdfRendering) return;
-    biblePdfRendering = true;
-    const pdf = await ensurePdf();
-    pageNum = Math.max(1, Math.min(pageNum, pdf.numPages));
-    biblePdfPage = pageNum;
-
-    const canvas = document.getElementById('biblePdfCanvas');
-    const label = document.getElementById('biblePdfPageLabel');
-    const container = document.getElementById('biblePdfCanvasWrap');
-    if (!canvas || !container) {
-      biblePdfRendering = false;
-      return;
-    }
-
-    const page = await pdf.getPage(pageNum);
-    const containerWidth = container.clientWidth || 320;
-    const viewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(2, Math.max(1, (containerWidth - 8) / viewport.width));
-    const scaledViewport = page.getViewport({ scale });
-    const ctx = canvas.getContext('2d');
-    canvas.width = scaledViewport.width;
-    canvas.height = scaledViewport.height;
-    await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-    if (label) label.textContent = `Página ${pageNum} / ${pdf.numPages}`;
-    biblePdfRendering = false;
-  };
-
-  const searchPdf = async (query) => {
-    const statusEl = document.getElementById('biblePdfStatus');
-    const resultsEl = document.getElementById('biblePdfResults');
-    const token = ++biblePdfSearchToken;
-    if (resultsEl) resultsEl.innerHTML = '';
-    if (statusEl) statusEl.textContent = 'Buscando no PDF...';
-
-    const pdf = await ensurePdf();
-    const terms = [];
-    const normalizedQuery = normalizeText(query);
-    if (normalizedQuery.length >= 4) terms.push(normalizedQuery);
-    terms.push(...extractSearchTerms(query));
-
-    const matches = [];
-    const maxScanPages = Math.min(pdf.numPages, 420);
-    for (let i = 1; i <= maxScanPages; i++) {
-      if (token !== biblePdfSearchToken) return;
-      const pageText = await getPageText(i);
-      const hit = terms.find(t => t && pageText.normalized.includes(t));
-      if (hit) {
-        matches.push({ page: i, term: hit, text: pageText.raw });
-        if (matches.length >= 12) break;
-      }
-      if (statusEl && i % 10 === 0) statusEl.textContent = `Buscando no PDF... (${i}/${maxScanPages})`;
-    }
-
-    if (!matches.length) {
-      if (statusEl) statusEl.textContent = 'Nenhum trecho encontrado no PDF.';
-      return;
-    }
-
-    let finalMatches = matches;
-    if (bibleSemanticEnabled) {
-      try {
-        if (statusEl) statusEl.textContent = 'Reordenando com busca inteligente...';
-        const queryEmb = await embedText(query);
-        const scored = [];
-        for (const m of matches) {
-          const snippet = m.text.slice(0, 600);
-          const emb = await embedText(snippet);
-          const score = cosineSimilarity(queryEmb, emb);
-          scored.push({ ...m, score });
-        }
-        scored.sort((a, b) => b.score - a.score);
-        finalMatches = scored.slice(0, 5);
-      } catch (e) {
-        if (statusEl) statusEl.textContent = 'Busca inteligente indisponível. Mostrando resultados normais.';
-      }
-    }
-
-    if (statusEl) statusEl.textContent = `Encontrado ${finalMatches.length} resultado(s).`;
-    if (resultsEl) {
-      const highlightTerms = terms.filter(Boolean).slice(0, 3);
-      const highlightSnippet = (text) => {
-        let snippet = text.slice(0, 220).replace(/\s+/g, ' ').trim();
-        highlightTerms.forEach((t, idx) => {
-          if (!t) return;
-          const re = new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
-          snippet = snippet.replace(re, `<mark class="hl-${idx + 1}">$1</mark>`);
-        });
-        return snippet;
-      };
-      resultsEl.innerHTML = finalMatches.map(m => {
-        const safe = highlightSnippet(m.text);
-        const scoreText = (typeof m.score === 'number') ? `<div class="bible-result-score">Relevância: ${(m.score * 100).toFixed(1)}%</div>` : '';
-        return `
-          <div class="bible-result">
-            <div class="bible-result-title">Página ${m.page}</div>
-            <div class="bible-result-snippet">${safe}...</div>
-            ${scoreText}
-            <button class="ghost bible-open-page-btn" data-page="${m.page}">Abrir página</button>
-          </div>
-        `;
-      }).join('');
-      resultsEl.querySelectorAll('.bible-open-page-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const page = parseInt(btn.dataset.page, 10);
-          const reader = document.getElementById('biblePdfReader');
-          if (reader) reader.classList.remove('hidden');
-          renderPdfPage(page);
-        });
-      });
-    }
-  };
-
   const activateBibleTab = () => {
     // Desativa todos os outros botões de navegação e abas de conteúdo
     document.querySelectorAll('.nav-item, .mobile-drawer-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
@@ -10565,6 +11364,7 @@ function injectBibleTab() {
     if (typeof closeDrawer === 'function') closeDrawer();
   };
 
+  /*
   // 1. Injetar Botão na Navegação Desktop (Sidebar)
   const desktopNav = document.querySelector('.cinema .app-nav');
   if (desktopNav && !desktopNav.querySelector('[data-tab="bible"]')) {
@@ -10586,6 +11386,7 @@ function injectBibleTab() {
     btn.addEventListener('click', activateBibleTab);
     mobileDrawerItemContainer.appendChild(btn);
   }
+  */
 
   // 3. Injetar Conteúdo da Aba
   const main = document.getElementById('gameScreen');
@@ -10593,80 +11394,34 @@ function injectBibleTab() {
     const content = document.createElement('div');
     content.id = 'tab-bible';
     content.className = 'tab-content';
-    content.style.cssText = 'padding: 10px;';
+    content.style.cssText = 'padding: 0;'; // Remove padding do container pai para evitar overflow
     
-    // BIBLE_BOOKS moved to top-level to reduce injectBibleTab function size
-
-    const booksHtml = BIBLE_BOOKS.map(b => `
-      <button class="bible-book-card" data-book="${b.name}" data-testament="${b.testament}">
-        <div class="bible-book-name">${b.name}</div>
-        <div class="bible-book-meta">${b.group} • ${b.order}º livro</div>
-      </button>
-    `).join('');
-
     content.innerHTML = `
-      <div class="bible-interface">
-        <div class="bible-header">
-          <div class="bible-header-top">
+      <div class="bible-interface" style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; height: 100%; padding: 10px; box-sizing: border-box;">
+        <div class="bible-header" style="text-align: center; flex-shrink: 0;">
+          <div class="bible-header-top" style="justify-content: center;">
             <div class="bible-icon">✝️</div>
             <div>
               <h2 class="bible-title">Assistente Bíblico</h2>
               <p class="bible-subtitle">"Lâmpada para os meus pés é a tua palavra"</p>
             </div>
           </div>
-          <div class="bible-quick-actions">
+          <div class="bible-quick-actions" style="justify-content: center; margin-top: 10px;">
             <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')">✝️ Jesus</button>
             <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')">🧠 O que você sabe?</button>
             <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')">📅 Plano de Leitura</button>
-            <button class="btn ghost bible-tag" id="bibleOpenPdfBtn">📖 Abrir Bíblia</button>
-            <button class="btn ghost bible-tag" id="bibleSemanticBtn">✨ Busca inteligente</button>
           </div>
         </div>
         
-        <div id="bibleChatArea" class="bible-chat">
+        <div id="bibleChatArea" class="bible-chat" style="flex: 1; overflow-y: auto; margin-bottom: 10px; min-height: 0;">
           <div class="bible-message bot">
             Olá, a Paz! Sou seu assistente bíblico. 🙏<br>Posso explicar sobre livros (ex: "Gênesis"), temas (ex: "ansiedade") ou dar um versículo do dia.
           </div>
         </div>
 
-        <div class="bible-pdf-tools">
-          <div id="biblePdfStatus" class="bible-pdf-status">Bíblia pronta para busca.</div>
-          <div id="biblePdfResults" class="bible-pdf-results"></div>
-        </div>
-
-        <div class="bible-books">
-          <div class="bible-books-title">Livros da Bíblia</div>
-          <div class="bible-books-filters">
-            <button class="ghost bible-filter-btn active" data-filter="all">Todos</button>
-            <button class="ghost bible-filter-btn" data-filter="AT">Antigo Testamento</button>
-            <button class="ghost bible-filter-btn" data-filter="NT">Novo Testamento</button>
-          </div>
-          <div class="bible-books-grid">
-            ${booksHtml}
-          </div>
-        </div>
-
-        <div id="biblePdfReader" class="bible-pdf-reader hidden">
-          <div class="bible-pdf-reader-header">
-            <div id="biblePdfPageLabel" class="bible-pdf-page">Página 1</div>
-            <div class="bible-pdf-controls">
-              <button class="ghost" id="biblePdfPrevBtn">◀</button>
-              <button class="ghost" id="biblePdfNextBtn">▶</button>
-              <button class="ghost" id="biblePdfCloseBtn">Fechar</button>
-            </div>
-          </div>
-          <div class="bible-pdf-search">
-            <input type="text" id="biblePdfSearchInput" class="bible-pdf-search-input" placeholder="Buscar na Bíblia...">
-            <button class="ghost" id="biblePdfSearchBtn">Buscar</button>
-          </div>
-          <div id="biblePdfCanvasWrap" class="bible-pdf-canvas-wrap">
-            <canvas id="biblePdfCanvas"></canvas>
-          </div>
-        </div>
-
-        <div class="bible-input-area">
-          <input type="text" id="bibleInput" class="bible-input" placeholder="Ex: Gênesis, Salmos...">
-          <button id="bibleSendBtn" class="bible-send-btn" aria-label="Enviar">➤</button>
+        <div class="bible-input-area" style="display: flex; gap: 8px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 12px; flex-shrink: 0;">
+          <input type="text" id="bibleInput" class="bible-input" placeholder="Ex: Gênesis, Salmos..." style="flex: 1;">
+          <button id="bibleSendBtn" class="bible-send-btn" aria-label="Enviar" style="padding: 0 15px;">➤</button>
         </div>
       </div>
     `;
@@ -10677,13 +11432,6 @@ function injectBibleTab() {
     const input = document.getElementById('bibleInput');
     const btn = document.getElementById('bibleSendBtn');
     const chat = document.getElementById('bibleChatArea');
-    const openPdfBtn = document.getElementById('bibleOpenPdfBtn');
-    const semanticBtn = document.getElementById('bibleSemanticBtn');
-    const pdfPrevBtn = document.getElementById('biblePdfPrevBtn');
-    const pdfNextBtn = document.getElementById('biblePdfNextBtn');
-    const pdfCloseBtn = document.getElementById('biblePdfCloseBtn');
-    const pdfSearchInput = document.getElementById('biblePdfSearchInput');
-    const pdfSearchBtn = document.getElementById('biblePdfSearchBtn');
     const bookCards = document.querySelectorAll('.bible-book-card');
     const filterButtons = document.querySelectorAll('.bible-filter-btn');
     
@@ -10741,52 +11489,10 @@ function injectBibleTab() {
         }
         chat.scrollTop = chat.scrollHeight;
 
-        // Busca no PDF para abrir versículos relacionados
-        try {
-          await searchPdf(text);
-        } catch (e) {
-          const statusEl = document.getElementById('biblePdfStatus');
-          if (statusEl) statusEl.textContent = 'Não foi possível buscar no PDF.';
-        }
     };
     
     btn.addEventListener('click', sendMessage);
     input.addEventListener('keypress', (e) => { if(e.key === 'Enter') sendMessage(); });
-
-    if (openPdfBtn) {
-      openPdfBtn.addEventListener('click', async () => {
-        const reader = document.getElementById('biblePdfReader');
-        if (reader) reader.classList.remove('hidden');
-        await renderPdfPage(biblePdfPage || 1);
-      });
-    }
-    if (semanticBtn) {
-      semanticBtn.addEventListener('click', async () => {
-        try {
-          await loadEmbedder();
-          bibleSemanticEnabled = true;
-          semanticBtn.classList.add('active');
-          semanticBtn.textContent = '✨ Inteligente ativo';
-        } catch (e) {
-          const statusEl = document.getElementById('biblePdfStatus');
-          if (statusEl) statusEl.textContent = 'Falha ao ativar busca inteligente. Verifique se abriu via localhost.';
-        }
-      });
-    }
-
-    const runPdfSearch = async () => {
-      const q = (pdfSearchInput && pdfSearchInput.value || '').trim();
-      if (!q) return;
-      const reader = document.getElementById('biblePdfReader');
-      if (reader) reader.classList.remove('hidden');
-      await searchPdf(q);
-    };
-    if (pdfSearchBtn) pdfSearchBtn.addEventListener('click', runPdfSearch);
-    if (pdfSearchInput) {
-      pdfSearchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') runPdfSearch();
-      });
-    }
 
     if (bookCards.length) {
       bookCards.forEach(card => {
@@ -10817,12 +11523,6 @@ function injectBibleTab() {
       });
       setFilter('all');
     }
-    if (pdfPrevBtn) pdfPrevBtn.addEventListener('click', () => renderPdfPage(biblePdfPage - 1));
-    if (pdfNextBtn) pdfNextBtn.addEventListener('click', () => renderPdfPage(biblePdfPage + 1));
-    if (pdfCloseBtn) pdfCloseBtn.addEventListener('click', () => {
-      const reader = document.getElementById('biblePdfReader');
-      if (reader) reader.classList.add('hidden');
-    });
     
     // Global helper for tags
     window.askBible = (query) => {
@@ -11794,7 +12494,7 @@ window.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => {
     try {
       OracleChat.init();
-      console.log('✅ OracleChat.init executado com sucesso');
+      console.log('✅ OracleChat.init executado com sucesso'); 
     } catch (e) {
       console.error('❌ Erro na inicialização do OracleChat:', e);
       // Mostra uma mensagem na UI para facilitar debugging
@@ -11937,7 +12637,7 @@ window.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       const tabId = btn.getAttribute('data-tab');
       // Fecha ferramentas ativas antes de trocar
-      closeActiveTools();
+      closeActiveTools(); 
       // Se for a aba Bíblia e o conteúdo ainda não existir, injeta antes de prosseguir
       if (tabId === 'bible' && !document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
         try { injectBibleTab(); } catch (e) { console.warn('injectBibleTab falhou ao clicar na aba:', e); }
@@ -11952,6 +12652,16 @@ window.addEventListener('DOMContentLoaded', () => {
       
       const target = document.getElementById(`tab-${tabId}`);
       if (target) target.classList.add('active');
+      // Se abriu a aba Trabalho (`dom`), inserir dados de teste uma vez (se solicitado)
+      if (tabId === 'dom' && typeof window._insertSampleWorkDataForTesting === 'function') {
+        if (!window._workTestInserted) {
+          window._workTestInserted = true;
+          // Aguarda próximo tick para garantir que elementos foram renderizados
+          setTimeout(() => {
+            try { window._insertSampleWorkDataForTesting(); } catch (e) { console.warn('Teste de inserção falhou:', e); }
+          }, 150);
+        }
+      }
       
       // Forçar redimensionamento dos gráficos ao trocar de aba
       window.dispatchEvent(new Event('resize'));
@@ -12130,68 +12840,6 @@ window.checkAppVersion = async function() {
 
 // Função global para forçar atualização (pode ser chamada do console)
 window.forceUpdate = forceAppUpdate;
-
-// -------------------------------
-// Ingestão de PDF para o Oracle
-// Requer PDF.js (veja instruções no index.html)
-// -------------------------------
-async function ingestPdfToOracle(url, options = { chunkSize: 2000 }) {
-  if (typeof pdfjsLib === 'undefined') {
-    console.warn('PDF.js não encontrado. Adicione <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script> em index.html');
-    return { success: false, error: 'pdfjs missing' };
-  }
-
-  try {
-    const loadingTask = pdfjsLib.getDocument(url);
-    const pdf = await loadingTask.promise;
-    let fullText = '';
-
-    for (let p = 1; p <= pdf.numPages; p++) {
-      const page = await pdf.getPage(p);
-      const content = await page.getTextContent();
-      const pageText = content.items.map(i => i.str).join(' ');
-      fullText += `\n\n--- Página ${p} ---\n\n` + pageText;
-    }
-
-    const chunkSize = options.chunkSize || 2000;
-    let chunksAdded = 0;
-    for (let i = 0; i < fullText.length; i += chunkSize) {
-      const chunk = fullText.slice(i, i + chunkSize).trim();
-      if (chunk) {
-        OracleMemory.learn(chunk, 'pdf');
-        chunksAdded++;
-      }
-    }
-
-    // Opcional: criar um script resumido no OracleScript
-    try {
-      const script = {
-        id: Date.now(),
-        filename: url.split('/').pop(),
-        loadedAt: new Date().toISOString(),
-        instructions: [],
-        facts: [fullText.slice(0, 2000)],
-        commands: [],
-        responses: {},
-        raw: fullText
-      };
-      const scripts = OracleScript.getScripts();
-      scripts.push(script);
-      OracleScript.saveScripts(scripts);
-    } catch (e) {
-      console.warn('Não foi possível salvar script resumido:', e);
-    }
-
-    OracleMemory.updateMemoryDisplay();
-    return { success: true, pages: pdf.numPages, chunks: chunksAdded };
-  } catch (e) {
-    console.error('Erro ingestando PDF:', e);
-    return { success: false, error: e.message || String(e) };
-  }
-}
-
-// Helper para chamar pela UI (ex: botão)
-window.ingestPdfToOracle = ingestPdfToOracle;
 
 // Controla visibilidade da navegação móvel conforme autenticação
 function setMobileNavVisible(visible) {
