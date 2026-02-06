@@ -13204,8 +13204,25 @@ try {
   }
 
   function openBiblia(){
-    // abre página dedicada da Bíblia (leitura)
-    try { window.location.href = 'biblia-leitura.html'; } catch (e) {}
+    // abre a aba Bíblia embutida (versão antiga)
+    try {
+      if (!document.getElementById('tab-bible') && typeof injectBibleTab === 'function') {
+        injectBibleTab();
+      }
+      const tabBtn = document.querySelector('.tab-btn[data-tab="bible"]') || document.querySelector('[data-tab="bible"]');
+      if (tabBtn && typeof tabBtn.click === 'function') {
+        tabBtn.click();
+      } else {
+        // fallback: ativa manualmente a aba se não existir botão
+        document.querySelectorAll('.nav-item, .mobile-drawer-item, .mobile-nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('[data-tab="bible"]').forEach(b => b.classList.add('active'));
+        const content = document.getElementById('tab-bible');
+        if (content) content.classList.add('active');
+      }
+    } catch (e) {
+      console.warn('openBiblia falhou:', e);
+    }
   }
 
     try { console.info('[UI] Aba Bíblia aberta'); } catch (e) {}
