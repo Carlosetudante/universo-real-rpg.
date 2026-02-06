@@ -1629,15 +1629,8 @@ async function resetAccount() {
     return;
   }
 
-  const preConfirm = confirm('Tudo bem resetar sua conta?\n\nIsso apagará todos os seus dados deste perfil.');
-  if (!preConfirm) {
-    showToast('❌ Ação cancelada.');
-    return;
-  }
-
-  const confirmation = prompt('⚠️ Confirmação final\n\nVou apagar TODOS os seus dados (perfil, tarefas, finanças, etc.) permanentemente, tanto neste dispositivo quanto na nuvem.\n\nPara confirmar, digite "DELETAR":');
-
-  if (confirmation !== 'DELETAR') {
+  const confirmation = confirm('⚠️ Resetar conta\n\nIsso apagará TODOS os seus dados deste perfil (local e nuvem). Esta ação é irreversível.\n\nDeseja continuar?');
+  if (!confirmation) {
     showToast('❌ Ação cancelada.');
     return;
   }
