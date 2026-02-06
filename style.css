@@ -1683,6 +1683,24 @@ body.zen-mode-active .container {
   margin-bottom: 4px;
 }
 
+.bible-note-card-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bible-note-edit-form {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bible-note-edit-form.hidden {
+  display: none;
+}
+
 .bible-note-card-tags span {
   font-size: 12px;
   opacity: 0.8;

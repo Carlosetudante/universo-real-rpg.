@@ -9916,8 +9916,8 @@ const BibleAssistant = {
     if (!notes || notes.length === 0) return "";
     const top = notes.slice(0, 2).map(n => n.content || "").filter(Boolean);
     if (!top.length) return "";
-    const clean = top.map(t => this.escapeHtml(t.length > 160 ? t.slice(0, 160) + "..." : t));
-    return `<p><strong>Aprendizado das suas anotações:</strong> ${clean.join(" | ")}</p>`;
+    const clean = top.map(t => this.escapeHtml(t.length > 90 ? t.slice(0, 90) + "..." : t));
+    return `<p><strong>Aprendizado:</strong> ${clean.join(" | ")}</p>`;
   },
 
   // -------------------------
@@ -11899,15 +11899,78 @@ function injectBibleTab() {
           <div class="bible-note-card-ref">${n.reference ? BibleAssistant.escapeHtml(n.reference) : 'Sem referência'}</div>
           <div class="bible-note-card-content">${BibleAssistant.escapeHtml(n.content)}</div>
           ${n.tags && n.tags.length ? `<div class="bible-note-card-tags">${n.tags.map(t => `<span>#${BibleAssistant.escapeHtml(t)}</span>`).join(' ')}</div>` : ''}
-          <button class="ghost bible-note-delete" data-id="${n.id}">Excluir</button>
+          <div class="bible-note-card-actions">
+            <button class="ghost bible-note-edit" data-id="${n.id}">Editar</button>
+            <button class="ghost bible-note-delete" data-id="${n.id}">Excluir</button>
+          </div>
+          <div class="bible-note-edit-form hidden" data-id="${n.id}">
+            <input type="text" class="bible-note-input edit-ref" value="${BibleAssistant.escapeHtml(n.reference || '')}">
+            <textarea class="bible-note-textarea edit-content">${BibleAssistant.escapeHtml(n.content || '')}</textarea>
+            <input type="text" class="bible-note-input edit-tags" value="${BibleAssistant.escapeHtml((n.tags || []).join(', '))}">
+            <div class="bible-note-card-actions">
+              <button class="btn success bible-note-save" data-id="${n.id}">Salvar</button>
+              <button class="ghost bible-note-cancel" data-id="${n.id}">Cancelar</button>
+            </div>
+          </div>
         </div>
       `).join('');
+
       notesList.querySelectorAll('.bible-note-delete').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = btn.getAttribute('data-id');
           if (!id) return;
           await BibleNotesStore.remove(id);
           renderNotes();
+        });
+      });
+
+      notesList.querySelectorAll('.bible-note-edit').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
+          if (!card) return;
+          card.querySelector('.bible-note-edit-form')?.classList.remove('hidden');
+        });
+      });
+
+      notesList.querySelectorAll('.bible-note-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
+          if (!card) return;
+          card.querySelector('.bible-note-edit-form')?.classList.add('hidden');
+        });
+      });
+
+      notesList.querySelectorAll('.bible-note-save').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-id');
+          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
+          if (!card) return;
+          const ref = card.querySelector('.edit-ref')?.value?.trim() || '';
+          const content = card.querySelector('.edit-content')?.value?.trim() || '';
+          const tags = BibleNotesStore._parseTags(card.querySelector('.edit-tags')?.value || '');
+          if (!content) {
+            showToast('⚠️ Escreva uma anotação antes de salvar.');
+            return;
+          }
+          if (BibleNotesStore._canSupabase()) {
+            await window.SupabaseService.updateBibleNote(id, { reference: ref, content, tags });
+          }
+          // Atualiza cache local
+          const idx = BibleNotesStore.cache.findIndex(n => n.id === id);
+          if (idx >= 0) {
+            BibleNotesStore.cache[idx] = {
+              ...BibleNotesStore.cache[idx],
+              reference: ref,
+              content,
+              tags,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          BibleNotesStore._saveLocal();
+          renderNotes();
+          showToast('✅ Anotação atualizada!');
         });
       });
     };
