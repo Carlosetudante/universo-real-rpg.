@@ -535,6 +535,75 @@ async function getXpHistory(limit = 50) {
 }
 
 // ===========================================
+// BÍBLIA - ANOTAÇÕES
+// ===========================================
+async function getBibleNotes() {
+  if (!currentUser) return [];
+
+  const { data, error } = await supabaseClient
+    .from('bible_notes')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+async function addBibleNote({ reference, content, tags }) {
+  if (!currentUser) return null;
+
+  const payload = {
+    user_id: currentUser.id,
+    reference: reference || null,
+    content: content || '',
+    tags: Array.isArray(tags) ? tags : []
+  };
+
+  const { data, error } = await supabaseClient
+    .from('bible_notes')
+    .insert(payload)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function updateBibleNote(id, fields = {}) {
+  if (!currentUser) return null;
+
+  const payload = {
+    ...fields,
+    updated_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabaseClient
+    .from('bible_notes')
+    .update(payload)
+    .eq('id', id)
+    .eq('user_id', currentUser.id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function deleteBibleNote(id) {
+  if (!currentUser) return false;
+
+  const { error } = await supabaseClient
+    .from('bible_notes')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', currentUser.id);
+
+  if (error) throw error;
+  return true;
+}
+
+// ===========================================
 // ORÁCULO - MENSAGENS E MEMÓRIA
 // ===========================================
 
@@ -626,6 +695,7 @@ async function deleteAllUserData() {
     'work_sessions',
     'finance_transactions',
     'finance_groups',
+    'bible_notes',
     'bills',
     'tasks'
   ];
@@ -1250,6 +1320,12 @@ window.SupabaseService = {
   // XP
   addXpEvent,
   getXpHistory,
+
+  // Bíblia
+  getBibleNotes,
+  addBibleNote,
+  updateBibleNote,
+  deleteBibleNote,
   
   // Oracle
   saveOracleMessage,

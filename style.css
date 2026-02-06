@@ -1626,6 +1626,65 @@ body.zen-mode-active .container {
   50% { transform: translate(-50%, -50%) rotate(45deg) scale(1.15); opacity: 1; box-shadow: 0 0 90px rgb(245 170 195 / 55%); }
 }
 
+/* Bíblia - Anotações */
+.bible-notes {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.bible-notes-header {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.bible-notes-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bible-note-input, .bible-note-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.25);
+  color: #fff;
+}
+
+.bible-note-textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.bible-notes-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bible-note-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.bible-note-card-ref {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.bible-note-card-tags span {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-right: 6px;
+}
+
 /* Animação de Level Up */
 @keyframes level-up-pulse {
   0% { box-shadow: 0 0 0 0 rgb(255 221 87 / 70%); transform: scale(1); filter: brightness(1); }

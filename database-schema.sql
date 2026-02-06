@@ -341,6 +341,44 @@ CREATE POLICY "Users can delete own pending"
   USING (auth.uid() = user_id);
 
 
+-- 11. BIBLE_NOTES (Anotações bíblicas do usuário)
+-- ===========================================
+CREATE TABLE IF NOT EXISTS bible_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  reference TEXT,
+  content TEXT NOT NULL,
+  tags TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_bible_notes_user_id ON bible_notes(user_id);
+CREATE INDEX idx_bible_notes_reference ON bible_notes(reference);
+
+ALTER TABLE bible_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own bible notes"
+  ON bible_notes FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own bible notes"
+  ON bible_notes FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own bible notes"
+  ON bible_notes FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own bible notes"
+  ON bible_notes FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own pending"
+  ON oracle_pending FOR DELETE
+  USING (auth.uid() = user_id);
+
+
 
 -- ===========================================
 -- FUNÇÃO: Criar perfil automaticamente no signup
