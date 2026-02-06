@@ -11736,7 +11736,7 @@ function injectBibleTab() {
     content.style.cssText = 'padding: 0;'; // Remove padding do container pai para evitar overflow
     
     content.innerHTML = `
-      <div class="bible-interface" style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; height: 100%; padding: 10px; box-sizing: border-box;">
+      <div class="bible-interface" style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; padding: 10px; box-sizing: border-box;">
         <div class="bible-header" style="text-align: center; flex-shrink: 0;">
           <div class="bible-header-top" style="justify-content: center;">
             <div class="bible-icon">✝️</div>

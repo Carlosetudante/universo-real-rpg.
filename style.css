@@ -1669,6 +1669,13 @@ body.zen-mode-active .container {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bible-interface {
+  overflow-y: auto;
 }
 
 .bible-note-card {
