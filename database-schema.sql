@@ -59,6 +59,10 @@ CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
+CREATE POLICY "Users can delete own profile"
+  ON profiles FOR DELETE
+  USING (auth.uid() = id);
+
 
 -- 2. TASKS (Tarefas/Quests)
 -- ===========================================
@@ -158,6 +162,10 @@ CREATE POLICY "Users can update own work sessions"
   ON work_sessions FOR UPDATE
   USING (auth.uid() = user_id);
 
+CREATE POLICY "Users can delete own work sessions"
+  ON work_sessions FOR DELETE
+  USING (auth.uid() = user_id);
+
 
 -- 5. XP_EVENTS (Histórico de XP)
 -- ===========================================
@@ -181,6 +189,10 @@ CREATE POLICY "Users can view own xp events"
 CREATE POLICY "Users can insert own xp events"
   ON xp_events FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own xp events"
+  ON xp_events FOR DELETE
+  USING (auth.uid() = user_id);
 
 
 -- 6. ORACLE_MESSAGES (Mensagens do Oráculo/Chat)
@@ -206,6 +218,10 @@ CREATE POLICY "Users can view own oracle messages"
 CREATE POLICY "Users can insert own oracle messages"
   ON oracle_messages FOR INSERT
   WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own oracle messages"
+  ON oracle_messages FOR DELETE
+  USING (auth.uid() = user_id);
 
 
 -- 7. ORACLE_MEMORY (Memória do Oráculo)
@@ -319,6 +335,10 @@ CREATE POLICY "Users can view own pending"
 CREATE POLICY "Users can insert pending"
   ON oracle_pending FOR INSERT
   WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+
+CREATE POLICY "Users can delete own pending"
+  ON oracle_pending FOR DELETE
+  USING (auth.uid() = user_id);
 
 
 
