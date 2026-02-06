@@ -1646,6 +1646,10 @@ body.zen-mode-active .container {
   gap: 8px;
 }
 
+.bible-notes-search {
+  margin-top: 10px;
+}
+
 .bible-note-input, .bible-note-textarea {
   width: 100%;
   padding: 10px 12px;

@@ -9912,6 +9912,14 @@ const BibleAssistant = {
     `;
   },
 
+  summarizeNotes(notes = []) {
+    if (!notes || notes.length === 0) return "";
+    const top = notes.slice(0, 2).map(n => n.content || "").filter(Boolean);
+    if (!top.length) return "";
+    const clean = top.map(t => this.escapeHtml(t.length > 160 ? t.slice(0, 160) + "..." : t));
+    return `<p><strong>Aprendizado das suas anotações:</strong> ${clean.join(" | ")}</p>`;
+  },
+
   // -------------------------
   // SINÔNIMOS / GATILHOS
   // (ajuda a mapear o que a pessoa escreve para um tópico)
@@ -11493,6 +11501,7 @@ esperanca: {
     const t = this.normalize(raw);
     const notes = await BibleNotesStore.search(raw);
     const withNotes = (html) => notes.length ? (html + this.formatNotesBlock(notes)) : html;
+    const withLearning = (html) => notes.length ? (this.summarizeNotes(notes) + html) : html;
 
     // Detecta perguntas tipo: "versículo sobre ansiedade", "passagem sobre perdão"
     if (t.includes("versiculo sobre") || t.includes("versículo sobre") || t.includes("passagem sobre") || t.includes("texto sobre")) {
@@ -11503,10 +11512,10 @@ esperanca: {
         .replace("texto sobre", "")
         .trim();
       const topic = this.resolveTopic(cleaned);
-      if (topic) return withNotes(this.formatTopic(topic));
+      if (topic) return withNotes(withLearning(this.formatTopic(topic)));
     }
 
-    if (!t) return withNotes(this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16')."));
+    if (!t) return withNotes(withLearning(this.formatNotFound("Escreva um tema, livro, personagem ou referência (ex: 'João 3:16').")));
 
     // Prioridade: detectar pedido explícito de "nome hebraico"
     try {
@@ -11520,7 +11529,7 @@ esperanca: {
 
     // 0) Detecta pedido de conhecimento
     if (t.includes("o que voce sabe") || t.includes("o que vc sabe") || t.includes("seu conhecimento") || t.includes("lista de topicos")) {
-      return withNotes(this.formatKnowledgeBase());
+      return withNotes(withLearning(this.formatKnowledgeBase()));
     }
 
     // 1) Detecta pedido de plano
@@ -11530,24 +11539,24 @@ esperanca: {
       const days = m ? Math.max(3, Math.min(30, parseInt(m[1], 10))) : 7;
       // temos planos 3,7,14 — se vier outro número, cai no 7
       const normalizedDays = [3,7,14].includes(days) ? days : 7;
-      return withNotes(this.buildReadingPlan(normalizedDays));
+      return withNotes(withLearning(this.buildReadingPlan(normalizedDays)));
     }
 
     // 2) Detecta "versículo do dia"
     if (t.includes("versiculo do dia") || t.includes("versículo do dia") || t.includes("hoje me da um versiculo") || t.includes("me da um versiculo")) {
       const ref = this.getVerseOfTheDayHint();
-      return withNotes(`
+      return withNotes(withLearning(`
         <div>
           <h3>${this.config.ui.okIcon} Sugestão de hoje</h3>
           <p><strong>${this.escapeHtml(ref)}</strong></p>
           <p>${this.config.ui.tipIcon} Quer que eu conecte esse versículo com um tema (ansiedade, fé, paz, propósito…)?</p>
         </div>
-      `);
+      `));
     }
 
     // 3) Detecta referência tipo "João 3:16"
     const refObj = this.parseReference(raw);
-    if (refObj) return withNotes(this.formatReference(refObj));
+    if (refObj) return withNotes(withLearning(this.formatReference(refObj)));
 
     // 4) Detecta livro ("resumo de romanos")
     if (t.includes("resumo") || t.includes("livro") || t.includes("sobre o livro") || t.includes("o que fala")) {
@@ -11555,41 +11564,41 @@ esperanca: {
       const parts = t.split(" ");
       const tail = parts.slice(-3).join(" "); // tentativa
       const book = this.resolveBookName(tail) || this.resolveBookName(parts[parts.length - 1]) || this.resolveBookName(t);
-      if (book) return withNotes(this.formatBook(book));
+      if (book) return withNotes(withLearning(this.formatBook(book)));
     } else {
       // mesmo sem "resumo", pode ter digitado só o nome do livro
       const maybeBook = this.resolveBookName(t);
-      if (maybeBook) return withNotes(this.formatBook(maybeBook));
+      if (maybeBook) return withNotes(withLearning(this.formatBook(maybeBook)));
     }
 
     // 5) Detecta personagem
     if (t.includes("quem foi") || t.includes("quem e") || t.includes("personagem") || t.includes("historia de")) {
       const candidate = t.replace("quem foi", "").replace("quem e", "").replace("historia de", "").trim();
       const ch = this.resolveCharacter(candidate) || this.resolveCharacter(t);
-      if (ch) return withNotes(await this.formatCharacter(ch));
+      if (ch) return withNotes(withLearning(await this.formatCharacter(ch)));
     } else {
       const maybeChar = this.resolveCharacter(t);
-      if (maybeChar) return withNotes(await this.formatCharacter(maybeChar));
+      if (maybeChar) return withNotes(withLearning(await this.formatCharacter(maybeChar)));
     }
 
     // 6) Detecta tópico (principal)
     const topic = this.resolveTopic(t);
-    if (topic) return withNotes(this.formatTopic(topic));
+    if (topic) return withNotes(withLearning(this.formatTopic(topic)));
 
     // 7) fallback: sugerir opções próximas
     const suggestions = this.suggest(t);
     if (suggestions.length) {
-      return withNotes(`
+      return withNotes(withLearning(`
         <div>
           <h3>${this.config.ui.warnIcon} Não identifiquei com certeza</h3>
           <p>Talvez você quis dizer:</p>
           <p>${suggestions.map(s => `• ${this.escapeHtml(s)}`).join("<br>")}</p>
           <p>${this.config.ui.tipIcon} Exemplos: "ansiedade", "resumo de romanos", "quem foi davi", "joão 3:16"</p>
         </div>
-      `);
+      `));
     }
 
-    return withNotes(this.formatNotFound("Não consegui identificar o tema/livro/personagem/referência."));
+    return withNotes(withLearning(this.formatNotFound("Não consegui identificar o tema/livro/personagem/referência.")));
   },
 
   // -------------------------
@@ -11762,6 +11771,9 @@ function injectBibleTab() {
             <input type="text" id="bibleNoteTags" class="bible-note-input" placeholder="Tags (separe por vírgula)">
             <button class="btn success" id="bibleNoteSaveBtn">Salvar anotação</button>
           </div>
+          <div class="bible-notes-search">
+            <input type="text" id="bibleNoteSearch" class="bible-note-input" placeholder="Buscar anotação por referência ou texto...">
+          </div>
           <div id="bibleNotesList" class="bible-notes-list"></div>
         </div>
       </div>
@@ -11871,15 +11883,18 @@ function injectBibleTab() {
     const noteTags = document.getElementById('bibleNoteTags');
     const noteSaveBtn = document.getElementById('bibleNoteSaveBtn');
     const notesList = document.getElementById('bibleNotesList');
+    const noteSearch = document.getElementById('bibleNoteSearch');
 
     const renderNotes = async () => {
       const notes = await BibleNotesStore.load();
+      const q = noteSearch ? noteSearch.value.trim() : '';
+      const filtered = q ? await BibleNotesStore.search(q) : notes;
       if (!notesList) return;
-      if (!notes.length) {
+      if (!filtered.length) {
         notesList.innerHTML = '<div class="small" style="opacity:0.7">Sem anotações ainda.</div>';
         return;
       }
-      notesList.innerHTML = notes.map(n => `
+      notesList.innerHTML = filtered.map(n => `
         <div class="bible-note-card" data-id="${n.id}">
           <div class="bible-note-card-ref">${n.reference ? BibleAssistant.escapeHtml(n.reference) : 'Sem referência'}</div>
           <div class="bible-note-card-content">${BibleAssistant.escapeHtml(n.content)}</div>
@@ -11913,6 +11928,10 @@ function injectBibleTab() {
         renderNotes();
         showToast('✅ Anotação salva!');
       });
+    }
+
+    if (noteSearch) {
+      noteSearch.addEventListener('input', () => renderNotes());
     }
 
     renderNotes();
