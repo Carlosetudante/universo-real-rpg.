@@ -1330,6 +1330,7 @@ async function checkSession() {
           setMobileNavVisible(true);
           checkDailyTaskReset();
           updateUI();
+          processFinancePending({ silent: true });
           if (typeof renderDailyTasks === 'function') renderDailyTasks();
           if (typeof renderFinances === 'function') renderFinances();
           if (typeof checkAchievements === 'function') checkAchievements();
@@ -1359,6 +1360,8 @@ async function checkSession() {
       setMobileNavVisible(true);
     checkDailyTaskReset();
     updateUI();
+    processFinancePending({ silent: true });
+    if (typeof renderFinances === 'function') renderFinances();
     if (typeof checkAchievements === 'function') checkAchievements();
     checkBackupAvailability();
     checkBillsDueToday();
@@ -1386,6 +1389,7 @@ function normalizeGameState(data) {
     inventory: [],
     dailyTasks: [],
     finances: [],
+    financePending: [],
     financialGoal: 0,
     bills: [],
     relationshipStart: null,
@@ -2353,6 +2357,44 @@ function renderFinances() {
   if (elements.financeBalance) {
     elements.financeBalance.textContent = `R$ ${balance.toLocaleString('pt-BR')}`;
     elements.financeBalance.style.color = balance >= 0 ? 'var(--success)' : 'var(--danger)';
+  }
+}
+
+// Move lançamentos financeiros pendentes (agendados) para o financeiro quando a data chegar
+function processFinancePending({ silent = true } = {}) {
+  if (!gameState || !Array.isArray(gameState.financePending) || gameState.financePending.length === 0) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const remaining = [];
+  let moved = 0;
+
+  gameState.financePending.forEach(p => {
+    const dueRaw = p.scheduledDate || p.date || p.dueDate || p.scheduledAt;
+    const due = dueRaw ? new Date(dueRaw) : null;
+    if (due && !isNaN(due.getTime()) && due <= today) {
+      if (!gameState.finances) gameState.finances = [];
+      gameState.finances.push({
+        id: p.id || Date.now(),
+        desc: p.desc || 'Lançamento agendado',
+        value: Number(p.value) || 0,
+        type: p.type || 'income',
+        category: p.category || 'Extra',
+        date: new Date(due).toISOString()
+      });
+      moved += 1;
+    } else {
+      remaining.push(p);
+    }
+  });
+
+  gameState.financePending = remaining;
+  if (moved > 0) {
+    saveGame(true);
+    if (!silent) showToast(`📅 ${moved} lançamento(s) agendado(s) entrou(aram) no financeiro.`);
+    if (typeof renderFinances === 'function') renderFinances();
+    if (typeof renderFinanceChart === 'function') renderFinanceChart();
+    if (typeof renderFinanceMonthlyChart === 'function') renderFinanceMonthlyChart();
   }
 }
 
@@ -3698,27 +3740,42 @@ window.addWorkRecord = function() {
 
   // Adicionar ao Financeiro (se gerou valor)
   if (loggedFinancialValue > 0) {
-    if (!gameState.finances) gameState.finances = [];
     // Categoria mais específica para produção de massas
     const category = (type === 'pizzaria') ? 'Produção' : 'Extra';
-    const financeEntry = {
+    const baseEntry = {
       id: Date.now(),
       desc: `${gameState.job.name} - ${desc}`,
       value: loggedFinancialValue,
       type: 'income',
-      category: category,
-      date: new Date().toISOString()
+      category: category
     };
-    gameState.finances.push(financeEntry);
 
-    // Anexa referência do lançamento financeiro ao registro de produção
-    try {
-      const idx = gameState.workLog.length - 1;
-      if (idx >= 0) {
-        gameState.workLog[idx].financeId = financeEntry.id;
+    if (type === 'pizzaria') {
+      // Massa: agendar para o próximo mês (não entra no saldo atual)
+      if (!gameState.financePending) gameState.financePending = [];
+      const now = new Date();
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      gameState.financePending.push({
+        ...baseEntry,
+        scheduledDate: nextMonth.toISOString()
+      });
+    } else {
+      if (!gameState.finances) gameState.finances = [];
+      const financeEntry = {
+        ...baseEntry,
+        date: new Date().toISOString()
+      };
+      gameState.finances.push(financeEntry);
+
+      // Anexa referência do lançamento financeiro ao registro de produção
+      try {
+        const idx = gameState.workLog.length - 1;
+        if (idx >= 0) {
+          gameState.workLog[idx].financeId = financeEntry.id;
+        }
+      } catch (e) {
+        console.warn('Falha ao anexar financeId ao workLog:', e);
       }
-    } catch (e) {
-      console.warn('Falha ao anexar financeId ao workLog:', e);
     }
   }
 
@@ -3728,7 +3785,10 @@ window.addWorkRecord = function() {
   saveGame();
   renderWorkHistory();
   renderWorkChart();
-  showToast(`✅ Registrado! ${loggedFinancialValue > 0 ? '+ R$ ' + loggedFinancialValue.toFixed(2) : '(Não remunerado)'}`);
+  const loggedMsg = (loggedFinancialValue > 0)
+    ? (type === 'pizzaria' ? `Agendado para o próximo mês: + R$ ${loggedFinancialValue.toFixed(2)}` : `+ R$ ${loggedFinancialValue.toFixed(2)}`)
+    : '(Não remunerado)';
+  showToast(`✅ Registrado! ${loggedMsg}`);
 }
 
 // Função para finalizar sessão de tempo (Cronômetro)
