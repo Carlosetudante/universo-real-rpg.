@@ -5873,6 +5873,8 @@ const VoiceRecognition = {
       this.recognition.lang = 'pt-BR';
       
       this.recognition.onresult = (event) => {
+        // Ignora resultados se o Oráculo estiver falando (evita transcrever a própria voz)
+        if (OracleSpeech && OracleSpeech.isSpeaking) return;
         const result = event.results[event.results.length - 1];
         const transcript = result[0].transcript;
         
@@ -5986,6 +5988,15 @@ const VoiceRecognition = {
   
   startListening() {
     if (!this.recognition || this.isListening) return;
+
+    // SpeechRecognition exige contexto seguro (HTTPS), exceto localhost
+    try {
+      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      if (location.protocol !== 'https:' && !isLocalhost) {
+        OracleChat.addSystemMessage('⚠️ O microfone só funciona em HTTPS (ou localhost).');
+        return;
+      }
+    } catch (e) {}
     
     try {
       this.recognition.start();
@@ -6087,6 +6098,14 @@ const OracleSpeech = {
     
     // Cancela qualquer fala anterior
     this.stop();
+
+    // Evita que o reconhecimento capture a própria voz do oráculo
+    try {
+      if (typeof VoiceRecognition !== 'undefined' && VoiceRecognition.isListening) {
+        VoiceRecognition._resumeAfterSpeak = VoiceRecognition.conversationMode || true;
+        VoiceRecognition.stopListening();
+      }
+    } catch (e) {}
     
     // Remove tags HTML do texto
     const cleanText = text.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
