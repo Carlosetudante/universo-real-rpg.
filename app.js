@@ -4974,6 +4974,13 @@ if (elements.closeGroupConfigBtn) elements.closeGroupConfigBtn.addEventListener(
 if (elements.addGroupBtn) elements.addGroupBtn.addEventListener('click', addExpenseGroup);
 
 if (elements.resetAccountBtn) elements.resetAccountBtn.addEventListener('click', resetAccount);
+// Fallback: delegação para garantir funcionamento mesmo se o botão for recriado
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('#resetAccountBtn, #drawerResetBtn') : null;
+  if (!btn) return;
+  e.preventDefault();
+  if (typeof resetAccount === 'function') resetAccount();
+});
 
 // ========================================
 // SISTEMA DE LINGUAGEM NATURAL (NLU) 2.0
