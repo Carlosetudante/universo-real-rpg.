@@ -3029,6 +3029,8 @@ function toggleZenMode() {
     overlay.classList.remove('hidden');
     const randomQuote = ZEN_QUOTES[Math.floor(Math.random() * ZEN_QUOTES.length)];
     if (elements.zenQuote) elements.zenQuote.textContent = `"${randomQuote}"`;
+    // Ativa respiração automaticamente ao entrar
+    if (elements.zenBreathingOrb) elements.zenBreathingOrb.classList.add('active');
     
     // Carregar playlist do banco se o player estiver vazio ou playlist vazia
     if (zenPlaylist.length === 0 && !elements.zenAudio.getAttribute('src')) {
@@ -3058,6 +3060,7 @@ function toggleZenMode() {
   } else {
     overlay.classList.add('hidden');
     elements.zenAudio.pause();
+    if (elements.zenBreathingOrb) elements.zenBreathingOrb.classList.remove('active');
   }
 
   // Alterna classe no body para esconder a UI não essencial (navs/controls)
