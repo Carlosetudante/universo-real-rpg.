@@ -621,9 +621,12 @@ async function deleteAllUserData() {
   const tablesWithUserId = [
     'oracle_messages',
     'oracle_memory',
+    'oracle_pending',
     'xp_events',
     'work_sessions',
     'finance_transactions',
+    'finance_groups',
+    'bills',
     'tasks'
   ];
 
