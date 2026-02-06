@@ -1,0 +1,80 @@
+{
+  "runAt": "2026-02-02T20:15:10.525Z",
+  "results": [
+    {
+      "question": "nome hebraico de João Batista, escreva em hebraico",
+      "response": "👤 Joao Batista — Nome em hebraico\n        Hebraico: יוֹחָנָן הַמַּטְבִּיל (Yôḥānān ha-Matbil)\n               Significado: João, o que batiza (o que imerge)\n        Biografia não disponível; peça por \"quem foi Joao Batista\" para mais detalhes.",
+      "status": "ok"
+    },
+    {
+      "question": "nome hebraico de João apóstolo, escreva em hebraico",
+      "response": "👤 Joao Apóstolo — Nome em hebraico\n        Hebraico: יוֹחָנָן (Yôḥānān (Yohanan))\n               Significado: YHWH foi gracioso\n        Biografia não disponível; peça por \"quem foi Joao Apóstolo\" para mais detalhes.",
+      "status": "ok"
+    },
+    {
+      "question": "nome hebraico de Jesus, escreva em hebraico e significado",
+      "response": "👤 Jesus — Nome em hebraico\n        Hebraico: יֵשׁוּעַ (Yeshua)\n               Significado: Salvação / o Senhor salva\n        Caminhada (resumo): Jesus Cristo, o Filho de Deus, é a figura central da fé cristã e da Bíblia. Sua missão foi revelada desde o nascimento: 'Ele salvará o seu povo dos seus pecados' (Mateus 1:21). Ele não foi chamado, Ele é o chamado. Ele é o Messias prometido, o Salvador da humanidade, o Cordeiro de Deus que tira o pecado do mundo. Através de Sua vida, morte e ressurreição, Ele oferece reconciliação entre Deus e os homens.",
+      "status": "ok"
+    },
+    {
+      "question": "nome hebraico de Paulo (Saulo), escreva em hebraico",
+      "response": "👤 Paulo — Nome em hebraico\n        Hebraico: שָׁאוּל (Sha'ul (Saul))\n               Significado: Pedido/oração (Saul) — Paulo é forma latina\n        Caminhada (resumo): Paulo de Tarso (Saulo) foi fariseu e perseguidor; convertido, virou grande missionário aos gentios. Encontro com Cristo no caminho de Damasco (At 9). Plantou igrejas e escreveu cartas fundamentais do NT.",
+      "status": "ok"
+    },
+    {
+      "question": "nome hebraico de Pedro (Simão), escreva em hebraico",
+      "response": "👤 Pedro — Nome em hebraico\n        Hebraico: שִׁמְעוֹן (Shim'on (Simão))\n               Significado: Ouvir / ouvinte\n        Caminhada (resumo): Simão Pedro, pescador da Galileia, tornou-se liderança apostólica na igreja primitiva. Chamado por Jesus no trabalho; 'pescador de homens' (Mt 4:19). Pregou no Pentecostes e ajudou a abrir portas para judeus e gentios.",
+      "status": "ok"
+    },
+    {
+      "question": "nome hebraico de Maria mãe de Jesus, escreva em hebraico",
+      "response": "👤 Maria — Nome em hebraico\n          Hebraico: מִרְיָם (Miryam)\n          Significado: Possivelmente 'amada' ou ligado a 'amar' (origem incerta)\n          Caminhada: Maria, mãe de Jesus, jovem de fé que respondeu ao chamado com submissão e confiança.",
+      "status": "ok"
+    },
+    {
+      "question": "quem foi João Batista? caminhada completa",
+      "response": "👤 Personagem: João\n        Quem foi: Apóstolo, conhecido como 'discípulo amado'.\n        Chamado: Chamado ainda jovem, deixou as redes para seguir Jesus.\n        Papel: Escreveu Evangelho de João, cartas e Apocalipse; ênfase em amor e verdade.\n        \n        Dica: Pergunte mais: \"me conte mais sobre João\" ou salve uma memória dizendo: \"lembre que João foi...\"",
+      "status": "ok"
+    },
+    {
+      "question": "quem foi João apóstolo? caminhada completa",
+      "response": "👤 Personagem: João\n        Quem foi: Apóstolo, conhecido como 'discípulo amado'.\n        Chamado: Chamado ainda jovem, deixou as redes para seguir Jesus.\n        Papel: Escreveu Evangelho de João, cartas e Apocalipse; ênfase em amor e verdade.\n        \n        Dica: Pergunte mais: \"me conte mais sobre João\" ou salve uma memória dizendo: \"lembre que João foi...\"",
+      "status": "ok"
+    },
+    {
+      "question": "quem foi Pedro? queda e restauração",
+      "response": "👤 Personagem: Pedro\n        Quem foi: Simão Pedro, pescador da Galileia, tornou-se liderança apostólica na igreja primitiva.\n        Chamado: Chamado por Jesus no trabalho; 'pescador de homens' (Mt 4:19).\n        Papel: Pregou no Pentecostes e ajudou a abrir portas para judeus e gentios.\n        \n        Dica: Pergunte mais: \"me conte mais sobre Pedro\" ou salve uma memória dizendo: \"lembre que Pedro foi...\"",
+      "status": "ok"
+    },
+    {
+      "question": "quem foi Paulo? conversão e missões",
+      "response": "👤 Personagem: Paulo\n        Quem foi: Paulo de Tarso (Saulo) foi fariseu e perseguidor; convertido, virou grande missionário aos gentios.\n        Chamado: Encontro com Cristo no caminho de Damasco (At 9).\n        Papel: Plantou igrejas e escreveu cartas fundamentais do NT.\n        \n        Dica: Pergunte mais: \"me conte mais sobre Paulo\" ou salve uma memória dizendo: \"lembre que Paulo foi...\"",
+      "status": "ok"
+    },
+    {
+      "question": "quem foi Maria? fé e sofrimento",
+      "response": "👤 Personagem: Maria\n        Quem foi: Maria, mãe de Jesus, jovem de fé que respondeu ao chamado com submissão e confiança.\n        Chamado: Chamado extraordinário ao papel de mãe do Messias; respondeu com 'faça-se em mim segundo a tua palavra' (Lucas).\n        Papel: Presente nos momentos de alegria e dor; exemplo de fé, serviço e perseverança diante do sofrimento.\n        \n        Dica: Pergunte mais: \"me conte mais sobre Maria\" ou salve uma memória dizendo: \"lembre que Maria foi...\"",
+      "status": "ok"
+    },
+    {
+      "question": "novo mandamento: cite e explique profundo",
+      "response": "🧭 Tema: Novos Mandamentos\n        Resumo: O 'mandamento novo' de Jesus resume-se em amar: amar a Deus e amar ao próximo com dedicação prática. Esse amor é a marca dos seus discípulos.\n\n        Referências:\n          • João 13:34-35• João 15:12• 1 João 4:7-8\n        \n\n        \n          💡 Práticas:\n            • Pratique um ato concreto de amor hoje (ouvir, perdoar, ajudar).• Peça perdão onde for necessário e ofereça perdão quando possível.• Sirva alguém sem esperar reconhecimento; observe como isso muda seu coração.",
+      "status": "ok"
+    },
+    {
+      "question": "qual a diferença entre mandamento e conselho bíblico?",
+      "response": "🧭 Tema: Fe\n        Resumo: Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva gera frutos, não só discurso.\n\n        Referências:\n          • Hebreus 11:1• Marcos 11:22-24• Romanos 10:17• Tiago 2:14-26• 2 Coríntios 5:7• Marcos 9:24\n        \n\n        \n          💡 Práticas:\n            • Leia um trecho curto e aplique 1 coisa prática hoje.• Ore: 'Senhor, eu creio; ajuda minha incredulidade.'• Aproxime-se de uma comunidade/irmãos na fé.\n          \n        \n\n        🙏 Oração sugerida: Jesus, aumenta minha fé. Ajuda minha incredulidade e guia meus passos em obediência. Amém.",
+      "status": "ok"
+    },
+    {
+      "question": "o que significa 'graça' na prática?",
+      "response": "🧭 Tema: Fe\n        Resumo: Fé cresce ouvindo a Palavra e obedecendo em pequenos passos. Fé viva gera frutos, não só discurso.\n\n        Referências:\n          • Hebreus 11:1• Marcos 11:22-24• Romanos 10:17• Tiago 2:14-26• 2 Coríntios 5:7• Marcos 9:24\n        \n\n        \n          💡 Práticas:\n            • Leia um trecho curto e aplique 1 coisa prática hoje.• Ore: 'Senhor, eu creio; ajuda minha incredulidade.'• Aproxime-se de uma comunidade/irmãos na fé.\n          \n        \n\n        🙏 Oração sugerida: Jesus, aumenta minha fé. Ajuda minha incredulidade e guia meus passos em obediência. Amém.",
+      "status": "ok"
+    },
+    {
+      "question": "como lidar com ansiedade com base bíblica (passos práticos)",
+      "response": "🧭 Tema: Ansiedade\n        Resumo: Deus convida você a trocar a ansiedade por oração, entrega e confiança. A paz vem como guarda do coração e da mente.\n\n        Referências:\n          • Filipenses 4:6-7• 1 Pedro 5:7• Mateus 6:25-34• Salmos 94:19• Salmos 55:22\n        \n\n        \n          💡 Práticas:\n            • Transforme preocupação em oração objetiva (o que você quer pedir?).• Anote 3 coisas fora do seu controle e entregue a Deus conscientemente.• Respire fundo e repita: 'Eu confio no cuidado de Deus hoje.'\n          \n        \n\n        🙏 Oração sugerida: Senhor, eu entrego minhas preocupações a Ti. Guarda meu coração com a Tua paz e me dá clareza para viver um passo de cada vez. Amém.",
+      "status": "ok"
+    }
+  ]
+}
