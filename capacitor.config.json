@@ -1,0 +1,6 @@
+﻿{
+  "appId": "com.universoreal.app",
+  "appName": "Universo Real",
+  "webDir": "web",
+  "bundledWebRuntime": false
+}

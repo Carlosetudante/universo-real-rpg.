@@ -687,6 +687,12 @@ body.bible-page {
   color: var(--accent);
 }
 
+.bible-page-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .bible-page-icon {
   width: 26px;
   height: 26px;
@@ -1712,6 +1718,30 @@ body.zen-mode-active .container {
   font-size: 12px;
   opacity: 0.8;
   margin-right: 6px;
+}
+
+.bible-note-tags-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.bible-note-tags-panel button {
+  border: 1px solid rgba(255, 221, 87, 0.2);
+  background: rgba(255, 221, 87, 0.08);
+  color: #ffe7a8;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.bible-note-tags-panel button:hover {
+  background: rgba(255, 221, 87, 0.18);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 /* Animação de Level Up */
@@ -3513,9 +3543,100 @@ input.success {
   transform: scale(1.02);
 }
 
+/* Oráculo - cartão inline para criar tarefa */
+.oracle-inline-card {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.oracle-inline-title {
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.oracle-inline-card label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.oracle-inline-card input {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.25);
+  color: #fff;
+}
+
+.oracle-inline-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.oracle-task-save,
+.oracle-task-cancel {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+.oracle-task-save {
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+  color: #1a1a1a;
+  border-color: transparent;
+  font-weight: 700;
+}
+
+/* Oráculo - pílula de modo ativo */
+.oracle-mode-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255, 221, 87, 0.12);
+  border: 1px solid rgba(255, 221, 87, 0.3);
+  border-radius: 12px;
+  color: #fff3c4;
+  font-size: 12px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+.oracle-mode-text {
+  opacity: 0.9;
+}
+
+.oracle-mode-stop {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.15);
+  color: #fecaca;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.oracle-mode-stop:hover {
+  background: rgba(248, 113, 113, 0.25);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
 /* === ABA BÍBLIA === */
 #tab-bible {
-  justify-content: center;
+  justify-content: flex-start;
   overflow: auto;
 }
 
@@ -3535,6 +3656,12 @@ input.success {
   min-height: 520px;
   max-height: calc(100dvh - 120px);
   overflow: hidden;
+}
+
+/* Aba Bíblia (dentro do app): permite altura total e scroll do conteúdo */
+#tab-bible .bible-interface {
+  max-height: none;
+  overflow: visible;
 }
 
 .bible-header {

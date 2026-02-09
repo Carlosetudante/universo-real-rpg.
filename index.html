@@ -11,12 +11,23 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="logo.svg">
-  <link rel="manifest" href="manifest.json">
+  <!-- Manifest é injetado via JS para evitar erros em file:// -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- Supabase Client (Auth + Database) -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1/dist/transformers.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1/dist/transformers.umd.min.js"></script>
+  <script>
+    // Evita erro de CORS em file:// ao carregar manifest
+    try {
+      if (location.protocol !== 'file:') {
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = 'manifest.json';
+        document.head.appendChild(link);
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <!-- Splash Screen (Tela de Abertura) -->
@@ -575,6 +586,23 @@
               <div style="text-align: center; font-weight: 700; font-size: 1.1em; margin-bottom: 8px; line-height: 1.4;" id="relationshipTimer">Carregando...</div>
               <div class="small" style="text-align: center; opacity: 0.7;">Juntos nessa jornada!</div>
               <button class="ghost" id="resetRelationshipBtn" style="width: 100%; margin-top: 12px; font-size: 12px;">Resetar Data</button>
+            </div>
+          </div>
+
+          <h3>🧘 Modo Zen</h3>
+          <div class="section">
+            <div class="small" style="margin-bottom: 8px;">Escolha a foto e a música do Modo Zen:</div>
+            <div class="form-row" style="gap: 8px; flex-wrap: wrap;">
+              <button class="btn" id="zenImageBtn" style="flex:1; min-width: 140px;">🖼️ Escolher Foto</button>
+              <button class="btn" id="zenMusicBtn" style="flex:1; min-width: 140px;">🎵 Escolher Músicas</button>
+            </div>
+            <div class="form-row" style="margin-top: 8px;">
+              <select id="zenTrackSelect" style="flex:1; display:none;"></select>
+            </div>
+            <div class="small" id="zenPlaylistInfo" style="opacity:0.7; margin-top: 6px;">Nenhuma música carregada</div>
+            <div class="form-row" style="margin-top: 10px; gap: 8px;">
+              <button class="ghost" id="zenToggleHudBtn" style="flex:1; min-width: 140px;">Ocultar HUD</button>
+              <button class="ghost" id="zenBreathingBtn" style="flex:1; min-width: 140px;">Respiração</button>
             </div>
           </div>
         </div>

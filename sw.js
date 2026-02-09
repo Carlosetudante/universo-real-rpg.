@@ -2,14 +2,13 @@ const CACHE_NAME = 'universo-real-v50';
 
 const urlsToCache = [
   './index.html',
-  './biblia.html',
-  './biblia-leitura.html',
   './financeiro.html',
   './carga-horaria.html',
   './style.css',
   './app.js',
   './biblia.js',
-  './biblia-leitura.js',
+  './biblia-anotacoes.html',
+  './biblia-anotacoes.js',
   './supabase.js',
   './workTimer.js',
   './logo.svg',
@@ -103,8 +102,7 @@ self.addEventListener('fetch', event => {
         return networkResponse;
       } catch (e) {
         const cacheMatch = await caches.match(event.request) ||
-          await caches.match('./biblia-leitura.html') ||
-          await caches.match('./biblia.html') ||
+          await caches.match('./biblia-anotacoes.html') ||
           await caches.match('./index.html') ||
           await caches.match('./offline.html');
         return cacheMatch || Response.error();

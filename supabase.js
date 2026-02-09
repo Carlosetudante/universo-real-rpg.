@@ -769,13 +769,36 @@ async function processOracleActions(actions) {
           break;
 
         case 'task.add':
-          const taskResult = await addTask({
-            title: payload.title || payload.name,
-            xpReward: payload.xp || payload.xpReward || 10,
-            dueDate: payload.date || payload.due_date || null
-          });
-          results.push({ success: true, action: 'task.add', data: taskResult });
+        case 'task.create': {
+          const title = payload.title || payload.name || payload.text || action.title || action.name || action.text;
+          if (!title) {
+            results.push({ success: false, action: action.type, error: 'Título da tarefa ausente' });
+            break;
+          }
+          let taskResult = null;
+          if (currentUser) {
+            try {
+              taskResult = await addTask({
+                title: title,
+                xpReward: payload.xp || payload.xpReward || 10,
+                dueDate: payload.date || payload.due_date || null
+              });
+            } catch (e) {
+              console.warn('Falha ao criar tarefa no Supabase, fallback local:', e);
+            }
+          }
+          if (!taskResult) {
+            if (typeof createTask === 'function') {
+              const msg = createTask(title);
+              results.push({ success: true, action: action.type, data: { local: true, message: msg } });
+            } else {
+              results.push({ success: false, action: action.type, error: 'Sem sessão e sem fallback local' });
+            }
+            break;
+          }
+          results.push({ success: true, action: action.type, data: taskResult });
           break;
+        }
 
         case 'task.complete':
           await updateTask(payload.task_id || action.task_id, { 

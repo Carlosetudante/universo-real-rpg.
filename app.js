@@ -1641,12 +1641,22 @@ async function resetAccount() {
     // Se estiver usando Supabase, deleta os dados da nuvem
     if (useSupabase()) {
       console.log('☁️ Deletando dados da nuvem...');
+      try {
+        // Garante sessão carregada
+        await SupabaseService.getSession().catch(() => null);
+      } catch (e) {}
+      const current = SupabaseService.getCurrentUser && SupabaseService.getCurrentUser();
+      if (!current) {
+        showToast('⚠️ Não consegui validar sua sessão na nuvem. Faça login e tente novamente.');
+        return;
+      }
       const success = await SupabaseService.deleteAllUserData();
       if (!success) {
-        // Mesmo que falhe na nuvem, continua o reset local para deslogar o usuário
-        showToast('⚠️ Falha ao resetar dados na nuvem, mas continuando reset local.');
+        showToast('❌ Falha ao apagar dados na nuvem. Nenhum dado local foi apagado.');
+        return;
       } else {
         console.log('✅ Dados da nuvem deletados.');
+        try { await SupabaseService.signOut(); } catch (e) {}
       }
     }
 
@@ -3854,6 +3864,11 @@ window.finishWorkSession = function(startTime) {
 };
 
 function renderWorkHistory() {
+  if (typeof gameState === 'undefined' || gameState === null) {
+    window.gameState = window.gameState || {};
+    gameState = window.gameState;
+  }
+  if (!gameState.workLog) gameState.workLog = [];
   if (!elements.workTimeHistoryList || !elements.workProductionHistoryList) return;
 
   // Garante IDs para permitir ediÃ§Ã£o/remoÃ§Ã£o
@@ -3972,6 +3987,7 @@ function renderWorkHistory() {
   // Renderizar Lista de Produção (Agrupada por Semana)
   const renderProductionList = (items, container, emptyMsg) => {
     container.innerHTML = '';
+    items = Array.isArray(items) ? items.filter(Boolean) : [];
 
     // Top: filtro com visual mais agradável
     // Preserva o valor selecionado anteriormente (pode ser string vazia para 'limpar')
@@ -4046,7 +4062,7 @@ function renderWorkHistory() {
     }
 
     // Filtra e agrupa como antes
-    const filteredItems = selectedMonth ? items.filter(it => (it.month && it.month.startsWith(selectedMonth)) || (it.date && it.date.startsWith(selectedMonth))) : items;
+    const filteredItems = selectedMonth ? items.filter(it => it && ((it.month && it.month.startsWith(selectedMonth)) || (it.date && it.date.startsWith(selectedMonth)))) : items;
     const groups = {};
     filteredItems.forEach(item => {
       let key = 'Outros';
@@ -4075,7 +4091,8 @@ function renderWorkHistory() {
       let totalQty = 0, paidQty = 0, unpaidQty = 0;
       groupItems.forEach(i => { const val = i.inputVal || 0; totalQty += val; if (i.isUnpaid) unpaidQty += val; else paidQty += val; });
 
-      const def = JOB_TYPES[gameState.job.type || 'pizzaria'];
+      const jobType = (gameState && gameState.job && gameState.job.type) ? gameState.job.type : 'pizzaria';
+      const def = JOB_TYPES[jobType];
       const unit = def ? def.unit : 'unidades';
 
       const card = document.createElement('div');
@@ -4545,20 +4562,6 @@ function setTabBadge(tabId, show) {
 }
 
 function updateUI() {
-  // Debug temporário: registrar fontes possíveis de perfil (OracleMemory / localStorage)
-  try {
-    const dbg = { gameStatePresent: !!gameState };
-    dbg.oracleMemory = (typeof OracleMemory !== 'undefined') ? {
-      hasGetProfile: !!OracleMemory.getProfile,
-      sampleName: (OracleMemory.getProfile && OracleMemory.getProfile('name')) || null
-    } : null;
-    dbg.ur_last_user = localStorage.getItem('ur_last_user');
-    try { dbg.ur_users = localStorage.getItem('ur_users'); } catch (e) { dbg.ur_users = null; }
-    console.log('[debug][updateUI]', dbg);
-    if (window.OracleTelemetry && OracleTelemetry.log) OracleTelemetry.log('updateUI_debug', dbg);
-  } catch (e) {
-    console.warn('updateUI debug failed', e);
-  }
 
   // Se não houver gameState, tenta preencher com memórias locais (OracleMemory) antes de sair
   if (!gameState) {
@@ -4997,6 +5000,7 @@ const OracleNLU = {
     },
     'task.create': {
       patterns: [
+        /^(tarefa|criar tarefa|nova tarefa)$/i,
         /(?:cria|criar|adiciona|adicionar|nova|novo|faz|fazer|coloca|colocar|preciso|quero|tenho que|vou)\s+(?:uma?\s+)?(?:tarefa|task|missão|lembrete|reminder)?:?\s*(.+)/i,
         /(?:lembra|lembrar|me lembra|lembre-me)\s+(?:de\s+)?(.+)/i,
         /(?:preciso|tenho que|vou|devo)\s+(.+?)(?:\s+(?:amanhã|hoje|depois|mais tarde|às?\s+\d))?/i,
@@ -6174,22 +6178,31 @@ const OracleOnboarding = {
   async init() {
     try {
       // Carrega JSON de regras: tenta fetch HTTP, se falhar usa script embutido no HTML
-      try {
-        const response = await fetch('pergaminho-onboarding.json');
-        if (response.ok) {
-          this.data = await response.json();
-          console.log('📜 Pergaminho de Onboarding (JSON) carregado via fetch.');
+      if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+        // Em file://, evita fetch para não gerar erros de CORS
+        const el = document.getElementById('pergaminho-onboarding-data');
+        if (el && el.textContent) {
+          this.data = JSON.parse(el.textContent);
+          console.log('📜 Pergaminho de Onboarding carregado via script embutido.');
         }
-      } catch (fe) {
-        // fetch pode falhar quando abrimos via file:// — tentamos ler o script embutido
+      } else {
         try {
-          const el = document.getElementById('pergaminho-onboarding-data');
-          if (el && el.textContent) {
-            this.data = JSON.parse(el.textContent);
-            console.log('📜 Pergaminho de Onboarding carregado via script embutido.');
+          const response = await fetch('pergaminho-onboarding.json');
+          if (response.ok) {
+            this.data = await response.json();
+            console.log('📜 Pergaminho de Onboarding (JSON) carregado via fetch.');
           }
-        } catch (pe) {
-          console.warn('Falha ao carregar pergaminho via fallback embutido:', pe);
+        } catch (fe) {
+          // fetch pode falhar — tenta ler o script embutido
+          try {
+            const el = document.getElementById('pergaminho-onboarding-data');
+            if (el && el.textContent) {
+              this.data = JSON.parse(el.textContent);
+              console.log('📜 Pergaminho de Onboarding carregado via script embutido.');
+            }
+          } catch (pe) {
+            console.warn('Falha ao carregar pergaminho via fallback embutido:', pe);
+          }
         }
       }
       
@@ -6899,6 +6912,12 @@ const OracleChat = {
     const cleanedInput = this.cleanInput(input);
     const expandedInput = this.expandAbbreviations(cleanedInput);
     const lowerInput = expandedInput.toLowerCase().trim();
+    // Atalho: abrir balão de tarefa antes do fluxo RAG
+    if (lowerInput === 'tarefa' || lowerInput === 'criar tarefa' || lowerInput === 'nova tarefa' || lowerInput.startsWith('criar tarefa ')) {
+      const nlu = OracleNLU.detectIntent(expandedInput);
+      const data = (nlu && nlu.intent === 'task.create') ? (nlu.data || {}) : {};
+      return this.showTaskInlineForm(data, OracleMemory.getProfile('name') || 'amigo');
+    }
     // Intercepta pedidos explícitos de ajuda para evitar iniciar onboarding/perguntas pessoais
     const helpPatterns = [
       'o que você pode', 'o que voce pode', 'o que vc pode', 'o que voce faz', 'o que você faz', 'o que vc faz',
@@ -6963,7 +6982,7 @@ const OracleChat = {
           const sessionId = result.session || (this.sessionState && (this.sessionState.id || this.sessionState.sessionId));
           this.pendingAction = { type: 'slot_fill', originalInput: input, understand: result, awaiting: result.questions, collectedAnswers: [], session: sessionId || null };
           window.OracleTelemetry?.log('pending_questions', { count: result.questions.length });
-          return { message: result.questions.map(q => `❓ ${q}`).join('\n'), actions: [] };
+          return { message: `❓ ${result.questions[0]}`, actions: [] };
         }
 
         if (result.actions && result.actions.length > 0 && result.confidence >= 0.7) {
@@ -7630,12 +7649,7 @@ const OracleChat = {
     
     switch (intent) {
       case 'task.create':
-        if (data.title) {
-          return this.createTaskWithDetails(data);
-        }
-        // Se não tem título, pergunta
-        this.pendingAction = { type: 'task_name' };
-        return `Claro, ${treatment}! 📝 Qual tarefa você quer criar?`;
+        return this.showTaskInlineForm(data, treatment);
         
       case 'task.complete':
         return this.completeTask(data.taskName);
@@ -7904,6 +7918,41 @@ const OracleChat = {
     
     return response + `<br><br>Boa sorte, ${treatment}! 💪`;
   },
+
+  showTaskInlineForm(data = {}, treatment = 'amigo') {
+    const title = data.title || '';
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = data.dueDate || today;
+    const dueTime = data.dueTime || '';
+    this.pendingAction = { type: 'task_inline' };
+    return {
+      message: `Claro, ${treatment}! 📝 Preencha os dados da tarefa abaixo:`,
+      actions: [
+        {
+          text: '➕ Preencher agora',
+          action: () => {
+            addBotMessage({
+              message: `
+                <div class="oracle-inline-card">
+                  <div class="oracle-inline-title">📝 Nova Tarefa</div>
+                  <label>Nome</label>
+                  <input type="text" name="taskTitle" placeholder="Ex: Estudar matemática" value="${this.escapeHtml ? this.escapeHtml(title) : title}">
+                  <label>Data (opcional)</label>
+                  <input type="date" name="taskDate" value="${this.escapeHtml ? this.escapeHtml(dueDate) : dueDate}">
+                  <label>Hora (opcional)</label>
+                  <input type="time" name="taskTime" value="${this.escapeHtml ? this.escapeHtml(dueTime) : dueTime}">
+                  <div class="oracle-inline-actions">
+                    <button class="oracle-task-save">Salvar</button>
+                    <button class="oracle-task-cancel">Cancelar</button>
+                  </div>
+                </div>
+              `
+            });
+          }
+        }
+      ]
+    };
+  },
   
   // Processa resposta para ação pendente
   async handlePendingAction(input, lowerInput) {
@@ -7912,6 +7961,31 @@ const OracleChat = {
     const gender = OracleMemory.getProfile('gender');
     const treatment = gender === 'male' ? 'cara' : gender === 'female' ? 'querida' : (name || 'amigo');
     
+    // Se o usuário pediu outra ação enquanto há pendência, limpa a pendência e executa o novo comando
+    try {
+      const override = OracleNLU.detectIntent(input);
+      const overrideIntents = new Set([
+        'task.list', 'task.create', 'task.complete',
+        'status.show', 'finance.summary', 'finance.goal',
+        'work.start', 'work.stop', 'memory.query', 'utility.calc', 'utility.date',
+        'system.clear'
+      ]);
+      if (override && override.intent && override.intent !== 'unknown' && overrideIntents.has(override.intent)) {
+        this.pendingAction = null;
+        if (override.intent === 'task.create' && override.data && override.data.title) {
+          return this.createTaskWithDetails(override.data);
+        }
+        if (override.intent === 'task.complete') {
+          return this.completeTask(override.data?.taskName);
+        }
+        const intentResponse = this.executeIntent ? this.executeIntent(override) : null;
+        if (intentResponse) return intentResponse;
+        return this.generateResponse(input);
+      }
+    } catch (e) {
+      // Se falhar, continua o fluxo normal
+    }
+
     // Se o usuário cancelou
     if (lowerInput.match(/^(cancela|cancelar|deixa|deixa pra lá|esquece|nada|não|nao)$/i)) {
       this.pendingAction = null;
@@ -7924,7 +7998,23 @@ const OracleChat = {
         try {
           const answer = input.trim();
           action.collectedAnswers = action.collectedAnswers || [];
-          action.collectedAnswers.push(answer);
+
+          // Se for criação de tarefa e a resposta já contém título + data, resolve de uma vez
+          try {
+            const maybeTask = OracleNLU.detectIntent(answer);
+            if (maybeTask && maybeTask.intent === 'task.create' && maybeTask.data?.title) {
+              this.pendingAction = null;
+              return this.createTaskWithDetails(maybeTask.data);
+            }
+          } catch (e) { /* ignore */ }
+
+          // Permite múltiplas respostas em uma única mensagem (ex: "tarefa X; amanhã")
+          const parts = answer.split(/[\n;]+/).map(p => p.trim()).filter(Boolean);
+          if (parts.length > 1) {
+            parts.forEach(p => action.collectedAnswers.push(p));
+          } else {
+            action.collectedAnswers.push(answer);
+          }
 
           // If still need more answers, ask next question
           if (action.collectedAnswers.length < (action.awaiting || []).length) {
@@ -8353,6 +8443,28 @@ const OracleChat = {
       const rules = OracleOnboarding.getRulesText();
       const displayRules = rules.length > 500 ? rules.substring(0, 500) + '...' : rules;
       return `📜 <strong>Regras Atuais (${OracleOnboarding.activeMode.toUpperCase()}):</strong><br><br><pre style="font-size:10px; white-space:pre-wrap; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">${displayRules}</pre>`;
+    }
+
+    // Combustível -> cria tarefa + registra saída na categoria Moto
+    const fuelMatch = originalInput.match(/coloquei\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s*(?:de|em|no|na)?\s*combust[ií]vel/i);
+    if (fuelMatch) {
+      const value = parseFloat(fuelMatch[1].replace(',', '.'));
+      if (!isNaN(value) && value > 0) {
+        const expenseMsg = addExpenseWithCategory(value, 'Combustível', 'Moto');
+        const taskMsg = createTask('Abastecer moto');
+        return `${expenseMsg}<br><br>📝 ${taskMsg}`;
+      }
+    }
+
+    // Lanche/Comida -> registra saída na categoria Comida
+    const foodMatch = originalInput.match(/gastei\s+(?:r?\$?\s*)?(\d+(?:[.,]\d{1,2})?)\s*(?:reais?)?\s*(?:com|em|no|na)?\s*(lanche|comida|almo[cç]o|janta|jantar|cafe|café|lanches|pizza|hamb[úu]rguer|pastel|salgado|coxinha|sigarete|cigarro|mercado|padaria|sorvete|a[cç]a[ií]|marmita|restaurante|ifood)/i);
+    if (foodMatch) {
+      const value = parseFloat(foodMatch[1].replace(',', '.'));
+      const desc = (foodMatch[2] || 'Comida').trim();
+      if (!isNaN(value) && value > 0) {
+        const expenseMsg = addExpenseWithCategory(value, desc.charAt(0).toUpperCase() + desc.slice(1), 'Comida');
+        return expenseMsg;
+      }
     }
     
     // CRIAR TAREFA
@@ -9176,6 +9288,7 @@ const OracleChat = {
     // Salva que está em modo conversa
     OracleMemory.setProfile('conversationMode', true);
     OracleMemory.setProfile('lastQuestion', unknownTopics[0] || 'general');
+    updateOracleModePill();
     
     const questions = {
       name: `Bora lá! 😊 Pra começar, como posso te chamar?`,
@@ -9197,6 +9310,7 @@ const OracleChat = {
   stopConversationMode() {
     OracleMemory.setProfile('conversationMode', false);
     OracleMemory.setProfile('lastQuestion', null);
+    updateOracleModePill();
     return "Modo conversa encerrado. Estou pronto para ajudar como assistente! 💼";
   },
   
@@ -11749,6 +11863,7 @@ function injectBibleTab() {
             <button class="btn ghost bible-tag" onclick="askBible('quem foi jesus')">✝️ Jesus</button>
             <button class="btn ghost bible-tag" onclick="askBible('o que você sabe?')">🧠 O que você sabe?</button>
             <button class="btn ghost bible-tag" onclick="askBible('plano de leitura')">📅 Plano de Leitura</button>
+            <button class="btn ghost bible-tag" id="openBibleNotesBtn">✍️ Anotações</button>
           </div>
         </div>
         
@@ -11763,19 +11878,6 @@ function injectBibleTab() {
           <button id="bibleSendBtn" class="bible-send-btn" aria-label="Enviar" style="padding: 0 15px;">➤</button>
         </div>
 
-        <div class="bible-notes">
-          <div class="bible-notes-header">✍️ Anotações</div>
-          <div class="bible-notes-form">
-            <input type="text" id="bibleNoteRef" class="bible-note-input" placeholder="Referência (ex: João 3:16)">
-            <textarea id="bibleNoteContent" class="bible-note-textarea" placeholder="Escreva sua anotação..."></textarea>
-            <input type="text" id="bibleNoteTags" class="bible-note-input" placeholder="Tags (separe por vírgula)">
-            <button class="btn success" id="bibleNoteSaveBtn">Salvar anotação</button>
-          </div>
-          <div class="bible-notes-search">
-            <input type="text" id="bibleNoteSearch" class="bible-note-input" placeholder="Buscar anotação por referência ou texto...">
-          </div>
-          <div id="bibleNotesList" class="bible-notes-list"></div>
-        </div>
       </div>
     `;
     
@@ -11787,6 +11889,7 @@ function injectBibleTab() {
     const chat = document.getElementById('bibleChatArea');
     const bookCards = document.querySelectorAll('.bible-book-card');
     const filterButtons = document.querySelectorAll('.bible-filter-btn');
+    const openNotesBtn = document.getElementById('openBibleNotesBtn');
     
     const sendMessage = async () => {
         const text = input.value.trim();
@@ -11877,127 +11980,11 @@ function injectBibleTab() {
       setFilter('all');
     }
 
-    // Anotações bíblicas
-    const noteRef = document.getElementById('bibleNoteRef');
-    const noteContent = document.getElementById('bibleNoteContent');
-    const noteTags = document.getElementById('bibleNoteTags');
-    const noteSaveBtn = document.getElementById('bibleNoteSaveBtn');
-    const notesList = document.getElementById('bibleNotesList');
-    const noteSearch = document.getElementById('bibleNoteSearch');
-
-    const renderNotes = async () => {
-      const notes = await BibleNotesStore.load();
-      const q = noteSearch ? noteSearch.value.trim() : '';
-      const filtered = q ? await BibleNotesStore.search(q) : notes;
-      if (!notesList) return;
-      if (!filtered.length) {
-        notesList.innerHTML = '<div class="small" style="opacity:0.7">Sem anotações ainda.</div>';
-        return;
-      }
-      notesList.innerHTML = filtered.map(n => `
-        <div class="bible-note-card" data-id="${n.id}">
-          <div class="bible-note-card-ref">${n.reference ? BibleAssistant.escapeHtml(n.reference) : 'Sem referência'}</div>
-          <div class="bible-note-card-content">${BibleAssistant.escapeHtml(n.content)}</div>
-          ${n.tags && n.tags.length ? `<div class="bible-note-card-tags">${n.tags.map(t => `<span>#${BibleAssistant.escapeHtml(t)}</span>`).join(' ')}</div>` : ''}
-          <div class="bible-note-card-actions">
-            <button class="ghost bible-note-edit" data-id="${n.id}">Editar</button>
-            <button class="ghost bible-note-delete" data-id="${n.id}">Excluir</button>
-          </div>
-          <div class="bible-note-edit-form hidden" data-id="${n.id}">
-            <input type="text" class="bible-note-input edit-ref" value="${BibleAssistant.escapeHtml(n.reference || '')}">
-            <textarea class="bible-note-textarea edit-content">${BibleAssistant.escapeHtml(n.content || '')}</textarea>
-            <input type="text" class="bible-note-input edit-tags" value="${BibleAssistant.escapeHtml((n.tags || []).join(', '))}">
-            <div class="bible-note-card-actions">
-              <button class="btn success bible-note-save" data-id="${n.id}">Salvar</button>
-              <button class="ghost bible-note-cancel" data-id="${n.id}">Cancelar</button>
-            </div>
-          </div>
-        </div>
-      `).join('');
-
-      notesList.querySelectorAll('.bible-note-delete').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          if (!id) return;
-          await BibleNotesStore.remove(id);
-          renderNotes();
-        });
-      });
-
-      notesList.querySelectorAll('.bible-note-edit').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-id');
-          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
-          if (!card) return;
-          card.querySelector('.bible-note-edit-form')?.classList.remove('hidden');
-        });
-      });
-
-      notesList.querySelectorAll('.bible-note-cancel').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-id');
-          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
-          if (!card) return;
-          card.querySelector('.bible-note-edit-form')?.classList.add('hidden');
-        });
-      });
-
-      notesList.querySelectorAll('.bible-note-save').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const id = btn.getAttribute('data-id');
-          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
-          if (!card) return;
-          const ref = card.querySelector('.edit-ref')?.value?.trim() || '';
-          const content = card.querySelector('.edit-content')?.value?.trim() || '';
-          const tags = BibleNotesStore._parseTags(card.querySelector('.edit-tags')?.value || '');
-          if (!content) {
-            showToast('⚠️ Escreva uma anotação antes de salvar.');
-            return;
-          }
-          if (BibleNotesStore._canSupabase()) {
-            await window.SupabaseService.updateBibleNote(id, { reference: ref, content, tags });
-          }
-          // Atualiza cache local
-          const idx = BibleNotesStore.cache.findIndex(n => n.id === id);
-          if (idx >= 0) {
-            BibleNotesStore.cache[idx] = {
-              ...BibleNotesStore.cache[idx],
-              reference: ref,
-              content,
-              tags,
-              updatedAt: new Date().toISOString()
-            };
-          }
-          BibleNotesStore._saveLocal();
-          renderNotes();
-          showToast('✅ Anotação atualizada!');
-        });
-      });
-    };
-
-    if (noteSaveBtn) {
-      noteSaveBtn.addEventListener('click', async () => {
-        const ref = noteRef ? noteRef.value.trim() : '';
-        const content = noteContent ? noteContent.value.trim() : '';
-        const tags = noteTags ? BibleNotesStore._parseTags(noteTags.value) : [];
-        if (!content) {
-          showToast('⚠️ Escreva uma anotação antes de salvar.');
-          return;
-        }
-        await BibleNotesStore.add({ reference: ref, content, tags });
-        if (noteRef) noteRef.value = '';
-        if (noteContent) noteContent.value = '';
-        if (noteTags) noteTags.value = '';
-        renderNotes();
-        showToast('✅ Anotação salva!');
+    if (openNotesBtn) {
+      openNotesBtn.addEventListener('click', () => {
+        window.location.href = 'biblia-anotacoes.html';
       });
     }
-
-    if (noteSearch) {
-      noteSearch.addEventListener('input', () => renderNotes());
-    }
-
-    renderNotes();
     
     // Global helper for tags
     window.askBible = (query) => {
@@ -12632,6 +12619,49 @@ function deleteIncome(name) {
 }
 
 // UI Methods
+function ensureOracleInlineHandlers() {
+  if (window.__oracleInlineHandlersBound) return;
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+  window.__oracleInlineHandlersBound = true;
+  messages.addEventListener('click', (e) => {
+    const saveBtn = e.target.closest('.oracle-task-save');
+    const cancelBtn = e.target.closest('.oracle-task-cancel');
+    if (cancelBtn) {
+      const wrap = cancelBtn.closest('.oracle-inline-card');
+      if (wrap) wrap.remove();
+      if (window.OracleChat) OracleChat.pendingAction = null;
+      addSystemMessage('Ok, cancelado! 👍');
+      return;
+    }
+    if (saveBtn) {
+      const wrap = saveBtn.closest('.oracle-inline-card');
+      if (!wrap) return;
+      const titleEl = wrap.querySelector('input[name="taskTitle"]');
+      const dateEl = wrap.querySelector('input[name="taskDate"]');
+      const timeEl = wrap.querySelector('input[name="taskTime"]');
+      const title = (titleEl && titleEl.value || '').trim();
+      const today = new Date().toISOString().split('T')[0];
+      const dueDate = (dateEl && dateEl.value || '').trim() || today;
+      const dueTime = (timeEl && timeEl.value || '').trim() || null;
+      if (!title) {
+        addSystemMessage('⚠️ Digite o nome da tarefa.');
+        return;
+      }
+      if (window.OracleChat) OracleChat.pendingAction = null;
+      const data = { title, dueDate, dueTime, xpReward: OracleNLU.estimateTaskXP(title) };
+      if (window.OracleChat && typeof OracleChat.createTaskWithDetails === 'function') {
+        addBotMessage(OracleChat.createTaskWithDetails(data));
+      } else if (typeof createTask === 'function') {
+        addBotMessage(createTask(title));
+      } else {
+        addSystemMessage('❌ Não consegui criar a tarefa.');
+      }
+      wrap.remove();
+    }
+  });
+}
+
 function addUserMessage(text) {
   const messages = document.getElementById('chatMessages');
   if (!messages) return;
@@ -12641,6 +12671,8 @@ function addUserMessage(text) {
   div.textContent = text;
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
+  updateOracleModePill();
+  ensureOracleInlineHandlers();
 }
 
 function addBotMessage(text, actions = null) {
@@ -12679,6 +12711,8 @@ function addBotMessage(text, actions = null) {
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
   playSound('click');
+  updateOracleModePill();
+  ensureOracleInlineHandlers();
   
   // Se estiver em modo conversa, fala a resposta
   if (VoiceRecognition.conversationMode && OracleSpeech.enabled) {
@@ -12699,6 +12733,64 @@ function addSystemMessage(text) {
   div.innerHTML = text;
   messages.appendChild(div);
   messages.scrollTop = messages.scrollHeight;
+  updateOracleModePill();
+  ensureOracleInlineHandlers();
+}
+
+function updateOracleModePill() {
+  const messages = document.getElementById('chatMessages');
+  if (!messages) return;
+
+  const profile = (typeof OracleMemory !== 'undefined' && OracleMemory.get) ? (OracleMemory.get().profile || {}) : {};
+  const conversationActive = !!(profile.conversationMode || (window.VoiceRecognition && VoiceRecognition.conversationMode));
+  const pending = !!(window.OracleChat && OracleChat.pendingAction);
+
+  let pill = document.getElementById('oracleModePill');
+  if (!conversationActive && !pending) {
+    if (pill) pill.remove();
+    return;
+  }
+  if (!pill) {
+    pill = document.createElement('div');
+    pill.id = 'oracleModePill';
+    pill.className = 'oracle-mode-pill';
+    messages.prepend(pill);
+  }
+
+  const parts = [];
+  if (pending) parts.push('🧭 Ação em andamento');
+  if (conversationActive) parts.push('📞 Modo conversa ativo');
+
+  pill.innerHTML = `
+    <span class="oracle-mode-text">${parts.join(' • ')}</span>
+    <button type="button" class="oracle-mode-stop">Parar</button>
+  `;
+
+  const stopBtn = pill.querySelector('.oracle-mode-stop');
+  if (stopBtn) {
+    stopBtn.onclick = () => {
+      if (window.OracleChat) OracleChat.pendingAction = null;
+      try {
+        if (window.OracleChat && typeof OracleChat.stopConversationMode === 'function') {
+          OracleChat.stopConversationMode();
+        }
+      } catch (e) {}
+      try {
+        if (window.VoiceRecognition && VoiceRecognition.conversationMode) {
+          VoiceRecognition.conversationMode = false;
+          if (typeof VoiceRecognition.stopListening === 'function') VoiceRecognition.stopListening();
+        }
+      } catch (e) {}
+      try {
+        if (typeof OracleMemory !== 'undefined') {
+          OracleMemory.setProfile('conversationMode', false);
+          OracleMemory.setProfile('lastQuestion', null);
+        }
+      } catch (e) {}
+      addSystemMessage('⛔ Ação interrompida.');
+      updateOracleModePill();
+    };
+  }
 }
 
 function showThinking() {
