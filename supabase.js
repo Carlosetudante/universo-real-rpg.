@@ -981,9 +981,10 @@ async function syncCloudToLocal() {
       lastTaskReset: extraData.lastTaskReset || null,
       zenBackgroundImage: extraData.zenBackgroundImage || null,
       zenMusic: extraData.zenMusic || null,
-      gratitudeJournal: extraData.gratitudeJournal || [],
-      taskHistory: extraData.taskHistory || [],
-      expenseGroups: extraData.expenseGroups || [],
+        gratitudeJournal: extraData.gratitudeJournal || [],
+        taskHistory: extraData.taskHistory || [],
+        tasksLastChangedAt: extraData.tasksLastChangedAt || null,
+        expenseGroups: extraData.expenseGroups || [],
       // Dados de outras tabelas
       dailyTasks: localTasks,
       finances: localFinances,
@@ -1040,9 +1041,10 @@ async function syncAllToCloud(localData) {
         lastTaskReset: localData.lastTaskReset || null,
         zenBackgroundImage: localData.zenBackgroundImage || null,
         zenMusic: localData.zenMusic || null,
-        gratitudeJournal: localData.gratitudeJournal || [],
-        taskHistory: localData.taskHistory || [],
-        expenseGroups: localData.expenseGroups || [],
+          gratitudeJournal: localData.gratitudeJournal || [],
+          taskHistory: localData.taskHistory || [],
+          tasksLastChangedAt: localData.tasksLastChangedAt || null,
+          expenseGroups: localData.expenseGroups || [],
         // Backup do workLog no campo inventory para não perder dados
         workLogBackup: localData.workLog || []
       },

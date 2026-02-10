@@ -1150,8 +1150,16 @@ async function login() {
               inputVal: w.inputVal || (w.total_seconds ? w.total_seconds / 3600 : 0)
             }));
 
-            // Integra os dados carregados ao state existente
-            gameState.dailyTasks = localTasks;
+              // Integra os dados carregados ao state existente
+              const localBackup = getLocalUserStateByEmail(authEmail);
+              const preferLocal = shouldPreferLocalTasks(localBackup, { dailyTasks: localTasks, tasksLastChangedAt: null });
+              const mergedTasks = preferLocal
+                ? mergeTasksPreferLocal(localBackup?.dailyTasks || gameState.dailyTasks || [], localTasks)
+                : localTasks;
+              gameState.dailyTasks = mergedTasks;
+              if (preferLocal && localBackup?.tasksLastChangedAt) {
+                gameState.tasksLastChangedAt = localBackup.tasksLastChangedAt;
+              }
             gameState.finances = localFinances;
             gameState.workLog = localWorkLog;
             if (oracleMemories && oracleMemories.length && typeof OracleMemory !== 'undefined') {
@@ -1161,9 +1169,12 @@ async function login() {
             }
 
             // Re-renderiza as seções que chegaram
-            if (typeof renderDailyTasks === 'function') renderDailyTasks();
-            if (typeof renderFinances === 'function') renderFinances();
-            if (typeof renderWorkLog === 'function') renderWorkLog();
+              if (typeof renderDailyTasks === 'function') renderDailyTasks();
+              if (typeof renderFinances === 'function') renderFinances();
+              if (typeof renderWorkLog === 'function') renderWorkLog();
+              if (preferLocal) {
+                saveGame(true);
+              }
 
             console.log('✅ Dados adicionais carregados da nuvem:', {
               tarefas: localTasks.length,
@@ -1365,6 +1376,7 @@ async function register() {
       achievements: [],
       inventory: [],
       dailyTasks: [],
+      tasksLastChangedAt: null,
       finances: [],
       financialGoal: 0,
       bills: [],
@@ -1440,15 +1452,25 @@ async function checkSession() {
   }
 
   // Tenta recuperar sessão do Supabase primeiro
-  if (useSupabase()) {
-    try {
-      const session = await SupabaseService.getSession();
-      if (session && session.user) {
-        // Carrega TODOS os dados da nuvem
-        const cloudData = await SupabaseService.syncCloudToLocal();
-        
-        if (cloudData) {
-          gameState = normalizeGameState(cloudData);
+    if (useSupabase()) {
+      try {
+        const session = await SupabaseService.getSession();
+        if (session && session.user) {
+          const sessionEmail = session.user.email || null;
+          if (sessionEmail) saveSession(sessionEmail);
+          const localBackup = getLocalUserStateByEmail(sessionEmail);
+          // Carrega TODOS os dados da nuvem
+          const cloudData = await SupabaseService.syncCloudToLocal();
+          
+          if (cloudData) {
+            const preferLocal = shouldPreferLocalTasks(localBackup, cloudData);
+            if (preferLocal) {
+              cloudData.dailyTasks = mergeTasksPreferLocal(localBackup?.dailyTasks || [], cloudData.dailyTasks || []);
+              if (localBackup?.tasksLastChangedAt) {
+                cloudData.tasksLastChangedAt = localBackup.tasksLastChangedAt;
+              }
+            }
+            gameState = normalizeGameState(cloudData);
           
           // Carrega memórias do oráculo se existirem
           if (cloudData.oracleMemory && typeof OracleMemory !== 'undefined') {
@@ -1464,14 +1486,15 @@ async function checkSession() {
           loginTime = new Date();
           hideAuthModal();
           setMobileNavVisible(true);
-          checkDailyTaskReset();
-          schedulePostLoginTasks();
-          return;
+            checkDailyTaskReset();
+            schedulePostLoginTasks();
+            if (preferLocal) saveGame(true);
+            return;
+          }
         }
+      } catch (e) {
+        console.warn('Erro ao verificar sessão Supabase:', e);
       }
-    } catch (e) {
-      console.warn('Erro ao verificar sessão Supabase:', e);
-    }
   }
 
   // Fallback: Verifica sessão local
@@ -1515,7 +1538,7 @@ function schedulePostLoginTasks() {
 }
 
 // Funções do jogo
-function normalizeGameState(data) {
+  function normalizeGameState(data) {
   // Define a estrutura padrão com valores default
   const defaultState = {
     username: data.username || 'User',
@@ -1566,8 +1589,69 @@ function normalizeGameState(data) {
     merged.attributes = { ...defaultState.attributes, ...data.attributes };
   }
   
-  return merged;
-}
+    return merged;
+  }
+
+  function getLocalUserStateByEmail(email) {
+    if (!email) return null;
+    try {
+      const users = getUsers();
+      if (users && users[email] && users[email].character) {
+        return normalizeGameState(users[email].character);
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function taskKey(task) {
+    if (!task) return '';
+    const text = (task.text || '').toString().trim().toLowerCase();
+    const dateRaw = task.dueDate || task.date || '';
+    let day = '';
+    if (dateRaw) {
+      const d = new Date(dateRaw);
+      if (!isNaN(d.getTime())) day = d.toISOString().split('T')[0];
+    }
+    return `${text}|${day}`;
+  }
+
+  function shouldPreferLocalTasks(localState, cloudState) {
+    if (!localState || !Array.isArray(localState.dailyTasks) || localState.dailyTasks.length === 0) return false;
+    if (!cloudState || !Array.isArray(cloudState.dailyTasks) || cloudState.dailyTasks.length === 0) return true;
+    const localTs = localState.tasksLastChangedAt ? Date.parse(localState.tasksLastChangedAt) : NaN;
+    const cloudTs = cloudState.tasksLastChangedAt ? Date.parse(cloudState.tasksLastChangedAt) : NaN;
+    if (!isNaN(localTs) && !isNaN(cloudTs)) return localTs >= cloudTs;
+    return true; // Sem timestamps confiáveis, mantém o local para evitar "ressuscitar" tarefas
+  }
+
+  function mergeTasksPreferLocal(localTasks, cloudTasks) {
+    if (!Array.isArray(localTasks) || localTasks.length === 0) return Array.isArray(cloudTasks) ? cloudTasks : [];
+    const localById = new Map();
+    const localByKey = new Map();
+    for (const t of localTasks) {
+      localById.set(String(t.id), t);
+      localByKey.set(taskKey(t), t);
+    }
+    const merged = [];
+    const seenLocal = new Set();
+    if (Array.isArray(cloudTasks)) {
+      for (const ct of cloudTasks) {
+        const idKey = String(ct.id);
+        let lt = localById.get(idKey);
+        if (!lt) {
+          lt = localByKey.get(taskKey(ct));
+        }
+        if (lt) {
+          merged.push({ ...ct, ...lt, id: ct.id ?? lt.id });
+          seenLocal.add(String(lt.id));
+        }
+      }
+    }
+    for (const lt of localTasks) {
+      if (!seenLocal.has(String(lt.id))) merged.push(lt);
+    }
+    return merged;
+  }
 
 async function saveGame(arg) {
   const silent = typeof arg === 'boolean' ? arg : false;
@@ -2100,6 +2184,7 @@ function addDailyTask() {
     text: text,
     completed: false
   });
+  gameState.tasksLastChangedAt = new Date().toISOString();
 
   elements.taskInput.value = '';
   saveGame();
@@ -2107,10 +2192,11 @@ function addDailyTask() {
   showToast('✅ Tarefa adicionada!');
 }
 
-function toggleTask(id) {
-  const task = gameState.dailyTasks.find(t => t.id === id);
-  if (task) {
-    task.completed = !task.completed;
+  function toggleTask(id) {
+    const task = gameState.dailyTasks.find(t => t.id === id);
+    if (task) {
+      task.completed = !task.completed;
+      gameState.tasksLastChangedAt = new Date().toISOString();
     
     // Recompensa ou penalidade imediata ao marcar/desmarcar
     if (task.completed) {
@@ -2152,13 +2238,14 @@ function toggleTask(id) {
   }
 }
 
-async function removeTask(id, event) {
-  event.stopPropagation(); // Impede que o clique no botão ative o toggleTask
-  if (confirm('Excluir esta tarefa permanentemente?')) {
-    // Remove localmente
-    gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== id);
-    saveGame();
-    updateUI();
+  async function removeTask(id, event) {
+    event.stopPropagation(); // Impede que o clique no botão ative o toggleTask
+    if (confirm('Excluir esta tarefa permanentemente?')) {
+      // Remove localmente
+      gameState.dailyTasks = gameState.dailyTasks.filter(t => t.id !== id);
+      gameState.tasksLastChangedAt = new Date().toISOString();
+      saveGame();
+      updateUI();
     
     // Remove do Supabase (nuvem)
     try {
@@ -2239,16 +2326,17 @@ function checkDailyTaskReset() {
       task.completed = false; // Reseta o status
     });
 
-    if (penalty > 0) {
-      gameState.xp = Math.max(0, gameState.xp - penalty);
-      updateXpHistory(-penalty);
-      showToast(`🌅 Novo dia! Você perdeu ${penalty} XP por tarefas pendentes.`);
-    }
+      if (penalty > 0) {
+        gameState.xp = Math.max(0, gameState.xp - penalty);
+        updateXpHistory(-penalty);
+        showToast(`🌅 Novo dia! Você perdeu ${penalty} XP por tarefas pendentes.`);
+      }
 
-    gameState.lastTaskReset = now.toISOString();
-    saveGame();
+      gameState.lastTaskReset = now.toISOString();
+      gameState.tasksLastChangedAt = new Date().toISOString();
+      saveGame();
+    }
   }
-}
 
 // --- Sistema Financeiro ---
 
@@ -4936,22 +5024,23 @@ if (elements.taskInput) elements.taskInput.addEventListener('keydown', (e) => {
 
 // Botão de remover todas as tarefas
 const clearAllTasksBtn = document.getElementById('clearAllTasksBtn');
-if (clearAllTasksBtn) {
-  clearAllTasksBtn.addEventListener('click', () => {
-    if (!gameState.dailyTasks || gameState.dailyTasks.length === 0) {
-      showToast('📭 Não há tarefas para remover!');
-      return;
+    if (clearAllTasksBtn) {
+      clearAllTasksBtn.addEventListener('click', () => {
+        if (!gameState.dailyTasks || gameState.dailyTasks.length === 0) {
+          showToast('📭 Não há tarefas para remover!');
+          return;
+        }
+        
+        if (confirm(`🗑️ Deseja remover todas as ${gameState.dailyTasks.length} tarefas?`)) {
+          gameState.dailyTasks = [];
+          gameState.tasksLastChangedAt = new Date().toISOString();
+          saveGame();
+          renderDailyTasks(); // Atualiza a lista imediatamente
+          updateUI(); // Atualiza toda a interface
+          showToast('✅ Todas as tarefas foram removidas!');
+        }
+      });
     }
-    
-    if (confirm(`🗑️ Deseja remover todas as ${gameState.dailyTasks.length} tarefas?`)) {
-      gameState.dailyTasks = [];
-      saveGame();
-      renderDailyTasks(); // Atualiza a lista imediatamente
-      updateUI(); // Atualiza toda a interface
-      showToast('✅ Todas as tarefas foram removidas!');
-    }
-  });
-}
 
 // -------------------------------
 // Finance category modal helpers
@@ -8997,17 +9086,18 @@ const OracleChat = {
     }
     
     // LIMPAR TAREFAS CONCLUÍDAS
-    if (lowerInput.match(/(?:limpar?|limpa|remover?|remove|apagar?|apaga)\s+(?:tarefas?\s+)?(?:concluídas?|completas?|feitas?)/i)) {
-      if (gameState && gameState.dailyTasks) {
-        const before = gameState.dailyTasks.length;
-        gameState.dailyTasks = gameState.dailyTasks.filter(t => !t.completed);
-        const removed = before - gameState.dailyTasks.length;
-        saveGame();
-        if (typeof renderTasks === 'function') renderTasks();
-        return removed > 0 
-          ? `🧹 ${removed} tarefa(s) concluída(s) removida(s)!`
-          : "Não há tarefas concluídas para limpar.";
-      }
+      if (lowerInput.match(/(?:limpar?|limpa|remover?|remove|apagar?|apaga)\s+(?:tarefas?\s+)?(?:concluídas?|completas?|feitas?)/i)) {
+        if (gameState && gameState.dailyTasks) {
+          const before = gameState.dailyTasks.length;
+          gameState.dailyTasks = gameState.dailyTasks.filter(t => !t.completed);
+          const removed = before - gameState.dailyTasks.length;
+          gameState.tasksLastChangedAt = new Date().toISOString();
+          saveGame();
+          if (typeof renderTasks === 'function') renderTasks();
+          return removed > 0 
+            ? `🧹 ${removed} tarefa(s) concluída(s) removida(s)!`
+            : "Não há tarefas concluídas para limpar.";
+        }
     }
     
     // RENOMEAR/ALTERAR GASTO
@@ -9209,12 +9299,13 @@ const OracleChat = {
       t.text.toLowerCase().includes(lowerTask) || lowerTask.includes(t.text.toLowerCase())
     );
     
-    if (taskIndex !== -1) {
-      const deleted = gameState.dailyTasks.splice(taskIndex, 1)[0];
-      saveGame();
-      if (typeof renderTasks === 'function') renderTasks();
-      return `🗑️ Tarefa "<strong>${deleted.text}</strong>" deletada!`;
-    }
+      if (taskIndex !== -1) {
+        const deleted = gameState.dailyTasks.splice(taskIndex, 1)[0];
+        gameState.tasksLastChangedAt = new Date().toISOString();
+        saveGame();
+        if (typeof renderTasks === 'function') renderTasks();
+        return `🗑️ Tarefa "<strong>${deleted.text}</strong>" deletada!`;
+      }
     
     return `Não encontrei uma tarefa com "${taskName}". Diz <strong>minhas tarefas</strong> pra ver a lista!`;
   },
@@ -12556,9 +12647,10 @@ function completeTask(taskName) {
     }
   }
 
-  if (task) {
-    task.completed = true;
-    task.completedAt = new Date().toISOString();
+    if (task) {
+      task.completed = true;
+      task.completedAt = new Date().toISOString();
+      gameState.tasksLastChangedAt = new Date().toISOString();
 
     // Dar XP
     const xpReward = task.xpReward || 10;
