@@ -172,18 +172,26 @@
         renderTagsPanel(notes);
         return;
       }
-      notesList.innerHTML = filtered.map(n => `
+      notesList.innerHTML = filtered.map(n => {
+        const content = n.content || '';
+        const needsToggle = content.length > 280;
+        const contentClass = needsToggle ? 'bible-note-card-content collapsed' : 'bible-note-card-content';
+        const toggleBtn = needsToggle
+          ? `<button class="ghost bible-note-toggle" data-id="${n.id}" data-expanded="false">Ver mais</button>`
+          : '';
+        return `
         <div class="bible-note-card" data-id="${n.id}">
-          <div class="bible-note-card-ref">${n.reference ? escapeHtml(n.reference) : 'Sem referência'}</div>
-          <div class="bible-note-card-content">${escapeHtml(n.content)}</div>
+          <div class="bible-note-card-ref">${n.reference ? escapeHtml(n.reference) : 'Sem refer?ncia'}</div>
+          <div class="${contentClass}">${escapeHtml(content)}</div>
           ${n.tags && n.tags.length ? `<div class="bible-note-card-tags">${n.tags.map(t => `<span data-tag="${escapeHtml(t)}">#${escapeHtml(t)}</span>`).join(' ')}</div>` : ''}
           <div class="bible-note-card-actions">
+            ${toggleBtn}
             <button class="ghost bible-note-edit" data-id="${n.id}">Editar</button>
             <button class="ghost bible-note-delete" data-id="${n.id}">Excluir</button>
           </div>
           <div class="bible-note-edit-form hidden" data-id="${n.id}">
             <input type="text" class="bible-note-input edit-ref" value="${escapeHtml(n.reference || '')}">
-            <textarea class="bible-note-textarea edit-content">${escapeHtml(n.content || '')}</textarea>
+            <textarea class="bible-note-textarea edit-content">${escapeHtml(content)}</textarea>
             <input type="text" class="bible-note-input edit-tags" value="${escapeHtml((n.tags || []).join(', '))}">
             <div class="bible-note-card-actions">
               <button class="btn success bible-note-save" data-id="${n.id}">Salvar</button>
@@ -191,7 +199,8 @@
             </div>
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       notesList.querySelectorAll('.bible-note-delete').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -235,6 +244,26 @@
           clearError();
           await BibleNotesStore.update(id, { reference: ref, content, tags });
           renderNotes();
+        });
+      });
+
+      notesList.querySelectorAll('.bible-note-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-id');
+          const card = notesList.querySelector(`.bible-note-card[data-id="${id}"]`);
+          if (!card) return;
+          const content = card.querySelector('.bible-note-card-content');
+          if (!content) return;
+          const expanded = btn.getAttribute('data-expanded') === 'true';
+          if (expanded) {
+            content.classList.add('collapsed');
+            btn.setAttribute('data-expanded', 'false');
+            btn.textContent = 'Ver mais';
+          } else {
+            content.classList.remove('collapsed');
+            btn.setAttribute('data-expanded', 'true');
+            btn.textContent = 'Ver menos';
+          }
         });
       });
 

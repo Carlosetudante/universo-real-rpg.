@@ -1675,13 +1675,74 @@ body.zen-mode-active .container {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 260px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding-right: 4px;
 }
 
 .bible-interface {
   overflow-y: auto;
+}
+
+/* Responsivo: anotações em qualquer tela */
+.bible-interface,
+.bible-notes {
+  width: 100%;
+  max-width: 980px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .bible-page-main {
+    padding: 12px;
+  }
+  .bible-notes {
+    padding: 12px;
+  }
+  .bible-note-input,
+  .bible-note-textarea {
+    font-size: 15px;
+  }
+  .bible-note-card {
+    padding: 12px;
+  }
+  .bible-notes-list {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  .bible-page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .bible-page-title {
+    width: 100%;
+    justify-content: center;
+  }
+  .bible-page-back,
+  .bible-page-links {
+    width: 100%;
+    justify-content: center;
+  }
+  .bible-note-textarea {
+    min-height: 140px;
+  }
+  .bible-note-card-content.collapsed {
+    max-height: 16em;
+  }
+}
+
+@media (min-width: 1200px) {
+  .bible-interface,
+  .bible-notes {
+    max-width: 1100px;
+  }
+  .bible-note-textarea {
+    min-height: 140px;
+  }
 }
 
 .bible-note-card {
@@ -1696,6 +1757,38 @@ body.zen-mode-active .container {
   margin-bottom: 4px;
 }
 
+.bible-note-card-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.bible-note-card-content.collapsed {
+  max-height: 14em;
+  overflow: hidden;
+  position: relative;
+}
+
+.bible-note-card-content.collapsed::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2.6em;
+  background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.6));
+}
+
+.bible-note-toggle {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #cfe6ff;
+}
+
+.bible-note-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
 .bible-note-card-actions {
   margin-top: 8px;
   display: flex;

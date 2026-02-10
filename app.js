@@ -229,6 +229,18 @@ function triggerHaptic(pattern = 15) {
   }
 }
 
+function deferTask(fn, timeout = 800) {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => {
+      try { fn(); } catch (e) { console.warn('deferTask falhou:', e); }
+    }, { timeout });
+  } else {
+    setTimeout(() => {
+      try { fn(); } catch (e) { console.warn('deferTask falhou:', e); }
+    }, timeout);
+  }
+}
+
 // ===================================
 // Sistema de Estrelas do Universo
 // ===================================
@@ -306,7 +318,7 @@ function updateStarColor(color) {
 
 // Inicializa estrelas quando a página carrega
 window.addEventListener('load', () => {
-  createStars(currentStarColor);
+  deferTask(() => createStars(currentStarColor), 500);
   
   // Recria estrelas se a janela for redimensionada (debounced)
   let resizeTimeout;
@@ -342,12 +354,20 @@ const ACHIEVEMENTS = [
     description: 'Você deu o primeiro passo na sua jornada de evolução pessoal!',
     getStats: () => {
       const now = new Date();
-      const sessionTime = loginTime ? (now - loginTime) : 0;
-      const totalTime = (gameState.playTime || 0) + sessionTime;
-      const hours = Math.floor(totalTime / 3600000);
+      let startAt = null;
+      if (gameState && gameState.createdAt) startAt = new Date(gameState.createdAt);
+      if (!startAt && typeof OracleMemory !== 'undefined') {
+        const mem = OracleMemory.get && OracleMemory.get();
+        if (mem && mem.firstInteraction) startAt = new Date(mem.firstInteraction);
+      }
+      if (!startAt || isNaN(startAt.getTime())) startAt = now;
+      const totalTime = Math.max(0, now - startAt);
+      const days = Math.floor(totalTime / 86400000);
+      const hours = Math.floor((totalTime % 86400000) / 3600000);
       const minutes = Math.floor((totalTime % 3600000) / 60000);
-      const startDate = gameState.createdAt ? new Date(gameState.createdAt).toLocaleDateString('pt-BR') : 'Início da jornada';
-      return `⏱️ Tempo total: ${hours}h ${minutes}m\n📅 Início: ${startDate}`;
+      const startDate = startAt ? startAt.toLocaleDateString('pt-BR') : 'Início da jornada';
+      const daysTxt = days > 0 ? `${days}d ` : '';
+      return `⏱️ Tempo desde o início: ${daysTxt}${hours}h ${minutes}m\n📅 Início: ${startDate}`;
     }
   },
   { 
@@ -1445,13 +1465,7 @@ async function checkSession() {
           hideAuthModal();
           setMobileNavVisible(true);
           checkDailyTaskReset();
-          updateUI();
-          processFinancePending({ silent: true });
-          if (typeof renderDailyTasks === 'function') renderDailyTasks();
-          if (typeof renderFinances === 'function') renderFinances();
-          if (typeof checkAchievements === 'function') checkAchievements();
-          checkBackupAvailability();
-          checkBillsDueToday();
+          schedulePostLoginTasks();
           return;
         }
       }
@@ -1475,16 +1489,29 @@ async function checkSession() {
     hideAuthModal();
       setMobileNavVisible(true);
     checkDailyTaskReset();
-    updateUI();
-    processFinancePending({ silent: true });
-    if (typeof renderFinances === 'function') renderFinances();
-    if (typeof checkAchievements === 'function') checkAchievements();
-    checkBackupAvailability();
-    checkBillsDueToday();
+    schedulePostLoginTasks();
   } else {
     showAuthModal();
     showLoginForm();
   }
+}
+
+function schedulePostLoginTasks() {
+  deferTask(() => {
+    if (typeof updateUI === 'function') updateUI();
+    if (typeof renderDailyTasks === 'function') renderDailyTasks();
+    if (typeof renderFinances === 'function') renderFinances();
+  }, 100);
+
+  deferTask(() => {
+    if (typeof processFinancePending === 'function') processFinancePending({ silent: true });
+    if (typeof checkAchievements === 'function') checkAchievements();
+  }, 400);
+
+  deferTask(() => {
+    if (typeof checkBackupAvailability === 'function') checkBackupAvailability();
+    if (typeof checkBillsDueToday === 'function') checkBillsDueToday();
+  }, 900);
 }
 
 // Funções do jogo
@@ -4818,23 +4845,38 @@ function updateUI() {
     elements.heroCardHeader.style.backgroundSize = 'cover';
     elements.heroCardHeader.style.backgroundPosition = 'center';
   }
-  
-  // Renderizar atributos e conquistas
-  renderAttributes();
-  renderAttributesChart();
-  renderAchievements();
-  renderVisualBadges();
-  renderInventory();
-  renderGratitudeJournal();
-  renderDailyTasks();
-  renderXpChart();
-  renderFinances();
-  renderFinanceChart();
-  renderFinancialGoal();
-  renderFinanceMonthlyChart();
-  renderFinanceGroups();
-  renderBills();
-  renderWorkTab();
+ 
+  const isTabActive = (tabId) => {
+    const el = document.getElementById(`tab-${tabId}`);
+    return !!(el && el.classList.contains('active'));
+  };
+  const renderFinanceNow = isTabActive('finance');
+  const renderWorkNow = isTabActive('dom');
+
+  // Renderizações pesadas em lotes para evitar travar a tela inicial
+  deferTask(() => {
+    renderAttributes();
+    renderAchievements();
+    renderVisualBadges();
+    renderInventory();
+    renderGratitudeJournal();
+  }, 120);
+
+  deferTask(() => {
+    renderDailyTasks();
+    if (renderFinanceNow) {
+      renderFinances();
+      renderFinanceChart();
+      renderFinancialGoal();
+      renderFinanceMonthlyChart();
+      renderFinanceGroups();
+      renderBills();
+    }
+  }, 320);
+
+  deferTask(() => {
+    if (renderWorkNow) renderWorkTab();
+  }, 700);
   
   // Atualizar Badges nas Abas
   // 1. Hero: Pontos de habilidade disponíveis
@@ -6536,7 +6578,10 @@ const OracleChat = {
   createTask(text) { return typeof createTask === 'function' ? createTask(text) : `Não consegui criar tarefa: ${text}`; },
   
   init() {
-    this.personality = gameState?.oraclePersonality || 'assistant';
+    this.personality = getOraclePersonalityKey(gameState?.oraclePersonality || 'assistant');
+    if (gameState && gameState.oraclePersonality !== this.personality) {
+      gameState.oraclePersonality = this.personality;
+    }
     this.pendingAction = null;
     this.setupListeners();
     OracleMemory.updateMemoryDisplay();
@@ -6569,9 +6614,19 @@ const OracleChat = {
     // Botão de voz - clique único para ouvir uma vez, clique duplo para modo conversa
     const voiceBtn = document.getElementById('oracleVoiceBtn');
     if (voiceBtn) {
+      if (voiceBtn.dataset.bound === '1') return;
+      voiceBtn.dataset.bound = '1';
       let clickTimeout = null;
       let lastClick = 0;
       
+      voiceBtn.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        clearTimeout(clickTimeout);
+        if (VoiceRecognition && typeof VoiceRecognition.toggleConversationMode === 'function') {
+          VoiceRecognition.toggleConversationMode();
+        }
+      });
+
       voiceBtn.addEventListener('click', (e) => {
         const now = Date.now();
         const timeDiff = now - lastClick;
@@ -6882,7 +6937,7 @@ const OracleChat = {
   },
 
   showWelcome() {
-    const p = ORACLE_PERSONALITIES_V2[this.personality];
+    const p = ORACLE_PERSONALITIES_V2[this.personality] || ORACLE_PERSONALITIES_V2.assistant;
     
     // Prioriza o nome salvo na memória do Oráculo, depois o nome do gameState
     const memorizedName = OracleMemory.getProfile('name');
@@ -6971,7 +7026,7 @@ const OracleChat = {
   
   changePersonality(key) {
     if (ORACLE_PERSONALITIES_V2[key]) {
-      this.personality = key;
+      this.personality = getOraclePersonalityKey(key);
       if (gameState) {
         gameState.oraclePersonality = key;
         saveGame(true);
@@ -7662,9 +7717,32 @@ const OracleChat = {
     this.pendingAction = null; // Limpa ação anterior
     
     return {
-      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Gostaria de falar suas receitas e contas para somarmos e criar sua meta juntos?`,
+      message: `🎯 Vamos criar uma meta financeira, ${name}!<br><br>Você permite que eu leia suas finanças registradas para calcular sua meta automaticamente?`,
       actions: [
-        { text: '🧮 Sim, calcular juntos', action: () => { 
+        { text: '✅ Pode usar minhas finanças', action: () => { 
+            const snapshot = this.getFinanceSnapshot('currentMonth');
+            if (!snapshot.hasData || snapshot.count < 3 || snapshot.income <= 0) {
+              this.pendingAction = { type: 'guided_goal_income' };
+              addBotMessage('Ainda não tenho dados suficientes das suas finanças. Para começar, qual é a sua **renda mensal média**?'); 
+              return;
+            }
+            const balance = snapshot.income - snapshot.expenses;
+            if (balance <= 0) {
+              this.pendingAction = null;
+              addBotMessage(`Analisei seus últimos 30 dias: receitas R$ ${snapshot.income.toLocaleString('pt-BR')}, despesas R$ ${snapshot.expenses.toLocaleString('pt-BR')}.<br><br>Parece que não sobra muito. Quer que eu analise seus gastos para reduzir?`);
+              return;
+            }
+            const suggestedMonthly = Math.floor(balance * 0.5);
+            const oneYearTotal = suggestedMonthly * 12;
+            this.pendingAction = { type: 'guided_goal_confirm', monthly: suggestedMonthly, total: oneYearTotal };
+            addBotMessage(`Li suas finanças dos últimos 30 dias 📊<br><br>` +
+              `• Receitas: <strong>R$ ${snapshot.income.toLocaleString('pt-BR')}</strong><br>` +
+              `• Despesas: <strong>R$ ${snapshot.expenses.toLocaleString('pt-BR')}</strong><br>` +
+              `• Sobra: <strong>R$ ${balance.toLocaleString('pt-BR')}</strong><br><br>` +
+              `Se você guardar <strong>R$ ${suggestedMonthly.toLocaleString('pt-BR')}</strong> por mês (metade da sobra), em 1 ano terá <strong>R$ ${oneYearTotal.toLocaleString('pt-BR')}</strong>.<br><br>` +
+              `Podemos definir essa meta?`);
+        }},
+        { text: '🧮 Prefiro informar manualmente', action: () => { 
             this.pendingAction = { type: 'guided_goal_income' }; 
             addBotMessage('Ótimo! Para começar, qual é a sua **renda mensal média** (salário + extras)?'); 
         }},
@@ -7674,6 +7752,32 @@ const OracleChat = {
         }}
       ]
     };
+  },
+
+  getFinanceSnapshot(range = 'currentMonth') {
+    try {
+      if (!gameState || !Array.isArray(gameState.finances)) {
+        return { hasData: false, income: 0, expenses: 0, count: 0 };
+      }
+      let fromDate = null;
+      if (range === 'currentMonth') {
+        const now = new Date();
+        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else if (typeof range === 'number' && range > 0) {
+        fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - range);
+      }
+      const recent = gameState.finances.filter(f => {
+        if (!f || !f.date) return false;
+        if (!fromDate) return true;
+        return new Date(f.date) >= fromDate;
+      });
+      const income = recent.filter(f => f.type === 'income').reduce((sum, f) => sum + (f.value || 0), 0);
+      const expenses = recent.filter(f => f.type === 'expense').reduce((sum, f) => sum + (f.value || 0), 0);
+      return { hasData: recent.length > 0, income, expenses, count: recent.length };
+    } catch (e) {
+      return { hasData: false, income: 0, expenses: 0, count: 0 };
+    }
   },
   
   analyzeSpending() {
@@ -10204,6 +10308,11 @@ const BibleNotesStore = {
     }).slice(0, 5);
   }
 };
+
+function getOraclePersonalityKey(key) {
+  if (key && ORACLE_PERSONALITIES_V2[key]) return key;
+  return 'assistant';
+}
 
 const BibleAssistant = {
   // -------------------------
@@ -13046,8 +13155,29 @@ function removeThinking() {
   if (thinking) thinking.remove();
 }
 
+function ensureOracleReady() {
+  try {
+    if (!OracleChat || typeof OracleChat.init !== 'function') return false;
+    if (!OracleChat._initialized) {
+      OracleChat.init();
+      OracleChat._initialized = true;
+      console.log('✅ OracleChat.init executado com sucesso');
+    }
+    return true;
+  } catch (err) {
+    console.error('❌ Erro na inicialização do OracleChat:', err);
+    const chatStatus = document.getElementById('oracleStatusText');
+    if (chatStatus) chatStatus.textContent = 'Erro ao inicializar Oráculo (ver console)';
+    return false;
+  }
+}
+
+function safeToggleOracleChat() {
+  if (ensureOracleReady()) OracleChat.toggle();
+}
+
 // Expõe globalmente para compatibilidade com onclick no HTML
-window.toggleChat = () => OracleChat.toggle();
+window.toggleChat = () => safeToggleOracleChat();
 window.toggleZenMode = toggleZenMode;
 window.removeTask = removeTask;
 window.toggleTask = toggleTask;
@@ -13119,7 +13249,7 @@ document.querySelectorAll('.mobile-drawer-item.tab-btn').forEach(btn => {
 
 // Ações do drawer - Ferramentas
 document.getElementById('drawerZenBtn')?.addEventListener('click', () => { closeDrawer(); toggleZenMode(); });
-document.getElementById('drawerChatBtn')?.addEventListener('click', () => { closeDrawer(); OracleChat.toggle(); });
+document.getElementById('drawerChatBtn')?.addEventListener('click', () => { closeDrawer(); safeToggleOracleChat(); });
 document.getElementById('drawerFinanceBtn')?.addEventListener('click', () => {
   closeDrawer();
   const tab = document.querySelector('.tab-btn[data-tab="finance"]');
@@ -13281,18 +13411,13 @@ window.addEventListener('DOMContentLoaded', () => {
   populateFinanceCategorySelect();
   
   // Inicializa o Oráculo (com try/catch para capturar erros em tempo de execução)
-  setTimeout(() => {
-    try {
-      OracleChat.init();
-      console.log('✅ OracleChat.init executado com sucesso'); 
-    } catch (e) {
-      console.error('❌ Erro na inicialização do OracleChat:', e);
-      // Mostra uma mensagem na UI para facilitar debugging
-      const chatStatus = document.getElementById('oracleStatusText');
-      if (chatStatus) chatStatus.textContent = 'Erro ao inicializar Oráculo (ver console)';
-    }
-  }, 500);
-  setTimeout(() => injectBibleTab(), 600); // Injeta a aba Bíblia
+  // Lazy init: só inicializa ao primeiro clique no botão do chat
+  const chatBtn = document.getElementById('chatBtn');
+  if (chatBtn) {
+    chatBtn.addEventListener('click', function handleFirstChatClick(e) {
+      safeToggleOracleChat();
+    }, { once: true });
+  }
   
   // Splash Screen Logic
   const splash = document.getElementById('splashScreen');
@@ -13455,10 +13580,32 @@ window.addEventListener('DOMContentLoaded', () => {
       
       // Forçar redimensionamento dos gráficos ao trocar de aba
       window.dispatchEvent(new Event('resize'));
+
+      // Renderizações sob demanda ao abrir a aba
+      if (tabId === 'finance') {
+        deferTask(() => {
+          renderFinances();
+          renderFinanceChart();
+          renderFinancialGoal();
+          renderFinanceMonthlyChart();
+          renderFinanceGroups();
+          renderBills();
+        }, 120);
+      } else if (tabId === 'dom') {
+        deferTask(() => {
+          renderWorkTab();
+        }, 120);
+      } else if (tabId === 'hero' || tabId === 'quests') {
+        deferTask(() => {
+          if (typeof renderAttributesChart === 'function') renderAttributesChart();
+          if (typeof renderXpChart === 'function') renderXpChart();
+        }, 120);
+      }
     });
   });
 
-  checkSession();
+  // Deferir sessão/sync para evitar travamento no primeiro frame
+  deferTask(() => checkSession(), 1500);
 });
 
 // Evento disparado quando o app é instalado com sucesso
