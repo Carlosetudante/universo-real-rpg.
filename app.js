@@ -894,8 +894,108 @@ function getUsers() {
   return JSON.parse(localStorage.getItem('ur_users') || '{}');
 }
 
-function setUsers(users) {
-  localStorage.setItem('ur_users', JSON.stringify(users));
+function isQuotaExceededError(error) {
+  if (!error) return false;
+  if (error.name === 'QuotaExceededError') return true;
+  if (error.code === 22 || error.code === 1014) return true;
+  if (typeof error.message === 'string' && error.message.toLowerCase().includes('quota')) return true;
+  return false;
+}
+
+function compactXpHistory(xpHistory, maxEntries = 365) {
+  if (!xpHistory || typeof xpHistory !== 'object') return xpHistory;
+  const entries = Object.entries(xpHistory);
+  if (entries.length <= maxEntries) return xpHistory;
+  entries.sort((a, b) => (a[0] > b[0] ? 1 : -1));
+  return Object.fromEntries(entries.slice(-maxEntries));
+}
+
+function buildCompactGameState(state) {
+  if (!state || typeof state !== 'object') return state;
+  const compact = { ...state };
+
+  // Dados muito pesados ou redundantes no backup local
+  delete compact.oracleMemory;
+
+  if (typeof compact.relationshipPhoto === 'string' && compact.relationshipPhoto.startsWith('data:')) {
+    compact.relationshipPhoto = null;
+  }
+  if (typeof compact.zenBackgroundImage === 'string' && compact.zenBackgroundImage.startsWith('data:')) {
+    compact.zenBackgroundImage = null;
+  }
+  if (typeof compact.zenMusic === 'string' && compact.zenMusic.startsWith('data:')) {
+    compact.zenMusic = null;
+  }
+
+  if (Array.isArray(compact.workLog) && compact.workLog.length > 1000) {
+    compact.workLog = compact.workLog.slice(-1000);
+  }
+  if (Array.isArray(compact.taskHistory) && compact.taskHistory.length > 365) {
+    compact.taskHistory = compact.taskHistory.slice(-365);
+  }
+  if (Array.isArray(compact.gratitudeJournal) && compact.gratitudeJournal.length > 365) {
+    compact.gratitudeJournal = compact.gratitudeJournal.slice(0, 365);
+  }
+  if (Array.isArray(compact.finances) && compact.finances.length > 1000) {
+    compact.finances = compact.finances.slice(-1000);
+  }
+  if (Array.isArray(compact.financePending) && compact.financePending.length > 500) {
+    compact.financePending = compact.financePending.slice(-500);
+  }
+  if (Array.isArray(compact.inventory) && compact.inventory.length > 500) {
+    compact.inventory = compact.inventory.slice(-500);
+  }
+  if (Array.isArray(compact.dailyTasks) && compact.dailyTasks.length > 500) {
+    compact.dailyTasks = compact.dailyTasks.slice(-500);
+  }
+  if (Array.isArray(compact.achievements) && compact.achievements.length > 500) {
+    compact.achievements = compact.achievements.slice(-500);
+  }
+  if (Array.isArray(compact.bills) && compact.bills.length > 500) {
+    compact.bills = compact.bills.slice(-500);
+  }
+  if (Array.isArray(compact.expenseGroups) && compact.expenseGroups.length > 200) {
+    compact.expenseGroups = compact.expenseGroups.slice(-200);
+  }
+
+  compact.xpHistory = compactXpHistory(compact.xpHistory, 365);
+  return compact;
+}
+
+function setUsers(users, options = {}) {
+  const { username, allowCompact = true } = options;
+  try {
+    localStorage.setItem('ur_users', JSON.stringify(users));
+    return { ok: true };
+  } catch (error) {
+    if (!isQuotaExceededError(error)) throw error;
+
+    if (username) {
+      try {
+        localStorage.removeItem(`ur_backup_${username}`);
+      } catch (_) {}
+      try {
+        localStorage.setItem('ur_users', JSON.stringify(users));
+        return { ok: true, clearedBackup: true };
+      } catch (errorAfterClear) {
+        if (!isQuotaExceededError(errorAfterClear)) throw errorAfterClear;
+      }
+    }
+
+    if (allowCompact && username && users && users[username]?.character) {
+      const compactUsers = {
+        ...users,
+        [username]: {
+          ...users[username],
+          character: buildCompactGameState(users[username].character)
+        }
+      };
+      localStorage.setItem('ur_users', JSON.stringify(compactUsers));
+      return { ok: true, compacted: true };
+    }
+
+    throw error;
+  }
 }
 
 function saveSession(username) {
@@ -1254,7 +1354,23 @@ async function register() {
     };
     character = normalizeGameState(character);
     users[email] = { password, character, security: { question, answer } };
-    setUsers(users);
+    try {
+      const saveResult = setUsers(users, { username: email });
+      if (saveResult?.clearedBackup) {
+        console.warn('Backup local removido para liberar espaço.');
+      }
+      if (saveResult?.compacted) {
+        console.warn('Backup local compactado por falta de espaço.');
+        showToast('⚠️ Espaço do navegador cheio. Backup local compactado. Considere exportar e limpar dados antigos.');
+      }
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        console.warn('Falha ao salvar backup local por falta de espaço.', e);
+        showToast('⚠️ Sem espaço no navegador. O backup local não pôde ser salvo. Exporte seus dados e limpe o armazenamento.');
+      } else {
+        throw e;
+      }
+    }
     showToast('🎉 Personagem criado com sucesso!', 4000);
     gameState = character;
     isLoggedIn = true;
@@ -1466,7 +1582,27 @@ async function saveGame(arg) {
     } else {
       users[username].character = gameState;
     }
-    setUsers(users);
+    try {
+      const saveResult = setUsers(users, { username });
+      if (saveResult?.clearedBackup) {
+        console.warn('Backup local removido para liberar espaço.');
+      }
+      if (saveResult?.compacted) {
+        console.warn('Backup local compactado por falta de espaço.');
+        if (!silent) {
+          showToast('⚠️ Espaço do navegador cheio. Backup local compactado. Considere exportar e limpar dados antigos.');
+        }
+      }
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        console.warn('Falha ao salvar backup local por falta de espaço.', e);
+        if (!silent) {
+          showToast('⚠️ Sem espaço no navegador. O backup local não pôde ser salvo. Exporte seus dados e limpe o armazenamento.');
+        }
+      } else {
+        throw e;
+      }
+    }
     
     // Backup Automático
     createAutoBackup();
@@ -1497,7 +1633,15 @@ function createAutoBackup() {
       summary: `Nível ${gameState.level} - ${gameState.race}`
     };
     
-    localStorage.setItem(`ur_backup_${username}`, JSON.stringify(backupData));
+    try {
+      localStorage.setItem(`ur_backup_${username}`, JSON.stringify(backupData));
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        console.warn('Sem espaço para backup automático local.');
+        return;
+      }
+      throw e;
+    }
     
     if (elements.restoreBackupBtn) elements.restoreBackupBtn.style.display = 'inline-block';
     console.log('🔄 Backup automático atualizado.');
@@ -1555,7 +1699,15 @@ function handleFileSelect(event) {
       // Condição: É um backup completo (formato { username: { password, character }})
       if (firstValue && firstValue.hasOwnProperty('password') && firstValue.hasOwnProperty('character')) {
         if (confirm(`Restaurar backup completo com ${Object.keys(importedData).length} usuário(s)?\n\n⚠️ ATENÇÃO: Isso substituirá TODOS os dados salvos neste navegador!`)) {
-          setUsers(importedData); // Substitui todos os usuários
+          try {
+            setUsers(importedData, { allowCompact: false }); // Substitui todos os usuários
+          } catch (e) {
+            if (isQuotaExceededError(e)) {
+              showToast('⚠️ Sem espaço no navegador para restaurar o backup completo. Limpe o armazenamento e tente novamente.');
+              return;
+            }
+            throw e;
+          }
           clearSession(); // Limpa a sessão atual
           showToast('✅ Backup completo restaurado! Por favor, faça o login novamente.', 5000);
           // Força um reload para reiniciar o estado do app e mostrar a tela de login
@@ -1665,7 +1817,15 @@ async function resetAccount() {
     let users = getUsers();
     if (users[username]) {
       delete users[username];
-      setUsers(users);
+      try {
+        setUsers(users, { username });
+      } catch (e) {
+        if (isQuotaExceededError(e)) {
+          console.warn('Sem espaço ao salvar remoção local, seguindo com reset.');
+        } else {
+          throw e;
+        }
+      }
     }
     
     localStorage.removeItem(`ur_backup_${username}`);
@@ -6058,6 +6218,9 @@ const VoiceRecognition = {
 const OracleSpeech = {
   synth: window.speechSynthesis,
   voice: null,
+  voices: [],
+  voiceSelectEl: null,
+  voiceKey: 'oracle_voice_name',
   isSpeaking: false,
   enabled: true,
   rate: 1.0,
@@ -6067,6 +6230,26 @@ const OracleSpeech = {
     if (!this.synth) {
       console.warn('Síntese de voz não suportada');
       return false;
+    }
+
+    this.voiceSelectEl = document.getElementById('oracleVoiceSelect');
+    this.voiceRefreshBtn = document.getElementById('oracleVoiceRefreshBtn');
+    if (this.voiceSelectEl) {
+      this.voiceSelectEl.addEventListener('change', () => {
+        const selected = this.voiceSelectEl.value;
+        if (selected === '__auto__') {
+          localStorage.removeItem(this.voiceKey);
+          this.voice = this.pickDefaultVoice(this.voices);
+        } else {
+          localStorage.setItem(this.voiceKey, selected);
+          this.voice = this.voices.find(v => v.name === selected) || this.pickDefaultVoice(this.voices);
+        }
+      });
+    }
+    if (this.voiceRefreshBtn) {
+      this.voiceRefreshBtn.addEventListener('click', () => {
+        this.loadVoices();
+      });
     }
     
     // Carrega vozes disponíveis
@@ -6081,17 +6264,56 @@ const OracleSpeech = {
   },
   
   loadVoices() {
-    const voices = this.synth.getVoices();
-    
+    const voices = this.synth.getVoices() || [];
+    this.voices = voices.slice();
+
+    const storedName = localStorage.getItem(this.voiceKey);
+    const storedVoice = storedName ? voices.find(v => v.name === storedName) : null;
+
     // Tenta encontrar uma voz em português brasileiro
-    this.voice = voices.find(v => v.lang === 'pt-BR') ||
-                 voices.find(v => v.lang.startsWith('pt')) ||
-                 voices.find(v => v.default) ||
-                 voices[0];
-    
+    this.voice = storedVoice ||
+                 this.pickDefaultVoice(voices);
+
+    this.syncVoiceSelect();
+
     if (this.voice) {
       console.log('Voz selecionada:', this.voice.name);
     }
+  },
+
+  pickDefaultVoice(voices) {
+    if (!voices || !voices.length) return null;
+    return voices.find(v => v.lang === 'pt-BR') ||
+           voices.find(v => v.lang && v.lang.startsWith('pt')) ||
+           voices.find(v => v.default) ||
+           voices[0];
+  },
+
+  syncVoiceSelect() {
+    if (!this.voiceSelectEl) return;
+    const select = this.voiceSelectEl;
+    const current = this.voice?.name || '__auto__';
+    const voices = this.voices.slice().sort((a, b) => {
+      const langA = a.lang || '';
+      const langB = b.lang || '';
+      if (langA !== langB) return langA.localeCompare(langB);
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
+    select.innerHTML = '';
+    const autoOpt = document.createElement('option');
+    autoOpt.value = '__auto__';
+    autoOpt.textContent = 'Voz: Automatica';
+    select.appendChild(autoOpt);
+
+    voices.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = `${v.name} (${v.lang || 'n/a'}${v.default ? ' - padrao' : ''})`;
+      select.appendChild(opt);
+    });
+
+    select.value = voices.some(v => v.name === current) ? current : '__auto__';
   },
   
   speak(text, callback) {
@@ -6121,7 +6343,7 @@ const OracleSpeech = {
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.voice = this.voice;
-    utterance.lang = 'pt-BR';
+    utterance.lang = this.voice?.lang || 'pt-BR';
     utterance.rate = this.rate;
     utterance.pitch = this.pitch;
     

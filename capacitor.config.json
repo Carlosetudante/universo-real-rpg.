@@ -1,6 +1,9 @@
-﻿{
-  "appId": "com.universoreal.app",
+{
+  "appId": "com.carlos.universoreal",
   "appName": "Universo Real",
   "webDir": "web",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
 }

@@ -161,13 +161,13 @@ self.addEventListener('notificationclick', event => {
         }
         if (allClients.length === 0) {
           // Se não houver janela aberta, abre a aplicação
-          await clients.openWindow('/');
+          await clients.openWindow('./index.html');
         }
         return;
       }
 
       if (action === 'pay') {
-        const url = '/financeiro.html';
+        const url = './financeiro.html';
         for (const c of allClients) {
           try { c.postMessage({ type: 'OPEN_URL', url }); } catch (e) {}
         }
@@ -181,7 +181,7 @@ self.addEventListener('notificationclick', event => {
       if (allClients.length > 0) {
         try { allClients[0].focus && allClients[0].focus(); } catch (e) {}
       } else {
-        await clients.openWindow('/');
+        await clients.openWindow('./index.html');
       }
     } catch (e) {
       // silencioso

@@ -2739,6 +2739,30 @@ input.success {
   border-color: var(--accent);
 }
 
+.oracle-voice-select {
+  min-width: 170px;
+}
+
+.oracle-voice-refresh {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.oracle-voice-refresh:hover {
+  background: rgb(255 255 255 / 15%);
+  border-color: var(--accent);
+}
+
 .oracle-close-btn {
   width: 32px;
   height: 32px;

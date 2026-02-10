@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#071428">
   
   <!-- Configuração PWA -->
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="logo.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="logo.svg">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./logo.svg">
 
   <!-- Supabase CDN -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -351,10 +351,10 @@
       <small>Todos os registros de ponto e produção</small>
       
       <div class="filters">
-        <select id="filterMonth">
+        <select id="filterMonth" title="Filtrar por mês">
           <option value="">Mês Atual</option>
         </select>
-        <select id="filterType">
+        <select id="filterType" title="Filtrar por tipo de registro">
           <option value="">Todos os Tipos</option>
           <option value="time_tracking">Ponto</option>
           <option value="production">Produção</option>
@@ -399,8 +399,12 @@
     };
 
     // Supabase config
-    const SUPABASE_URL = 'https://tufcnxbveupoqrgdabfg.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
+    const SUPABASE_URL = (window.APP_CONFIG && window.APP_CONFIG.supabaseUrl) ||
+      window.SUPABASE_URL ||
+      'https://tufcnxbveupoqrgdabfg.supabase.co';
+    const SUPABASE_ANON_KEY = (window.APP_CONFIG && window.APP_CONFIG.supabaseAnonKey) ||
+      window.SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR1ZmNueGJ2ZXVwb3FyZ2RhYmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0NzE2NzcsImV4cCI6MjA4NTA0NzY3N30.gYn4KDSBjuzt0yYo8_ha4W3AJnvwP_xSwblmL0wvG_4';
     let supabaseClient = null;
 
     async function init() {
@@ -760,6 +764,6 @@
   </script>
   
   <!-- Timer flutuante -->
-  <script src="workTimer.js"></script>
+  <script src="./workTimer.js"></script>
 </body>
 </html>
