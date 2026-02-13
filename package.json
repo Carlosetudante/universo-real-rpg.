@@ -1,34 +1,36 @@
-{
-  "name": "bible-ingest-tool",
-  "version": "1.0.0",
-  "description": "Ferramenta para extrair texto da Bíblia em PDF e popular oracle_memory no Supabase",
-  "main": "tools/ingest_pdf.js",
-  "scripts": {
-    "ingest": "node tools/ingest_pdf.js"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.0.0",
-    "dotenv": "^16.0.0",
-    "pdf-parse": "^1.1.1",
-    "puppeteer": "^19.11.1"
-  },
-  "devDependencies": {
-    "@capacitor/android": "^8.0.2",
-    "@capacitor/cli": "^8.0.2",
-    "@capacitor/core": "^8.0.2",
-    "stylelint": "^17.1.0",
-    "stylelint-config-standard": "^40.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Carlosetudante/universo-real-rpg..git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Carlosetudante/universo-real-rpg./issues"
-  },
-  "homepage": "https://github.com/Carlosetudante/universo-real-rpg.#readme"
+﻿{
+    "name":  "bible-ingest-tool",
+    "version":  "1.0.0",
+    "description":  "Ferramenta para extrair texto da BÃ­blia em PDF e popular oracle_memory no Supabase",
+    "main":  "tools/ingest_pdf.js",
+    "scripts":  {
+                    "ingest":  "node tools/ingest_pdf.js"
+                },
+    "dependencies":  {
+                         "@supabase/supabase-js":  "^2.0.0",
+                         "dotenv":  "^16.0.0",
+                         "pdf-parse":  "^1.1.1",
+                         "puppeteer":  "^19.11.1"
+                     },
+    "devDependencies":  {
+                            "@capacitor/android":  "^8.0.2",
+                            "@capacitor/cli":  "^8.0.2",
+                            "@capacitor/core":  "^8.0.2",
+                            "stylelint":  "^17.1.0",
+                            "stylelint-config-standard":  "^40.0.0"
+                        },
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/Carlosetudante/universo-real-rpg..git"
+                   },
+    "keywords":  [
+
+                 ],
+    "author":  "",
+    "license":  "GPL-3.0-or-later",
+    "type":  "commonjs",
+    "bugs":  {
+                 "url":  "https://github.com/Carlosetudante/universo-real-rpg./issues"
+             },
+    "homepage":  "https://github.com/Carlosetudante/universo-real-rpg.#readme"
 }

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071428">
+  <title>Bíblia — Anotações</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="logo.png" type="image/png">
+  <link rel="apple-touch-icon" href="logo.png">
+</head>
+<body class="bible-page">
+  <div class="bible-page-header">
+    <a class="bible-page-back" id="bibleBackBtn" href="index.html#home">← Voltar</a>
+    <div class="bible-page-title">
+      <span class="bible-page-icon">✍️</span>
+      <span>Bíblia — Anotações</span>
+    </div>
+    <div class="bible-page-links"></div>
+  </div>
+
+  <main class="bible-page-main">
+    <div class="bible-interface">
+      <div id="bibleNotesError" class="bible-error-box hidden"></div>
+      <div class="bible-header">
+        <div class="bible-header-top">
+          <div class="bible-icon">✍️</div>
+          <div>
+            <h2 class="bible-title">Anotações Bíblicas</h2>
+            <p class="bible-subtitle">Guarde aprendizados, referências e tags.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bible-notes">
+        <div class="bible-notes-header">✍️ Criar anotação</div>
+        <div class="bible-notes-form">
+          <input type="text" id="bibleNoteRef" class="bible-note-input" placeholder="Referência (ex: João 3:16)">
+          <textarea id="bibleNoteContent" class="bible-note-textarea" placeholder="Escreva sua anotação..."></textarea>
+          <input type="text" id="bibleNoteTags" class="bible-note-input" placeholder="Tags (separe por vírgula)">
+          <button class="btn success" id="bibleNoteSaveBtn">Salvar anotação</button>
+        </div>
+        <div class="bible-notes-search">
+          <input type="text" id="bibleNoteSearch" class="bible-note-input" placeholder="Buscar anotação por referência, texto ou #tag..." list="bibleTagsDatalist">
+          <datalist id="bibleTagsDatalist"></datalist>
+        </div>
+        <div id="bibleTagsPanel" class="bible-note-tags-panel"></div>
+        <div id="bibleNotesList" class="bible-notes-list"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="biblia-anotacoes.js"></script>
+</body>
+</html>

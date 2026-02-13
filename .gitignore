@@ -22,3 +22,5 @@ build/
 # Variáveis de ambiente
 .env
 .env.local
+config.local.js
+web/config.local.js

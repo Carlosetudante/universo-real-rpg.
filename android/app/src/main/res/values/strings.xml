@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Universo Real</string>
+    <string name="title_activity_main">Universo Real</string>
+    <string name="package_name">com.universoreal.app</string>
+    <string name="custom_url_scheme">com.universoreal.app</string>
+</resources>
